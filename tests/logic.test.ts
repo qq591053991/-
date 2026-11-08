@@ -107,3 +107,52 @@ describe('坊市与升级', () => {
     for (let i = 0; i < 200; i++) expect(rollRarity(1, 0)).toBeLessThanOrEqual(1);
   });
 });
+
+describe('摄像机与演出', async () => {
+  const { Director, PRESETS, gameplayPose, lerpPose } = await import('../src/game/camera');
+  const { introShots, enrageShots, deathShots } = await import('../src/game/cinematics');
+  const game = gameplayPose(PRESETS[0], 600, 400);
+
+  it('姿态插值取最短角度', () => {
+    const a = { ...game, yaw: 3 };
+    const b = { ...game, yaw: -3 };
+    const mid = lerpPose(a, b, 0.5);
+    expect(Math.abs(Math.abs(mid.yaw) - Math.PI)).toBeLessThan(0.3);
+  });
+
+  it('演出按镜头推进，最后回到战斗视角并结束', () => {
+    const d = new Director();
+    const shots = introShots('modaifu');
+    d.play(shots, { x: 640, y: 200, h: 60 });
+    expect(d.active).toBe(true);
+    expect(d.timeScale).toBe(0);
+    const total = shots.reduce((s, x) => s + x.dur, 0);
+    let t = 0;
+    while (t < total + 0.1) {
+      d.pose(game);
+      d.update(1 / 60);
+      t += 1 / 60;
+    }
+    expect(d.active).toBe(false);
+    expect(d.pose(game)).toEqual(game);
+  });
+
+  it('跳过会直接进入回到战斗的镜头', () => {
+    const d = new Director();
+    const shots = enrageShots('wangchan');
+    d.play(shots, { x: 0, y: 0, h: 0 });
+    d.skip();
+    expect(d.idx).toBe(shots.length - 1);
+    expect(d.timeScale).toBe(1);
+  });
+
+  it('每位首领三段演出都有镜头，伏诛为慢动作', () => {
+    for (const k of ['modaifu', 'wangchan', 'jiyin'] as const) {
+      expect(introShots(k).length).toBeGreaterThan(1);
+      expect(enrageShots(k).length).toBeGreaterThan(1);
+      const ds = deathShots(k);
+      expect(ds[0].timeScale).toBeGreaterThan(0);
+      expect(ds[0].timeScale).toBeLessThan(1);
+    }
+  });
+});

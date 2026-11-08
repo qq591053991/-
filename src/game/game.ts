@@ -10,7 +10,8 @@ import {
   ARENA, DASH_BASE_CD, DASH_IFRAMES, DASH_SPEED, DASH_TIME, H, HURT_IFRAMES, MAX_ENEMIES, PLAYER_BASE_SPEED, W,
 } from './constants';
 import { updateEnemy } from './enemyAI';
-import { render } from './render';
+import { Director, PRESETS } from './camera';
+import { deathShots, enrageShots, introShots, type BossKey } from './cinematics';
 import {
   applyWeaponPurchase, genLevelChoices, genOffers, lingyeSellValue, lingyeUpgradeCost, rerollCostFor,
 } from './shop';
@@ -23,6 +24,16 @@ import { updateWeapons } from './weaponsys';
 
 export interface UIHooks {
   render(): void;
+}
+
+/** 渲染层接口（3D 场景实现），游戏逻辑不直接依赖渲染库。 */
+export interface View {
+  draw(g: Game, realDt: number): void;
+  screenToGround(sx: number, sy: number): { x: number; y: number };
+}
+
+export interface Overlay {
+  draw(g: Game, realDt: number): void;
 }
 
 const BEST_KEY = 'fanren-roguelike-best';
@@ -40,11 +51,17 @@ function newPlayer(): Player {
 
 export class Game {
   state: GameState = 'title';
-  readonly ctx: CanvasRenderingContext2D;
   readonly input: Input;
   readonly audio = new Audio();
   ui: UIHooks = { render: () => {} };
-  dpr = 1;
+  view: View | null = null;
+  hud: Overlay | null = null;
+  /** 首领演出导演（多机位切换） */
+  readonly cine = new Director();
+  /** 当前战斗视角（V 键切换） */
+  camPreset = 0;
+  /** 鼠标指向的地面坐标 */
+  aimWorld = { x: 0, y: 0 };
 
   stats: Stats = baseStats();
   main: MainAttack = defaultMain();
@@ -89,15 +106,15 @@ export class Game {
   private lastT = 0;
 
   constructor(readonly canvas: HTMLCanvasElement) {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D 不可用');
-    this.ctx = ctx;
     this.input = new Input(canvas, W, H);
     try {
       this.bestWave = Number(localStorage.getItem(BEST_KEY) ?? 0) || 0;
     } catch {
       this.bestWave = 0;
     }
+    this.cine.setListener((shot) => {
+      if (shot.shake) this.shake = Math.max(this.shake, shot.shake);
+    });
   }
 
   // ───────────────────────── 派生数值 ─────────────────────────
@@ -177,6 +194,7 @@ export class Game {
     this.trail = [];
     this.boss = null;
     this.bossDeadT = 0;
+    this.cine.stop();
   }
 
   startWave(): void {
@@ -192,8 +210,8 @@ export class Game {
     const stage = STAGES[this.stageIndex()];
     if (def.boss) {
       const bdef = ENEMIES[def.boss];
-      this.addSpawnMarker(bdef, ARENA.x + ARENA.w / 2, ARENA.y + 110, true, 1.6);
-      this.showBanner(`第${this.wave}波 · ${bdef.name}`, `${stage.name} · 首领来袭`, 2.4);
+      // 首领现身时触发开场演出（见 spawnEnemy）
+      this.addSpawnMarker(bdef, ARENA.x + ARENA.w / 2, ARENA.y + 130, true, 0.7);
       this.audio.play('boss');
     } else {
       this.showBanner(`第${this.wave}波`, `${stage.name} · ${stage.subtitle}`, 2);
@@ -384,13 +402,40 @@ export class Game {
   private frame(dt: number): void {
     const inp = this.input;
     if (inp.wasPressed('KeyM')) this.audio.muted = !this.audio.muted;
-    if (inp.wasPressed('Escape', 'KeyP')) this.togglePause();
+    const c = this.cine;
+    const skippable = this.state === 'playing' && c.active && c.idx < c.shots.length - 1;
+    if (skippable && inp.wasPressed('Space', 'Enter', 'Escape', 'Dash')) {
+      c.skip();
+      inp.endFrame(); // 吞掉这次按键，避免同时触发闪避 / 暂停
+    } else if (inp.wasPressed('Escape', 'KeyP')) {
+      this.togglePause();
+    }
+    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 30);
     if (this.state === 'playing') {
       if (inp.wasPressed('KeyF')) this.autoFire = !this.autoFire;
-      this.update(dt);
+      if (inp.wasPressed('KeyV') && !c.active) this.camPreset = (this.camPreset + 1) % PRESETS.length;
+      c.update(dt);
+      if (this.view) this.aimWorld = this.view.screenToGround(inp.mouse.x, inp.mouse.y);
+      const ts = c.active ? c.timeScale : 1;
+      if (ts > 0) this.update(dt * ts);
+    } else {
+      c.update(0);
     }
-    render(this);
+    this.view?.draw(this, dt);
+    this.hud?.draw(this, dt);
     inp.endFrame();
+  }
+
+  /** 播放首领演出：开场 / 狂暴 / 伏诛，各有专属机位脚本。 */
+  playBossCine(e: Enemy, kind: 'intro' | 'enrage' | 'death'): void {
+    const key = (e.def.bossKey ?? 'modaifu') as BossKey;
+    const shots = kind === 'intro' ? introShots(key) : kind === 'enrage' ? enrageShots(key) : deathShots(key);
+    this.cine.play(shots, { x: e.x, y: e.y, h: e.r * 2 });
+  }
+
+  onBossEnrage(e: Enemy): void {
+    this.audio.play('boss');
+    this.playBossCine(e, 'enrage');
   }
 
   private update(dt: number): void {
@@ -399,8 +444,6 @@ export class Game {
       this.banner.t += dt;
       if (this.banner.t > this.banner.dur) this.banner = null;
     }
-    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 30);
-
     this.updatePlayer(dt);
     updateWeapons(this, dt);
     this.updateSpawner(dt);
@@ -444,7 +487,7 @@ export class Game {
       my /= len;
     }
     p.moving = len > 0;
-    p.aim = Math.atan2(inp.mouse.y - p.y, inp.mouse.x - p.x);
+    p.aim = Math.atan2(this.aimWorld.y - p.y, this.aimWorld.x - p.x);
 
     if (p.iframes > 0) p.iframes -= dt;
     if (p.dashCd > 0) p.dashCd -= dt;
@@ -550,7 +593,10 @@ export class Game {
       dead: false, boss, pIdx: 0, pT: 0, pSub: 0, pTimer: 0.8, spin: 0, enraged: false,
     };
     this.enemies.push(e);
-    if (boss) this.boss = e;
+    if (boss) {
+      this.boss = e;
+      this.playBossCine(e, 'intro');
+    }
   }
 
   private separateEnemies(): void {
@@ -639,7 +685,7 @@ export class Game {
       this.boss = null;
       this.bossDeadT = 1.8;
       this.shake = 16;
-      this.showBanner(`${e.def.name} 伏诛`, '敛气收功，拾取战利品', 1.8);
+      this.playBossCine(e, 'death');
       this.audio.play('boom');
     }
   }

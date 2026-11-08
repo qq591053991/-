@@ -12,9 +12,8 @@ interface Pat {
   arms?: number;
 }
 
-const SCRIPTS: Record<string, { normal: Pat[]; enraged: Pat[]; rageText: string }> = {
+const SCRIPTS: Record<string, { normal: Pat[]; enraged: Pat[] }> = {
   modaifu: {
-    rageText: '墨大夫欲行夺舍！',
     normal: [
       { type: 'spread', dur: 1.6, n: 5 },
       { type: 'rest', dur: 0.6 },
@@ -33,7 +32,6 @@ const SCRIPTS: Record<string, { normal: Pat[]; enraged: Pat[]; rageText: string 
     ],
   },
   wangchan: {
-    rageText: '王蝉祭出血灵钻！',
     normal: [
       { type: 'dash', dur: 0, n: 3 },
       { type: 'rest', dur: 0.7 },
@@ -53,7 +51,6 @@ const SCRIPTS: Record<string, { normal: Pat[]; enraged: Pat[]; rageText: string 
     ],
   },
   jiyin: {
-    rageText: '极阴老祖施展玄阴魔功！',
     normal: [
       { type: 'spiral', dur: 4.0, arms: 2 },
       { type: 'rest', dur: 0.6 },
@@ -198,9 +195,7 @@ function updateBoss(g: Game, e: Enemy, dt: number, nx: number, ny: number, d: nu
     e.pSub = 0;
     e.pTimer = 0;
     e.state = 0;
-    g.showBanner(script.rageText, '气息暴涨，攻势更猛', 2);
-    g.audio.play('boss');
-    g.shake = Math.max(g.shake, 10);
+    g.onBossEnrage(e);
   }
   const pats = e.enraged ? script.enraged : script.normal;
   const pat = pats[e.pIdx % pats.length];
