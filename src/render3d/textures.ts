@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TAU, rand } from '../core/math';
 import { STAGES } from '../data/waves';
-import { ARENA, GLYPH_FONT } from '../game/constants';
+import { ARENA } from '../game/constants';
 
 /** 所有贴图都由 Canvas 现画，不需要任何图片素材。字体加载完成后可整体重绘。 */
 interface Entry {
@@ -37,91 +37,6 @@ function paint(e: Entry): void {
 /** 字体加载完成后调用：重绘所有含文字的贴图。 */
 export function repaintAll(): void {
   for (const e of cache.values()) paint(e);
-}
-
-function inkCircle(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, fill: string): void {
-  g.fillStyle = fill;
-  g.beginPath();
-  // 略不规则的笔触边缘
-  const n = 40;
-  for (let i = 0; i <= n; i++) {
-    const a = (i / n) * TAU;
-    const rr = r * (1 + Math.sin(a * 5 + r) * 0.02 + Math.sin(a * 11) * 0.015);
-    g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
-  }
-  g.fill();
-}
-
-/** 敌人 / 玩家的“剪纸棋子”贴图。 */
-export function tokenTexture(glyph: string, color: string, flash = false, ring?: string): THREE.CanvasTexture {
-  return make(`token:${glyph}:${color}:${flash}:${ring ?? ''}`, 128, 128, (g, w) => {
-    const c = w / 2;
-    inkCircle(g, c, c, c - 6, flash ? '#ffffff' : color);
-    if (ring) {
-      g.strokeStyle = ring;
-      g.lineWidth = 6;
-      g.beginPath();
-      g.arc(c, c, c - 9, 0, TAU);
-      g.stroke();
-    }
-    g.globalAlpha = 0.18;
-    inkCircle(g, c - 12, c - 14, c * 0.45, '#ffffff');
-    g.globalAlpha = 1;
-    g.fillStyle = flash ? color : '#f4efe1';
-    g.font = `${Math.round(w * 0.56)}px ${GLYPH_FONT}`;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(glyph, c, c + 4);
-  });
-}
-
-/** 首领立绘：长袍人形剪影 + 胸前字形。 */
-export function bossTexture(glyph: string, color: string, accent: string, flash = false): THREE.CanvasTexture {
-  return make(`boss:${glyph}:${color}:${accent}:${flash}`, 256, 320, (g, w, h) => {
-    const body = flash ? '#ffffff' : color;
-    const cx = w / 2;
-    // 披风 / 长袍
-    g.fillStyle = body;
-    g.beginPath();
-    g.moveTo(cx - 40, 100);
-    g.quadraticCurveTo(cx - 70, 180, cx - 100, h - 14);
-    g.quadraticCurveTo(cx, h - 2, cx + 100, h - 14);
-    g.quadraticCurveTo(cx + 70, 180, cx + 40, 100);
-    g.closePath();
-    g.fill();
-    // 袖子
-    g.beginPath();
-    g.moveTo(cx - 38, 112);
-    g.quadraticCurveTo(cx - 112, 150, cx - 118, 214);
-    g.lineTo(cx - 74, 200);
-    g.closePath();
-    g.moveTo(cx + 38, 112);
-    g.quadraticCurveTo(cx + 112, 150, cx + 118, 214);
-    g.lineTo(cx + 74, 200);
-    g.closePath();
-    g.fill();
-    // 头与发髻
-    inkCircle(g, cx, 70, 34, body);
-    inkCircle(g, cx, 30, 14, body);
-    // 腰带
-    g.fillStyle = accent;
-    g.fillRect(cx - 52, 168, 104, 10);
-    // 胸前字
-    g.fillStyle = flash ? color : '#f4efe1';
-    g.font = `${Math.round(w * 0.36)}px ${GLYPH_FONT}`;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(glyph, cx, 236);
-    // 描边
-    g.strokeStyle = accent;
-    g.lineWidth = 3;
-    g.globalAlpha = 0.7;
-    g.beginPath();
-    g.moveTo(cx - 100, h - 14);
-    g.quadraticCurveTo(cx, h - 2, cx + 100, h - 14);
-    g.stroke();
-    g.globalAlpha = 1;
-  });
 }
 
 export function glowTexture(): THREE.CanvasTexture {
@@ -180,28 +95,6 @@ export function windTexture(): THREE.CanvasTexture {
     g.strokeStyle = 'rgba(220,255,245,0.9)';
     g.lineWidth = 2.5;
     g.stroke();
-  });
-}
-
-export function bladeTexture(): THREE.CanvasTexture {
-  return make('blade', 64, 64, (g, w) => {
-    const c = w / 2;
-    g.fillStyle = '#d9a520';
-    g.strokeStyle = '#6b4e0b';
-    g.lineWidth = 2;
-    g.beginPath();
-    for (let k = 0; k < 4; k++) {
-      const b = (k * TAU) / 4;
-      g.lineTo(c + Math.cos(b) * 30, c + Math.sin(b) * 30);
-      g.lineTo(c + Math.cos(b + 0.45) * 10, c + Math.sin(b + 0.45) * 10);
-    }
-    g.closePath();
-    g.fill();
-    g.stroke();
-    g.fillStyle = '#6b4e0b';
-    g.beginPath();
-    g.arc(c, c, 4, 0, TAU);
-    g.fill();
   });
 }
 

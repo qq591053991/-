@@ -63,7 +63,7 @@ export class Hud {
       ctx.globalAlpha = alpha;
       for (const e of g.enemies) {
         if (e.boss || e.hp >= e.maxHp || e.maxHp <= 20) continue;
-        const s = v.worldToScreen(e.x, e.y, e.r * 2.6);
+        const s = v.worldToScreen(e.x, e.y, e.r * 3.4);
         if (!s.visible) continue;
         const w = e.r * 1.8;
         ctx.fillStyle = 'rgba(0,0,0,0.4)';

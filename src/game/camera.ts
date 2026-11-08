@@ -28,9 +28,9 @@ const deg = (d: number): number => (d * Math.PI) / 180;
 
 /** 玩家可用 V 键切换的战斗视角。 */
 export const PRESETS: CamPreset[] = [
-  { name: '标准斜俯视', pitch: deg(56), dist: 760, fov: 40, follow: 0.55 },
+  { name: '标准斜俯视', pitch: deg(54), dist: 640, fov: 40, follow: 0.65 },
   { name: '高空俯视', pitch: deg(82), dist: 900, fov: 45, follow: 0.15 },
-  { name: '近景追身', pitch: deg(42), dist: 520, fov: 42, follow: 1 },
+  { name: '近景追身', pitch: deg(38), dist: 430, fov: 42, follow: 1 },
 ];
 
 export function gameplayPose(preset: CamPreset, px: number, py: number): CamPose {

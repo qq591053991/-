@@ -156,3 +156,22 @@ describe('摄像机与演出', async () => {
     }
   });
 });
+
+describe('3D 模型', async () => {
+  const { MODEL_IDS, createModel } = await import('../src/render3d/models');
+  it('每种敌人和玩家都有对应模型', () => {
+    for (const id of Object.keys(ENEMIES)) expect(MODEL_IDS).toContain(id);
+    expect(MODEL_IDS).toContain('player');
+  });
+  it('模型可创建并能驱动动画', () => {
+    for (const id of MODEL_IDS) {
+      const m = createModel(id);
+      expect(m.height).toBeGreaterThan(10);
+      expect(m.root.children.length).toBeGreaterThan(0);
+      m.update({ t: 1, dt: 1 / 60, phase: 2, speed: 1, action: 1, lean: 1 });
+      m.setFlash(1);
+      m.setTint('#ff0000');
+      m.setOpacity(0.5);
+    }
+  });
+});

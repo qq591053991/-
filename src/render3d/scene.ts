@@ -10,9 +10,28 @@ import type { Game, View } from '../game/game';
 import type { Enemy, ProjKind } from '../game/types';
 import { orbitRadius } from '../game/weaponsys';
 import {
-  bladeTexture, bossTexture, bugTexture, crossTexture, glowTexture, groundTexture, repaintAll,
-  shadowTexture, swordTexture, telegraphTexture, tokenTexture, windTexture,
+  bugTexture, crossTexture, glowTexture, groundTexture, repaintAll,
+  shadowTexture, swordTexture, telegraphTexture, windTexture,
 } from './textures';
+import { createModel, flyingSwordGeometry, shurikenGeometry, vertexColorMaterial, type Model } from './models';
+
+interface Inst {
+  model: Model;
+  id: string;
+  x: number;
+  y: number;
+  face: number;
+  phase: number;
+  action: number;
+  enraged: boolean;
+}
+
+function lerpAngle(a: number, b: number, t: number): number {
+  let d = (b - a) % TAU;
+  if (d > Math.PI) d -= TAU;
+  if (d < -Math.PI) d += TAU;
+  return a + d * t;
+}
 
 /**
  * 2.5D 渲染：游戏逻辑仍在二维平面 (x, y) 上运行，
@@ -67,11 +86,11 @@ export class Renderer3D implements View {
   private readonly stageGroup = new THREE.Group();
   private ground!: THREE.Mesh;
 
-  private readonly matCache = new Map<string, THREE.SpriteMaterial>();
-  private readonly enemyPool: Pool<THREE.Sprite>;
+  private readonly modelFree = new Map<string, Model[]>();
+  private readonly enemyInst = new Map<Enemy, Inst>();
+  private readonly playerInst: Inst;
+  private readonly showcase: { inst: Inst; x: number; y: number }[] = [];
   private readonly bossAura: THREE.Mesh;
-  private readonly player: THREE.Sprite;
-  private readonly playerSword: THREE.Mesh;
   private readonly shadows: THREE.InstancedMesh;
   private readonly pickups: THREE.InstancedMesh;
   private readonly bulletGlow: THREE.Points;
@@ -106,13 +125,7 @@ export class Renderer3D implements View {
     s.add(sun);
 
     // 角色
-    this.enemyPool = new Pool(s, () => new THREE.Sprite(spriteMat(tokenTexture('匪', '#000'))));
-    this.player = new THREE.Sprite(spriteMat(tokenTexture('韩', PLAYER_COLOR, false, '#f4efe1')));
-    s.add(this.player);
-    const swordGeo = new THREE.BoxGeometry(26, 2, 4);
-    swordGeo.translate(13, 0, 0);
-    this.playerSword = new THREE.Mesh(swordGeo, new THREE.MeshLambertMaterial({ color: '#8fe3d2', emissive: '#2a8c7a', emissiveIntensity: 0.4 }));
-    s.add(this.playerSword);
+    this.playerInst = this.newInst('player', ARENA.x + ARENA.w / 2, ARENA.y + ARENA.h / 2);
 
     const auraGeo = new THREE.RingGeometry(1, 1.12, 48);
     auraGeo.rotateX(-Math.PI / 2);
@@ -147,7 +160,7 @@ export class Renderer3D implements View {
     this.projPools = {
       sword: new Pool(s, flat(swordTexture(), 44, 12)),
       wind: new Pool(s, flat(windTexture(), 30, 30)),
-      blade: new Pool(s, flat(bladeTexture(), 26, 26)),
+      blade: new Pool(s, () => new THREE.Mesh(shurikenGeometry(), vertexColorMaterial('#5a3a00', 0.4))),
       fire: new Pool(s, () => {
         const sp = new THREE.Sprite(spriteMat(glowTexture()));
         sp.material.color.set('#ff7a3a');
@@ -161,8 +174,8 @@ export class Renderer3D implements View {
       }),
     };
     this.orbitPool = new Pool(s, () => {
-      const m = flatMesh(swordTexture(), 34, 10);
-      return m;
+      const mat = vertexColorMaterial('#1e6e4a', 0.35);
+      return new THREE.Mesh(flyingSwordGeometry(), mat);
     });
     this.spawnPool = new Pool(s, () => flatMesh(crossTexture(), 1, 1, '#b03a2e'));
     this.telePool = new Pool(s, () => {
@@ -175,7 +188,11 @@ export class Renderer3D implements View {
       geo.rotateX(-Math.PI / 2);
       return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: '#e8582a', transparent: true, depthWrite: false }));
     });
-    this.trailPool = new Pool(s, () => new THREE.Sprite(spriteMat(tokenTexture('韩', PLAYER_COLOR, false, '#f4efe1'), 0.4)));
+    this.trailPool = new Pool(s, () => {
+      const sp = new THREE.Sprite(spriteMat(glowTexture(), 0.4));
+      sp.material.color.set(PLAYER_COLOR);
+      return sp;
+    });
     this.boltPool = new Pool(s, () => {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 64), 3));
@@ -389,32 +406,74 @@ export class Renderer3D implements View {
       // 标题画面：缓慢环绕竞技场
       const cx = ARENA.x + ARENA.w / 2;
       const cy = ARENA.y + ARENA.h / 2;
-      pose = { x: cx, y: cy, h: 0, yaw: this.time * 0.08, pitch: 0.42, dist: 1250, fov: 42, roll: 0 };
+      pose = { x: cx, y: cy, h: 40, yaw: Math.sin(this.time * 0.15) * 0.25, pitch: 0.3, dist: 760, fov: 42, roll: 0 };
     } else {
       pose = g.cine.pose(gameplayPose(PRESETS[g.camPreset], g.player.x, g.player.y));
     }
     this.applyPose(pose, menu ? 0 : g.shake);
 
     const showWorld = !menu;
-    this.syncEntities(g, showWorld);
+    this.syncShowcase(menu, realDt);
+    this.syncEntities(g, showWorld, realDt);
     this.renderer.render(this.scene, this.camera);
   }
 
-  private enemyMaterial(e: Enemy): THREE.SpriteMaterial {
-    const flash = e.flash > 0;
-    const key = `${e.def.id}:${flash}:${e.enraged}`;
-    let m = this.matCache.get(key);
-    if (!m) {
-      const tex = e.boss
-        ? bossTexture(e.def.glyph, e.enraged ? '#5a0f1e' : e.def.color, e.enraged ? '#e0283c' : '#c9a227', flash)
-        : tokenTexture(e.def.glyph, e.def.color, flash);
-      m = spriteMat(tex, e.def.behavior === 'ghost' ? 0.75 : 1);
-      this.matCache.set(key, m);
-    }
-    return m;
+  // ───────────────────────── 模型实例 ─────────────────────────
+  private newInst(id: string, x: number, y: number): Inst {
+    const free = this.modelFree.get(id);
+    const model = free?.pop() ?? createModel(id);
+    if (!model.root.parent) this.scene.add(model.root);
+    model.root.visible = true;
+    return { model, id, x, y, face: Math.PI / 2, phase: rand(0, TAU), action: 0, enraged: false };
   }
 
-  private syncEntities(g: Game, show: boolean): void {
+  private release(inst: Inst): void {
+    inst.model.root.visible = false;
+    inst.model.setFlash(0);
+    inst.model.setTint(null);
+    let list = this.modelFree.get(inst.id);
+    if (!list) this.modelFree.set(inst.id, (list = []));
+    list.push(inst.model);
+  }
+
+  /** 更新一个模型实例：根据位移推算步伐，朝向平滑转向。 */
+  private drive(inst: Inst, x: number, y: number, face: number | null, dt: number, action: number, lean: number, lift = 0): void {
+    const dx = x - inst.x;
+    const dy = y - inst.y;
+    const moved = Math.hypot(dx, dy);
+    inst.x = x;
+    inst.y = y;
+    const speed = dt > 0 ? Math.min(1, moved / dt / 110) : 0;
+    inst.phase += moved * 0.22;
+    const target = face ?? (moved > 0.2 ? Math.atan2(dy, dx) : inst.face);
+    inst.face = lerpAngle(inst.face, target, Math.min(1, dt * 12));
+    inst.action += (action - inst.action) * Math.min(1, dt * 10);
+    const m = inst.model;
+    m.root.position.set(x, lift, y);
+    m.root.rotation.set(0, -inst.face, 0);
+    m.update({ t: this.time, dt, phase: inst.phase, speed, action: inst.action, lean });
+  }
+
+  private syncShowcase(menu: boolean, dt: number): void {
+    if (menu && !this.showcase.length) {
+      const cx = ARENA.x + ARENA.w / 2;
+      const cy = ARENA.y + ARENA.h / 2;
+      const layout: [string, number, number][] = [
+        ['modaifu', -440, -60],
+        ['player', -300, 120],
+        ['wangchan', 330, -40],
+        ['jiyin', 470, 110],
+      ];
+      for (const [id, ox, oy] of layout) this.showcase.push({ inst: this.newInst(id, cx + ox, cy + oy), x: cx + ox, y: cy + oy });
+    }
+    if (!menu && this.showcase.length) {
+      for (const s of this.showcase) this.release(s.inst);
+      this.showcase.length = 0;
+    }
+    for (const s of this.showcase) this.drive(s.inst, s.x, s.y, Math.PI / 2, dt, 0.3 + Math.sin(this.time * 1.3 + s.x) * 0.3, 0);
+  }
+
+  private syncEntities(g: Game, show: boolean, dt: number): void {
     const t = this.time;
     let sh = 0;
     const addShadow = (x: number, y: number, r: number) => {
@@ -423,46 +482,59 @@ export class Renderer3D implements View {
       this.shadows.setMatrixAt(sh++, this.tmpM);
     };
 
-    // 玩家
+    // 玩家（韩立）
     const p = g.player;
     const pAlive = show && g.state !== 'gameover';
-    this.player.visible = pAlive;
-    this.playerSword.visible = pAlive;
+    const pm = this.playerInst.model;
+    pm.root.visible = pAlive;
     if (pAlive) {
       const blink = p.iframes > 0 && p.dashT <= 0 && Math.floor(g.time * 20) % 2 === 0;
-      this.player.material.opacity = blink ? 0.4 : 1;
-      const size = p.r * 2.4;
-      const bob = p.moving ? Math.abs(Math.sin(g.time * 12)) * 4 : 0;
-      this.player.scale.set(size, size, 1);
-      this.player.position.set(p.x, size / 2 + bob, p.y);
-      this.playerSword.position.set(p.x, 18, p.y);
-      this.playerSword.rotation.set(0, -p.aim, 0);
+      const firing = (g.input.mouseDown || g.autoFire) && g.state === 'playing' && !g.cine.active;
+      this.drive(this.playerInst, p.x, p.y, p.aim, dt, firing ? 1 : 0, p.dashT > 0 ? 1 : 0);
+      pm.setOpacity(blink ? 0.45 : 1);
       addShadow(p.x, p.y, p.r);
     }
 
-    // 敌人
-    this.enemyPool.begin();
+    // 敌人：每个敌人绑定一个模型实例，敌人消失后模型回收
+    const seen = new Set<Enemy>();
     let boss: Enemy | null = null;
     if (show) {
       for (const e of g.enemies) {
-        const sp = this.enemyPool.get();
-        sp.material = this.enemyMaterial(e);
-        if (e.boss) {
-          boss = e;
-          const hgt = e.r * 3.6;
-          sp.scale.set(hgt * 0.8, hgt, 1);
-          sp.position.set(e.x, hgt / 2, e.y);
-        } else {
-          const size = e.r * 2.4;
-          const float = e.def.behavior === 'ghost' ? 14 + Math.sin(t * 3 + e.wobble) * 5 : 0;
-          const hop = e.def.behavior === 'charger' && e.state === 2 ? 6 : 0;
-          sp.scale.set(size, size, 1);
-          sp.position.set(e.x, size / 2 + float + hop, e.y);
+        seen.add(e);
+        let inst = this.enemyInst.get(e);
+        if (!inst) {
+          inst = this.newInst(e.def.id, e.x, e.y);
+          inst.face = Math.atan2(p.y - e.y, p.x - e.x);
+          this.enemyInst.set(e, inst);
+        }
+        if (e.boss) boss = e;
+        const toPlayer = Math.atan2(p.y - e.y, p.x - e.x);
+        const beh = e.def.behavior;
+        const dashing = e.state === 2 && (beh === 'charger' || beh === 'boss');
+        const telegraph = isTelegraphing(e);
+        let face: number | null = null;
+        if (dashing || telegraph) face = Math.atan2(e.dirY, e.dirX);
+        else if (beh === 'ranged' || beh === 'boss') face = toPlayer;
+        let action = 0;
+        if (telegraph) action = 1;
+        else if (beh === 'ranged' && e.def.shoot) action = e.shootCd < 0.35 ? 1 : 0;
+        else if (beh === 'boss') action = e.pTimer > 0 && e.pTimer < 0.2 ? 1 : 0.35;
+        const lift = beh === 'ghost' ? 10 + Math.sin(t * 3 + e.wobble) * 4 : 0;
+        this.drive(inst, e.x, e.y, face, dt, action, dashing ? 1 : 0, lift);
+        inst.model.setFlash(e.flash > 0 ? 1 : 0);
+        if (e.enraged !== inst.enraged) {
+          inst.enraged = e.enraged;
+          inst.model.setTint(e.enraged ? '#6a0010' : null);
         }
         addShadow(e.x, e.y, e.r);
       }
     }
-    this.enemyPool.end();
+    for (const [e, inst] of this.enemyInst) {
+      if (!seen.has(e)) {
+        this.release(inst);
+        this.enemyInst.delete(e);
+      }
+    }
 
     this.bossAura.visible = !!boss;
     if (boss) {
@@ -523,9 +595,9 @@ export class Renderer3D implements View {
       for (let i = 0; i < n; i++) {
         const a = g.orbitAngle + (i * TAU) / n;
         const m = this.orbitPool.get();
-        m.position.set(p.x + Math.cos(a) * rad, 20, p.y + Math.sin(a) * rad);
-        m.rotation.set(0, -(a + Math.PI / 2), 0);
-        (m.material as THREE.MeshBasicMaterial).color.set(fy.tier > 0 ? RARITY_COLORS[fy.tier] : '#ffffff');
+        m.position.set(p.x + Math.cos(a) * rad, 22 + Math.sin(t * 4 + i) * 2, p.y + Math.sin(a) * rad);
+        m.rotation.set(0.5, -(a + Math.PI / 2), 0, 'YXZ');
+        (m.material as THREE.MeshLambertMaterial).color.set(fy.tier > 0 ? RARITY_COLORS[fy.tier] : '#ffffff');
       }
     }
     this.orbitPool.end();
