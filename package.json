@@ -1,0 +1,19 @@
+{
+  "name": "fanren-roguelike",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "《凡人修仙传》同人 Roguelike 斗法小游戏（非商业）",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^6.4.5",
+    "vitest": "^3.2.4"
+  }
+}
