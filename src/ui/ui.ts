@@ -105,6 +105,7 @@ export class UI {
         <div><kbd>鼠标</kbd> 瞄准 · <kbd>左键</kbd> 青元剑芒</div>
         <div><kbd>空格</kbd>/<kbd>右键</kbd> 罗烟步（闪避无敌）</div>
         <div><kbd>F</kbd> 自动施法 · <kbd>Esc</kbd> 暂停 · <kbd>M</kbd> 静音</div>
+        <div><kbd>V</kbd> 切换视角 · <kbd>O</kbd> 水墨描边开关</div>
       </div>
       <p class="muted">${TOTAL_WAVES} 波 · 三大地图 · 三位首领${best ? ` · 最佳记录：第 ${best} 波` : ''}</p>
       <p class="fine">同人作品，仅供学习交流，非商业用途。原著版权归作者忘语及相关权利方所有。</p>

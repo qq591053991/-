@@ -37,6 +37,7 @@ export interface Overlay {
 }
 
 const BEST_KEY = 'fanren-roguelike-best';
+const OUTLINE_KEY = 'fanren-roguelike-outline';
 
 function defaultMain(): MainAttack {
   return { damage: 10, rate: 3.5, projectiles: 1, pierce: 0, speed: 640, life: 0.6 };
@@ -60,6 +61,10 @@ export class Game {
   readonly cine = new Director();
   /** 当前战斗视角（V 键切换） */
   camPreset = 0;
+  /** 水墨描边开关（O 键） */
+  outlineOn = true;
+  /** 屏幕提示（视角 / 描边切换） */
+  toast: { text: string; t: number } | null = null;
   /** 鼠标指向的地面坐标 */
   aimWorld = { x: 0, y: 0 };
 
@@ -109,6 +114,7 @@ export class Game {
     this.input = new Input(canvas, W, H);
     try {
       this.bestWave = Number(localStorage.getItem(BEST_KEY) ?? 0) || 0;
+      this.outlineOn = localStorage.getItem(OUTLINE_KEY) !== '0';
     } catch {
       this.bestWave = 0;
     }
@@ -394,6 +400,10 @@ export class Game {
     this.player.hp = Math.min(this.player.hp, this.stats.maxHp);
   }
 
+  showToast(text: string): void {
+    this.toast = { text, t: 1.6 };
+  }
+
   showBanner(text: string, sub: string, dur: number): void {
     this.banner = { text, sub, t: 0, dur };
   }
@@ -413,13 +423,29 @@ export class Game {
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 30);
     if (this.state === 'playing') {
       if (inp.wasPressed('KeyF')) this.autoFire = !this.autoFire;
-      if (inp.wasPressed('KeyV') && !c.active) this.camPreset = (this.camPreset + 1) % PRESETS.length;
+      if (inp.wasPressed('KeyV') && !c.active) {
+        this.camPreset = (this.camPreset + 1) % PRESETS.length;
+        this.showToast(`视角：${PRESETS[this.camPreset].name}（V 切换）`);
+      }
+      if (inp.wasPressed('KeyO')) {
+        this.outlineOn = !this.outlineOn;
+        this.showToast(`水墨描边：${this.outlineOn ? '开' : '关'}（O 切换）`);
+        try {
+          localStorage.setItem(OUTLINE_KEY, this.outlineOn ? '1' : '0');
+        } catch {
+          /* 忽略 */
+        }
+      }
       c.update(dt);
       if (this.view) this.aimWorld = this.view.screenToGround(inp.mouse.x, inp.mouse.y);
       const ts = c.active ? c.timeScale : 1;
       if (ts > 0) this.update(dt * ts);
     } else {
       c.update(0);
+    }
+    if (this.toast) {
+      this.toast.t -= dt;
+      if (this.toast.t <= 0) this.toast = null;
     }
     this.view?.draw(this, dt);
     this.hud?.draw(this, dt);

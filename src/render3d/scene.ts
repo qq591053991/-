@@ -13,6 +13,7 @@ import {
   bugTexture, crossTexture, glowTexture, groundTexture, repaintAll,
   shadowTexture, swordTexture, telegraphTexture, windTexture,
 } from './textures';
+import { markOutline, OUTLINE_LAYER, OutlineEffect } from './outline';
 import { createModel, flyingSwordGeometry, shurikenGeometry, vertexColorMaterial, type Model } from './models';
 
 interface Inst {
@@ -91,6 +92,7 @@ export class Renderer3D implements View {
   private readonly playerInst: Inst;
   private readonly showcase: { inst: Inst; x: number; y: number }[] = [];
   private readonly bossAura: THREE.Mesh;
+  private readonly outline: OutlineEffect;
   private readonly shadows: THREE.InstancedMesh;
   private readonly pickups: THREE.InstancedMesh;
   private readonly bulletGlow: THREE.Points;
@@ -116,6 +118,7 @@ export class Renderer3D implements View {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(W, H, false);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.outline = new OutlineEffect(this.renderer, W, H);
 
     const s = this.scene;
     s.add(this.stageGroup);
@@ -147,6 +150,7 @@ export class Renderer3D implements View {
       800,
     );
     this.pickups.frustumCulled = false;
+    markOutline(this.pickups);
     s.add(this.pickups);
 
     // 弹幕：两层点精灵（彩色光晕 + 白色内核）
@@ -160,7 +164,11 @@ export class Renderer3D implements View {
     this.projPools = {
       sword: new Pool(s, flat(swordTexture(), 44, 12)),
       wind: new Pool(s, flat(windTexture(), 30, 30)),
-      blade: new Pool(s, () => new THREE.Mesh(shurikenGeometry(), vertexColorMaterial('#5a3a00', 0.4))),
+      blade: new Pool(s, () => {
+        const m = new THREE.Mesh(shurikenGeometry(), vertexColorMaterial('#5a3a00', 0.4));
+        markOutline(m);
+        return m;
+      }),
       fire: new Pool(s, () => {
         const sp = new THREE.Sprite(spriteMat(glowTexture()));
         sp.material.color.set('#ff7a3a');
@@ -175,7 +183,9 @@ export class Renderer3D implements View {
     };
     this.orbitPool = new Pool(s, () => {
       const mat = vertexColorMaterial('#1e6e4a', 0.35);
-      return new THREE.Mesh(flyingSwordGeometry(), mat);
+      const m = new THREE.Mesh(flyingSwordGeometry(), mat);
+      markOutline(m);
+      return m;
     });
     this.spawnPool = new Pool(s, () => flatMesh(crossTexture(), 1, 1, '#b03a2e'));
     this.telePool = new Pool(s, () => {
@@ -280,6 +290,12 @@ export class Renderer3D implements View {
 
     this.addProps(stage);
     this.addMountains(stage);
+
+    // 描边：布景、矮墙、石柱、远山都勾墨线；地面不参与
+    markOutline(grp);
+    outer.layers.disable(OUTLINE_LAYER);
+    this.ground.layers.disable(OUTLINE_LAYER);
+    this.outline.setInk(new THREE.Color(st.ink).multiplyScalar(0.6));
   }
 
   /** 竞技场外的布景：松树、石灯 / 血晶、枯木 / 礁石。 */
@@ -415,13 +431,18 @@ export class Renderer3D implements View {
     const showWorld = !menu;
     this.syncShowcase(menu, realDt);
     this.syncEntities(g, showWorld, realDt);
-    this.renderer.render(this.scene, this.camera);
+    this.outline.enabled = g.outlineOn;
+    this.outline.render(this.scene, this.camera);
   }
 
   // ───────────────────────── 模型实例 ─────────────────────────
   private newInst(id: string, x: number, y: number): Inst {
     const free = this.modelFree.get(id);
-    const model = free?.pop() ?? createModel(id);
+    let model = free?.pop();
+    if (!model) {
+      model = createModel(id);
+      markOutline(model.root);
+    }
     if (!model.root.parent) this.scene.add(model.root);
     model.root.visible = true;
     return { model, id, x, y, face: Math.PI / 2, phase: rand(0, TAU), action: 0, enraged: false };

@@ -1,7 +1,6 @@
 import { RARITY_COLORS } from '../data/rarity';
 import { STAGES, TOTAL_WAVES, WAVES } from '../data/waves';
 import { WEAPONS } from '../data/weapons';
-import { PRESETS } from '../game/camera';
 import { GLYPH_FONT, H, HUD_H, UI_FONT, W } from '../game/constants';
 import type { Game } from '../game/game';
 import type { Renderer3D } from './scene';
@@ -10,8 +9,6 @@ import type { Renderer3D } from './scene';
 export class Hud {
   private readonly ctx: CanvasRenderingContext2D;
   private dpr = 1;
-  private presetToast = 0;
-  private lastPreset = 0;
 
   constructor(private readonly canvas: HTMLCanvasElement, private readonly view: Renderer3D) {
     const ctx = canvas.getContext('2d');
@@ -26,17 +23,12 @@ export class Hud {
     this.canvas.height = H * this.dpr;
   }
 
-  draw(g: Game, realDt: number): void {
+  draw(g: Game, _realDt: number): void {
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     if (g.state === 'title' || g.state === 'select') return;
 
-    if (g.camPreset !== this.lastPreset) {
-      this.lastPreset = g.camPreset;
-      this.presetToast = 1.6;
-    }
-    this.presetToast = Math.max(0, this.presetToast - realDt);
 
     const cine = g.cine;
     const hudAlpha = 1 - cine.letterbox;
@@ -49,7 +41,7 @@ export class Hud {
       ctx.globalAlpha = 1;
     }
     this.drawCinematic(g);
-    if (this.presetToast > 0) this.drawToast(`视角：${PRESETS[g.camPreset].name}（V 切换）`, Math.min(1, this.presetToast * 2));
+    if (g.toast) this.drawToast(g.toast.text, Math.min(1, g.toast.t * 2));
     if (g.state === 'playing' && !cine.active) this.drawCrosshair(g);
   }
 
@@ -175,7 +167,7 @@ export class Hud {
     ctx.fillRect(0, H - 22, W, 22);
     ctx.fillStyle = 'rgba(244,239,225,0.75)';
     ctx.fillText(
-      `WASD 移动 · 左键 青元剑芒 · 空格/右键 罗烟步 · F 自动施法${g.autoFire ? '【开】' : ''} · V 切换视角 · Esc 暂停 · M 静音${g.audio.muted ? '【静】' : ''}`,
+      `WASD 移动 · 左键 青元剑芒 · 空格/右键 罗烟步 · F 自动施法${g.autoFire ? '【开】' : ''} · V 切换视角 · O 描边 · Esc 暂停 · M 静音${g.audio.muted ? '【静】' : ''}`,
       12,
       H - 11,
     );
