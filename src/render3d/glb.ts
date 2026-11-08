@@ -10,12 +10,19 @@ import type { AnimState, Model } from './models';
  * - 模型按 glTF 惯例以 +Z 为正前方；若朝向不对，用 yaw（角度）修正
  * - 自动缩放到该角色的标准高度（或 height 指定），脚底贴地
  * - 若带动画，按名称自动挑选：walk/run（移动）、idle（站立）、attack/cast（施法）
+ * - tint / opacity / emissive 可对同一素材做换色（例如同一只狐狸分别染成灰狼和赤兽）
  */
 
 interface Cfg {
   file: string;
   height?: number;
   yaw?: number;
+  /** 乘到材质颜色上的色调，例如 "#e8707a" */
+  tint?: string;
+  /** 基础不透明度（如阴魂半透明） */
+  opacity?: number;
+  /** 基础自发光颜色 */
+  emissive?: string;
 }
 
 const loaded = new Map<string, { gltf: GLTF; cfg: Cfg }>();
@@ -61,13 +68,26 @@ export function glbModel(id: string, defaultHeight: number): Model | null {
   const scene = skeletonClone(gltf.scene);
 
   // 每个实例独立材质，便于闪白 / 着色
+  const baseOpacity = cfg.opacity ?? 1;
   const mats: { m: THREE.MeshStandardMaterial; base: THREE.Color; baseI: number }[] = [];
+  const bodyParts: THREE.Object3D[] = [];
   scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
+    mesh.frustumCulled = false; // 蒙皮包围盒不随动画更新，避免近景被误裁剪
+    if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) bodyParts.push(mesh);
     const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     const cloned = list.map((m) => {
       const c = m.clone() as THREE.MeshStandardMaterial;
+      if (cfg.tint && c.color) c.color.multiply(new THREE.Color(cfg.tint));
+      if (cfg.emissive && c.emissive) {
+        c.emissive.set(cfg.emissive);
+        c.emissiveIntensity = 1;
+      }
+      if (baseOpacity < 1) {
+        c.transparent = true;
+        c.opacity = baseOpacity;
+      }
       if (c.emissive) mats.push({ m: c, base: c.emissive.clone(), baseI: c.emissiveIntensity ?? 1 });
       return c;
     });
@@ -75,7 +95,12 @@ export function glbModel(id: string, defaultHeight: number): Model | null {
   });
 
   const height = cfg.height ?? defaultHeight;
-  const box = new THREE.Box3().setFromObject(scene);
+  // 只按身体（蒙皮网格）计算高度，避免法杖、武器把角色缩小
+  const box = new THREE.Box3();
+  scene.updateMatrixWorld(true);
+  for (const b of bodyParts) (b as THREE.SkinnedMesh).skeleton.update();
+  if (bodyParts.length) for (const b of bodyParts) box.expandByObject(b);
+  else box.setFromObject(scene);
   const size = box.getSize(new THREE.Vector3());
   const k = size.y > 0 ? height / size.y : 1;
   const inner = new THREE.Group();
@@ -133,7 +158,10 @@ export function glbModel(id: string, defaultHeight: number): Model | null {
     height,
     update(s: AnimState) {
       if (mixer) {
-        play(s.action > 0.6 && attack ? attack : s.speed > 0.15 ? walk : idle);
+        // 移动优先（避免边跑边攻击时双腿不动“滑行”），站定时才播攻击
+        const moving = s.speed > 0.15;
+        play(moving ? walk : s.action > 0.6 && attack ? attack : idle);
+        if (current) current.timeScale = moving ? 0.6 + 0.6 * s.speed : 1;
         mixer.update(s.dt);
       }
       inner.rotation.z = -0.35 * s.lean;
@@ -144,9 +172,10 @@ export function glbModel(id: string, defaultHeight: number): Model | null {
       applyEmissive(0);
     },
     setOpacity(a) {
+      const v = a * baseOpacity;
       for (const e of mats) {
-        e.m.transparent = a < 1;
-        e.m.opacity = a;
+        e.m.transparent = v < 1;
+        e.m.opacity = v;
       }
     },
   };

@@ -165,9 +165,8 @@ export class Renderer3D implements View {
       sword: new Pool(s, flat(swordTexture(), 44, 12)),
       wind: new Pool(s, flat(windTexture(), 30, 30)),
       blade: new Pool(s, () => {
-        const m = new THREE.Mesh(shurikenGeometry(), vertexColorMaterial('#5a3a00', 0.4));
-        markOutline(m);
-        return m;
+        // 小型飞行法宝不描边，避免远景时被墨线盖住颜色
+        return new THREE.Mesh(shurikenGeometry(), vertexColorMaterial('#5a3a00', 0.4));
       }),
       fire: new Pool(s, () => {
         const sp = new THREE.Sprite(spriteMat(glowTexture()));
@@ -183,9 +182,7 @@ export class Renderer3D implements View {
     };
     this.orbitPool = new Pool(s, () => {
       const mat = vertexColorMaterial('#1e6e4a', 0.35);
-      const m = new THREE.Mesh(flyingSwordGeometry(), mat);
-      markOutline(m);
-      return m;
+      return new THREE.Mesh(flyingSwordGeometry(), mat);
     });
     this.spawnPool = new Pool(s, () => flatMesh(crossTexture(), 1, 1, '#b03a2e'));
     this.telePool = new Pool(s, () => {
