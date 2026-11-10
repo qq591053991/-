@@ -266,10 +266,7 @@
     for (const d in room.doors) {
       const cells = room.doors[d].cells, cx = cells[1][0] + 0.5, cz = cells[1][1] + 0.5, ns = d === 'n' || d === 's';
       if (d === 'n') {
-        for (const sx of [-1.5, 1.5]) mesh(postM, cx + sx, (HN + 0.5) / 2, 0.86, 0.26, HN + 0.5, 0.26);
-        mesh(postM, cx, HN + 0.34, 0.86, 3.5, 0.2, 0.22);
-        mesh(roofM, cx, HN + 0.62, 0.8, 4.3, 0.16, 1.5).rotation.x = 0.1;
-        mesh(roofHi, cx, HN + 0.74, 0.74, 4.0, 0.12, 0.26);
+        const ag = Mo.archGate(ti); ag.g.position.set(cx, 0, 0.9); g.add(ag.g); rs.mats.push(...ag.mats); rs.tex.push(...ag.tex); // 青铜环门
       } else {
         const ph = d === 's' ? 0.8 : 1.3;
         if (ns) for (const sx of [-1.5, 1.5]) mesh(postM, cx + sx * 1.0, ph / 2, cz, 0.3, ph, 0.3);
@@ -318,13 +315,45 @@
         glowSprite(x, y, z + 0.1, L.c, 2.4, 0.3);
       }
     }
-    // 远景：云海里的几座小浮岛，岛上有树有灯，天外飞瀑垂落 —— 把"盆景天地"从一方浮台扩成一片
-    const farM = lm({ color: new THREE.Color(Tx.shade(th.base, -0.15)) }), FALL = [0xbfe0ff, 0xd86a78, 0, 0xcfeaff][ti];
+    // 岛缘与远山：全用削面山石堆出来，最后合并成一个网格
+    const scn = new THREE.Group(); g.add(scn);
+    const rockM = new THREE.MeshLambertMaterial({ vertexColors: true }); rs.mats.push(rockM);
+    const sd = (room.gx || 0) * 31 + (room.gy || 0) * 17 + ti * 7;
+    // rk：放一块山石，top 是它顶面的高度
+    const rk = (x, top, z, s, sy, k) => {
+      const geo = Mo.rockGeo((k + sd) % 4, ti), m = new THREE.Mesh(geo, rockM);
+      m.position.set(x, top - geo.userData.h * s * sy, z); m.scale.set(s, s * sy, s * (0.8 + U.hash(k, 3, sd) * 0.4)); m.rotation.y = U.hash(k, 7, sd) * TAU; scn.add(m); return m;
+    };
+    const dz = (d) => (room.doors[d] ? room.doors[d].cells[1] : null), nearDoor = (d, val, axis) => { const c = dz(d); return c && Math.abs(c[axis] + 0.5 - val) < 2.3; };
+    let kk = 0; const rv = (i) => U.hash(kk, i, sd);
+    // 南缘：贴着矮墙外侧的一排矮石，把浮台的直边裹住
+    for (let x = -0.3; x < w + 0.5; x += 1.45) { kk++; if (nearDoor('s', x, 0)) continue; rk(x + rv(1) * 0.5, -0.5 + rv(2) * 0.3, h + 0.55 + rv(3) * 0.35, 0.9 + rv(4) * 0.45, 1.6 + rv(5) * 0.7, kk); }
+    // 东西两缘
+    for (let z = 0.4; z < h; z += 1.55) for (const e of [0, 1]) { kk++; if (nearDoor(e ? 'e' : 'w', z, 1)) continue; rk(e ? w + 0.55 + rv(1) * 0.3 : -0.55 - rv(1) * 0.3, 0.2 + rv(2) * 0.55, z + rv(3) * 0.5, 1.0 + rv(4) * 0.6, 1.7 + rv(5) * 0.7, kk); }
+    // 北面：高出墙头的一道山脊，脊上有树
+    for (let x = -0.9; x < w + 1; x += 1.8) {
+      kk++; if (nearDoor('n', x, 0)) continue;
+      const top = 1.15 + rv(2) * 1.25, rx = x + rv(1) * 0.6, rz = -0.8 - rv(3) * 0.9;
+      rk(rx, top, rz, 1.3 + rv(4) * 0.9, 1.8 + rv(5) * 0.8, kk);
+      if (ti < 2 && rv(6) < 0.42) { const tr = Mo.tree(kk + sd, ti, ti === 1 ? 'round' : rv(7) < 0.3 ? 'bloom' : 'pine', 1.3); tr.g.position.set(rx, top - 0.12, rz); tr.g.rotation.y = rv(8) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); }
+    }
+    // 立轴：庭院与古殿的北墙上各挂两幅山水
+    if (ti === 0 || ti === 3) {
+      const dn = dz('n'), dcx = dn ? dn[0] + 0.5 : w / 2;
+      for (const off of [-3.5, 3.5]) {
+        const sx = dcx + off; if (sx < 1.7 || sx > w - 1.7 || at(Math.floor(sx), 0) !== 1 || room.lights.some((L) => L.sconce && Math.abs(L.x * S - sx) < 0.75)) continue;
+        const sc2 = Mo.scroll(ti, Math.floor(sx) * 7 + sd); sc2.g.position.set(sx, HN - 0.03, 1.035); g.add(sc2.g); rs.mats.push(...sc2.mats); rs.tex.push(...sc2.tex); rs.anims.push(sc2.anim);
+      }
+    }
+    // 远景：云海里的几根石柱，柱顶有树有灯，天外飞瀑垂落 —— 把"盆景天地"从一方浮台扩成一片
+    const FALL = [0xbfe0ff, 0xd86a78, 0, 0xcfeaff][ti];
     [[w * 0.16, -5.5], [w * 0.55, -8.5], [w * 0.9, -5.2], [-5.5, h * 0.42], [w + 5.5, h * 0.62]].forEach(([ix, iz], i) => {
       const hv = (k) => U.hash(i, k, (room.gx || 0) * 5 + (room.gy || 0) * 3 + ti), sc = 2.2 + hv(1) * 1.8;
       const isl = new THREE.Group(); isl.position.set(ix + (hv(3) - 0.5) * 2, -0.7 + hv(2) * 1.7, iz - hv(4) * 2);
-      const cap = new THREE.Mesh(Mo.geo.cyl(0.5, 0.42, 7), farM); cap.scale.set(sc, 0.5, sc * 0.8); cap.position.y = -0.25; isl.add(cap);
-      const body = new THREE.Mesh(Mo.geo.cone(6), rock2); body.scale.set(sc * 0.9, sc * 1.8, sc * 0.72); body.rotation.x = PI; body.position.y = -0.5 - sc * 0.9; isl.add(body);
+      // 一根自云海里拔起的石柱，旁边再靠一根矮的
+      rk(isl.position.x, isl.position.y + 0.04, isl.position.z, sc * 0.82, 3.6, i * 3 + 1);
+      rk(isl.position.x + sc * 0.8, isl.position.y - 0.9 - hv(6) * 1.2, isl.position.z + 0.5, sc * 0.5, 3.4, i * 3 + 2);
+      rk(isl.position.x - sc * 0.7, isl.position.y - 1.8 - hv(7) * 1.5, isl.position.z - 0.4, sc * 0.42, 3.2, i * 3 + 3);
       const put = (kind, v, k, x, z) => {
         const pm = Mo.prop(kind, v, ti); pm.g.scale.setScalar(k); pm.g.position.set(x, 0, z); pm.g.rotation.y = hv(v) * TAU; isl.add(pm.g); rs.mats.push(...pm.mats); if (pm.anim) rs.anims.push(pm.anim);
         const L = G.PROP_LIGHT[kind]; if (L) glowSprite(isl.position.x + x, isl.position.y + L.z * S * k, isl.position.z + z, L.c, 3.2, 0.34);
@@ -338,6 +367,8 @@
       }
       g.add(isl);
     });
+    const mergedScn = mergeStatic(scn);
+    if (mergedScn) { mergedScn.castShadow = false; g.add(mergedScn); rs.geos.push(mergedScn.geometry); rs.mats.push(mergedScn.material); }
     // 岩浆的光
     if (ti === 3) for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) if (at(x, y) === 3 && U.hash(x, y, 9) < 0.3) glowSprite(x + 0.5, 0.25, y + 0.5, 0xff7a28, 2.4, 0.3);
     return rs;
@@ -353,12 +384,12 @@
       if (Array.isArray(m) || m.map || m.transparent || !(m.isMeshLambertMaterial || m.isMeshPhongMaterial) || m.emissive.getHex() !== 0 || m.side === THREE.DoubleSide) return;
       let q = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
       if (m.flatShading) q.computeVertexNormals();
-      const P2 = q.attributes.position, N2 = q.attributes.normal;
+      const P2 = q.attributes.position, N2 = q.attributes.normal, C2 = m.vertexColors ? q.attributes.color : null; // 山石、叶团的颜色烘在顶点上
       nm.getNormalMatrix(o.matrixWorld);
       for (let i = 0; i < P2.count; i++) {
         v.fromBufferAttribute(P2, i).applyMatrix4(o.matrixWorld); pos.push(v.x, v.y, v.z);
         n.fromBufferAttribute(N2, i).applyMatrix3(nm).normalize(); nor.push(n.x, n.y, n.z);
-        colr.push(m.color.r, m.color.g, m.color.b);
+        if (C2) colr.push(m.color.r * C2.getX(i), m.color.g * C2.getY(i), m.color.b * C2.getZ(i)); else colr.push(m.color.r, m.color.g, m.color.b);
       }
       q.dispose(); o.visible = false;
     });

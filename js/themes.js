@@ -69,11 +69,17 @@
 
   function drawFloorTile(c, th, ti, x, y, px, py) {
     const hh = (i) => U.hash(x, y, i), TH = T;
-    if (ti === 0) { // 石板庭院
-      c.fillStyle = (x + y) % 2 ? th.floor : th.floor2; c.fillRect(px, py, T, TH);
-      c.fillStyle = `rgba(255,255,255,${0.02 + hh(1) * 0.05})`; c.fillRect(px + 1, py + 1, T - 2, TH - 2);
-      c.strokeStyle = th.line; c.lineWidth = 1.5; c.strokeRect(px + 0.5, py + 0.5, T - 1, TH - 1);
-      c.fillStyle = 'rgba(255,255,255,0.05)'; c.fillRect(px + 2, py + 2, T - 4, 1.5);
+    if (ti === 0) { // 庭院：手铺的不规则石板 —— 每个格点各自错开一点，石板之间是生苔的缝
+      const J = (ix, iy, k) => (U.hash(ix, iy, 40 + k) - 0.5) * 13;
+      const p = [[px + J(x, y, 0), py + J(x, y, 1)], [px + T + J(x + 1, y, 0), py + J(x + 1, y, 1)], [px + T + J(x + 1, y + 1, 0), py + TH + J(x + 1, y + 1, 1)], [px + J(x, y + 1, 0), py + TH + J(x, y + 1, 1)]];
+      const mx = (p[0][0] + p[1][0] + p[2][0] + p[3][0]) / 4, my = (p[0][1] + p[1][1] + p[2][1] + p[3][1]) / 4;
+      const ins = (k) => p.map(([ax, ay]) => [ax + (mx - ax) * k, ay + (my - ay) * k]);
+      const poly = (q) => { c.beginPath(); q.forEach(([ax, ay], i) => (i ? c.lineTo(ax, ay) : c.moveTo(ax, ay))); c.closePath(); };
+      const tone = hh(1), q = ins(0.05);
+      c.fillStyle = tone < 0.34 ? th.floor : tone < 0.68 ? th.floor2 : shade(th.floor, 0.08); poly(q); c.fill();
+      c.fillStyle = `rgba(255,255,255,${0.02 + hh(11) * 0.06})`; poly(ins(0.12)); c.fill();
+      c.lineWidth = 1.4; c.strokeStyle = 'rgba(255,255,255,0.11)'; c.beginPath(); c.moveTo(q[3][0], q[3][1]); c.lineTo(q[0][0], q[0][1]); c.lineTo(q[1][0], q[1][1]); c.stroke(); // 受光的两条棱
+      c.strokeStyle = 'rgba(0,0,0,0.24)'; c.beginPath(); c.moveTo(q[1][0], q[1][1]); c.lineTo(q[2][0], q[2][1]); c.lineTo(q[3][0], q[3][1]); c.stroke();
       if (hh(2) < 0.22) { c.strokeStyle = 'rgba(10,16,16,0.4)'; c.lineWidth = 1; c.beginPath(); c.moveTo(px + hh(3) * T, py + 3); c.lineTo(px + hh(4) * T, py + TH * 0.5); c.lineTo(px + hh(5) * T, py + TH - 3); c.stroke(); }
       if (hh(6) < 0.3) { c.fillStyle = th.moss; c.globalAlpha = 0.45; ell(c, px + hh(7) * T, py + hh(8) * TH, 8 + hh(9) * 9, 6 + hh(10) * 6); c.globalAlpha = 1; }
     } else if (ti === 1) { // 林地泥土
@@ -179,7 +185,7 @@
     const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 1 : tiles[y * w + x]);
     const cv = document.createElement('canvas'); cv.width = Math.round(w * T * FS); cv.height = Math.round(h * T * FS);
     const c = cv.getContext('2d'); c.scale(FS, FS);
-    c.fillStyle = shade(th.base, -0.4); c.fillRect(0, 0, w * T, h * T);
+    c.fillStyle = ti === 0 ? '#26382f' : shade(th.base, -0.4); c.fillRect(0, 0, w * T, h * T); // 第一章的石缝里是苔
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const t = at(x, y); if (t === 1) continue;
       drawFloorTile(c, th, ti, x, y, x * T, y * T);
