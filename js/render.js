@@ -853,6 +853,29 @@
           c.strokeStyle = `rgba(255,255,255,${k})`; c.lineWidth = q.w * 0.8; c.stroke();
           for (const br of q.br || []) { path(br); c.strokeStyle = `rgba(${q.c},${k * 0.85})`; c.lineWidth = q.w * 0.9; c.stroke(); }
           c.globalCompositeOperation = 'source-over';
+        } else if (q.kind === 'petal') { // 流光花瓣：一枚转着的小瓣，带一点拖光
+          const s = proj(q.x, q.y, q.z), a = Math.min(1, k * 2.5);
+          c.globalCompositeOperation = 'lighter';
+          c.save(); c.translate(s.x, s.y); c.rotate(q.rot);
+          c.fillStyle = `rgba(${q.c},${a * 0.85})`; c.beginPath(); c.ellipse(0, 0, q.size, q.size * 0.42, 0, 0, TAU); c.fill();
+          c.fillStyle = `rgba(255,255,255,${a * 0.7})`; c.beginPath(); c.ellipse(q.size * 0.2, 0, q.size * 0.45, q.size * 0.14, 0, 0, TAU); c.fill();
+          c.restore(); c.globalCompositeOperation = 'source-over';
+        } else if (q.kind === 'ribbon') { // 绸带：绕身盘旋上升，由粗到细
+          const u0 = 1 - k, N = 22, w = q.who;
+          c.globalCompositeOperation = 'lighter';
+          let prev = null;
+          for (let j = 0; j <= N; j++) {
+            const u = j / N, hd = Math.min(1, u0 * 1.5), tt = u * hd, a = q.a0 + tt * q.turns * TAU + u0 * 2.4, rr = q.r * (1 - tt * 0.45);
+            const s = proj(w.x + Math.cos(a) * rr, w.y + Math.sin(a) * rr, 6 + tt * 78);
+            if (prev) {
+              const al = Math.min(1, k * 2) * (0.3 + u * 0.7);
+              c.beginPath(); c.moveTo(prev.x, prev.y); c.lineTo(s.x, s.y);
+              c.strokeStyle = `rgba(${q.c},${al * 0.55})`; c.lineWidth = 2 + u * 6.5; c.stroke();
+              c.strokeStyle = `rgba(255,255,255,${al * u})`; c.lineWidth = 0.6 + u * 1.8; c.stroke();
+            }
+            prev = s;
+          }
+          c.globalCompositeOperation = 'source-over';
         } else if (q.kind === 'thread') { // 剑丝
           const s1 = proj(q.x1, q.y1, 20), s2 = proj(q.x2, q.y2, 20);
           c.globalCompositeOperation = 'lighter';

@@ -7,7 +7,7 @@
   const Game = (G.Game = {
     state: 'menu', meta: null, chapter: 0, floor: null, room: null, player: null,
     projs: [], haz: [], allies: [], pets: [], ghosts: [], barks: [], timers: [],
-    shakeAmt: 0, hurtFlash: 0, flash: 0, fade: 0, slowT: 0, god: false, stats: null, last: 0,
+    shakeAmt: 0, hurtFlash: 0, flash: 0, fade: 0, slowT: 0, god: false, stats: null, last: 0, combo: 0, comboT: 0,
 
     /* ---------------- 存档（仅局外成长） ---------------- */
     loadMeta() {
@@ -52,7 +52,7 @@
       this.player = E.makePlayer({ body: m.body, root: m.root, wit: m.wit, bag: m.bag, luck: m.luck, vial: m.vial });
       this.stats = { kills: 0, dmg: 0, taken: 0, casts: 0, rooms: 0, time: 0, bosses: 0 };
       this.meta.runs++; this.saveMeta();
-      this.timers.length = 0; this.slowT = 0;
+      this.timers.length = 0; this.slowT = 0; this.combo = 0; this.comboT = 0;
       G.UI.hideMenu();
       G.UI.story(G.Story.intro, () => this.enterChapter(0));
     },
@@ -167,7 +167,7 @@
       while (p.xp >= p.xpNeed) {
         p.xp -= p.xpNeed; p.level++; p.realmLv++; p.xpNeed = 26 + p.level * 14; p.pendingLv++;
         p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.08);
-        FX.ring(p.x, p.y, 10, 120, '255,230,150', 0.5, 5); FX.burst(p.x, p.y, 10, 24, { c: '255,230,150', s1: 160, g: -100, vz1: 80, l1: 0.9 });
+        FX.ring(p.x, p.y, 10, 120, '255,230,150', 0.5, 5); FX.petals(p.x, p.y, 8, 16, '255,230,150', { s1: 120, g: -40 }); FX.ribbon(p, '255,230,150', 1.0, 32);
         FX.text(p.x, p.y, 62, '修为精进', '#ffe6a0', 16);
         Au.sfx('levelup');
       }
@@ -329,7 +329,8 @@
         if (!p.fy) { p.fy = 1; p.sp = 100; p.flags.thunder = (p.flags.thunder || 0) + 1; G.UI.skillDirty = true; }
       }
       p.hp = p.maxHp; p.mp = p.maxMp; p.potions = Math.min(G.POTION_MAX, p.potions + 1);
-      FX.ring(p.x, p.y, 10, 300, '255,230,150', 0.8, 8); FX.burst(p.x, p.y, 20, 60, { c: '255,230,150', s1: 300, g: -60, l1: 1.2 });
+      FX.ring(p.x, p.y, 10, 300, '255,230,150', 0.8, 8); FX.petals(p.x, p.y, 16, 50, '255,230,150', { s0: 60, s1: 320, l1: 2.0, g: -20 });
+      for (let i = 0; i < 3; i++) FX.ribbon(p, i === 1 ? '255,255,235' : '255,230,150', 1.6, 30 + i * 12, 2.4, i * 2.1);
     },
 
     daoGain(win) {
@@ -386,7 +387,7 @@
       Au.sfx('ui');
       if (it.kind === 'chest') {
         it.used = true; Au.sfx('pickup');
-        FX.burst(it.x, it.y, 14, 24, { c: '255,220,130', s1: 180, g: -40 });
+        FX.petals(it.x, it.y, 14, 22, '255,220,130', { s0: 40, s1: 200, g: -10 });
         this.openLootChoice(it.elite ? '精英宝匣' : '机缘', '大道五十，天衍四九 —— 择其一', it.elite ? 2 : 1);
       } else if (it.kind === 'shop') {
         if (!it.items) {
@@ -457,6 +458,7 @@
       for (let i = this.ghosts.length - 1; i >= 0; i--) { this.ghosts[i].life -= dt; if (this.ghosts[i].life <= 0) this.ghosts.splice(i, 1); }
       for (let i = this.barks.length - 1; i >= 0; i--) { this.barks[i].life -= dt; if (this.barks[i].life <= 0 || this.barks[i].e.dead) this.barks.splice(i, 1); }
       this.shakeAmt *= Math.max(0, 1 - 9 * raw);
+      if (this.comboT > 0) { this.comboT -= raw; if (this.comboT <= 0) this.combo = 0; }
       if (this.hurtFlash > 0) this.hurtFlash -= raw;
       if (this.flash > 0) this.flash -= raw;
       R.updateCam(raw);

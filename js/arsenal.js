@@ -239,7 +239,7 @@
       Au.sfx('ice');
     } },
     yinyue: { cd: 10, range: 250, act(pt) {
-      FX.ring(pt.x, pt.y, 10, 250, '255,200,235', 0.5, 5); FX.burst(pt.x, pt.y, 20, 20, { c: '255,220,240', s1: 260, l1: 0.6 });
+      FX.ring(pt.x, pt.y, 10, 250, '255,200,235', 0.5, 5); FX.petals(pt.x, pt.y, 14, 34, '255,200,235', { s0: 120, s1: 330, l1: 1.3 }); FX.ribbon(pt, '255,200,235', 1.0, 26, 2.2);
       FX.text(pt.x, pt.y, 50, '迷魂', '#ffd0f0', 15);
       inRange(pt.x, pt.y, 250, (q) => hold(q, 1.6));
       Au.sfx('shield');

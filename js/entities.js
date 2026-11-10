@@ -52,6 +52,18 @@
     wings(life = 0.5) {
       this.parts.push({ kind: 'wings', x: 0, y: 0, z: 0, life, max: life, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
     },
+    // 花瓣：柔性法术（疗伤、迷魂、突破）用的流光花瓣，飘而不炸
+    petals(x, y, z, n, c, o = {}) {
+      for (let i = 0; i < n && this.parts.length < 900; i++) {
+        const a = U.rand(TAU), s = U.rand(o.s0 || 20, o.s1 || 110), life = U.rand(o.l0 || 0.7, o.l1 || 1.5);
+        this.parts.push({ kind: 'petal', x: x + Math.cos(a) * (o.r || 6), y: y + Math.sin(a) * (o.r || 6), z: z + U.rand(0, 20), vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: U.rand(o.vz0 === undefined ? 30 : o.vz0, o.vz1 === undefined ? 120 : o.vz1),
+          g: o.g === undefined ? 60 : o.g, drag: 1.6, life, max: life, size: U.rand(3.5, 6.5), c, rot: U.rand(TAU), spin: U.rand(-5, 5), add: true });
+      }
+    },
+    // 绸带：绕着某个人盘旋上升的一道流光
+    ribbon(who, c, life = 0.9, r = 34, turns = 1.6, a0 = U.rand(TAU)) {
+      this.parts.push({ kind: 'ribbon', who, x: who.x, y: who.y, z: 0, c, r, turns, a0, life, max: life, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
+    },
     // 剑丝：一道转瞬即逝的直线
     thread(x1, y1, x2, y2, c, life = 0.24) {
       if (this.parts.length > 900) return;
@@ -67,6 +79,10 @@
         const p = P[i];
         p.life -= dt;
         if (p.life <= 0) { P[i] = P[P.length - 1]; P.pop(); continue; }
+        if (p.kind === 'petal') { // 花瓣：减速、飘落，落地即止
+          p.x += p.vx * dt; p.y += p.vy * dt; p.z = Math.max(0, p.z + p.vz * dt); p.vz -= p.g * dt; p.rot += p.spin * dt;
+          const k = Math.max(0, 1 - p.drag * dt); p.vx *= k; p.vy *= k; continue;
+        }
         if (p.kind !== 'dot') continue;
         p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz -= p.g * dt;
         if (p.drag) { const k = Math.max(0, 1 - p.drag * dt); p.vx *= k; p.vy *= k; }
@@ -133,7 +149,7 @@
       if (d <= 0.5) { p.inv = 0.2; return false; }
     }
     d = Math.max(1, Math.round(d));
-    p.hp -= d; p.inv = p.invDur; p.flash = 0.18;
+    p.hp -= d; p.inv = p.invDur; p.flash = 0.18; Gm.combo = 0; Gm.comboT = 0;
     Gm.stats.taken += d;
     Gm.shake(7); Gm.hurtFlash = 0.35;
     FX.text(p.x, p.y, 52, '-' + d, '#ff5a5a', 17);
@@ -192,6 +208,7 @@
     d = Math.max(1, Math.round(d));
     e.hp -= d; e.flash = 0.1;
     Gm.stats.dmg += d;
+    Gm.combo = (Gm.comboT > 0 ? Gm.combo : 0) + 1; Gm.comboT = 2.4;
     FX.text(e.x, e.y, e.r * 2 + 14, crit ? d + '!' : d, crit ? '#ffd24a' : o.c || '#ffffff', crit ? 19 : 13);
     if ((o.kx || o.ky) && !e.boss) { const m = e.def.ai === 'tank' || e.def.ai === 'turret' ? 0.2 : 1; e.kx += (o.kx || 0) * m; e.ky += (o.ky || 0) * m; }
     Au.sfx(crit ? 'crit' : 'hit');
@@ -726,7 +743,7 @@
       if (p.potions > 0 && p.hp < p.maxHp) {
         p.potions--; p.potionCd = 0.8;
         const heal = Math.round(p.maxHp * 0.38 * p.potionMul); p.hp = Math.min(p.maxHp, p.hp + heal);
-        FX.text(p.x, p.y, 54, '+' + heal, '#7dffb0', 17); FX.burst(p.x, p.y, 10, 16, { c: '125,255,176', s1: 90, g: -120, vz1: 60, l1: 0.8 });
+        FX.text(p.x, p.y, 54, '+' + heal, '#7dffb0', 17); FX.petals(p.x, p.y, 8, 16, '150,255,190', { s1: 80, g: -30 }); FX.ribbon(p, '125,255,176', 1.0, 30);
         Au.sfx('heal');
       } else { Au.sfx('deny'); p.potionCd = 0.3; }
     }

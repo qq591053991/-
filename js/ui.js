@@ -333,6 +333,15 @@
         this.relicDirty = false;
         $('relics').innerHTML = p.relicList.map((id) => { const r = G.Relics[id]; return `<span class="glyph r${r.rar}" title="${r.name}：${r.desc}">${r.glyph}${p.relics[id] > 1 ? `<small>${p.relics[id]}</small>` : ''}</span>`; }).join('');
       }
+      // 连击数：五连以上才显示，每次增长跳一下
+      const cb = Gm.comboT > 0 && Gm.combo >= 5 ? Gm.combo : 0;
+      if (this.cache.combo !== cb) {
+        const el = $('combo'), grew = cb > (this.cache.combo || 0);
+        this.cache.combo = cb;
+        if (cb) { el.firstChild.textContent = cb; el.className = 'show' + (cb >= 100 ? ' t3' : cb >= 30 ? ' t2' : ''); if (grew && !(this.comboPop > 0)) { this.comboPop = 0.09; el.firstChild.style.animation = 'none'; void el.firstChild.offsetWidth; el.firstChild.style.animation = ''; } }
+        else el.className = '';
+      }
+      if (this.comboPop > 0) this.comboPop -= dt;
       // 首领血条
       const b = this.bossRef;
       if (b) { this.width('boss-fill', U.clamp(b.hp / b.maxHp, 0, 1)); $('boss').classList.toggle('p2', b.phase === 2); }
