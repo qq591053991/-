@@ -15,7 +15,7 @@
   const PAL = (Mo.PAL = [
     // capK：顶面有几成覆着"盖"。苔与枯苔只是零星几片，雪盖得满
     { rock: '#99a2ad', dark: '#353c48', cap: '#4c7650', cap2: '#648f5c', capK: 0.38, trunk: '#4b392e', leaf: '#629c62', leafD: '#214a36', bloom: '#f2ccd8', bloomD: '#b9708f' }, // 青石、苔、松、桃
-    { rock: '#93766a', dark: '#2e1e1c', cap: '#5c5a38', cap2: '#77703f', capK: 0.3, trunk: '#231818', leaf: '#9e3840', leafD: '#431420', bloom: '#d87c6c', bloomD: '#8a2c36' },  // 赭石、枯苔、血枫
+    { rock: '#93766a', dark: '#2e1e1c', cap: '#5c5a38', cap2: '#77703f', capK: 0.3, trunk: '#231818', leaf: '#8c3038', leafD: '#38101a', bloom: '#c87060', bloomD: '#7c2832' },  // 赭石、枯苔、血枫
     { rock: '#6c6a84', dark: '#222030', cap: '#3a3848', cap2: '#48465a', capK: 0.5, trunk: '#1e1c24', leaf: '#4c485a', leafD: '#22202a', bloom: '#9affc0', bloomD: '#2a7a50' },  // 玄石、灰
     { rock: '#9ab2c8', dark: '#3f5678', cap: '#e6f1fa', cap2: '#ffffff', capK: 0.85, trunk: '#3c4a60', leaf: '#d4ecfa', leafD: '#6490b6', bloom: '#eef8ff', bloomD: '#9ccaea' }, // 寒石、雪
   ]);
@@ -84,14 +84,14 @@
     for (let i = 0; i < segs; i++) stick(g, pts[i], pts[i + 1], 0.135 * (1 - i * 0.17), bark);
     for (let i = 0; i < 3; i++) { const ra = h(20 + i) * TAU; stick(g, new V3(Math.cos(ra) * 0.3, -0.03, Math.sin(ra) * 0.3), new V3(0, 0.22, 0), 0.06, bark); } // 露出地面的根
     const pad = (c, s, vr) => { const m = new THREE.Mesh(padGeo(vr, ti, kind), leaf); m.position.copy(c); m.scale.set(s, s * 0.95, s * (0.8 + h(vr + 30) * 0.3)); m.rotation.y = h(vr + 40) * TAU; m.castShadow = true; g.add(m); };
-    const top = pts[segs]; pad(new V3(top.x, top.y - 0.02, top.z), pine ? 0.64 : 0.6, 0);
+    const top = pts[segs]; pad(new V3(top.x, top.y - 0.02, top.z), pine ? 0.64 : 0.5, 0);
     const nB = pine ? 4 : 5;
     for (let j = 0; j < nB; j++) {
       const t = 0.42 + (j / nB) * 0.52, k = Math.min(segs - 1, Math.floor(t * segs)), base = pts[k].clone().lerp(pts[k + 1], t * segs - k);
       const ba = h(50 + j) * TAU + j * 2.4, bl = (pine ? 0.66 : 0.42) * (1.12 - t * 0.5) * (0.8 + h(60 + j) * 0.5);
       const end = new V3(base.x + Math.cos(ba) * bl, base.y + (pine ? 0.05 : 0.26), base.z + Math.sin(ba) * bl);
       stick(g, base, end, 0.045, bark);
-      pad(new V3(end.x, end.y + 0.02, end.z), (pine ? 0.52 : 0.42) * (1.12 - t * 0.38), j + 1);
+      pad(new V3(end.x, end.y + 0.02, end.z), (pine ? 0.52 : 0.36) * (1.12 - t * 0.38), j + 1);
     }
     g.scale.setScalar(scale);
     return { g, mats: [bark, leaf], anim: null };
@@ -171,6 +171,84 @@
     const p = new THREE.Mesh(gg('scrollp', () => new THREE.PlaneGeometry(0.62, 1.2)), m); p.position.set(0, -0.64, 0.02); g.add(p);
     for (const [y, r, l] of [[-0.03, 0.045, 0.78], [-1.25, 0.06, 0.74]]) { const rod = new THREE.Mesh(Mo.geo.cyl(0.5, 0.5, 6), wood); rod.rotation.z = PI / 2; rod.scale.set(r, l, r); rod.position.set(0, y, 0.02); rod.castShadow = true; g.add(rod); }
     return { g, mats: [m, wood], tex: [tex], anim: (t) => { g.rotation.x = Math.sin(t * 1.3 + seed) * 0.035; g.rotation.z = Math.sin(t * 0.9 + seed * 2) * 0.012; } };
+  };
+
+  /* ============================ 建筑构件 ============================
+     瓦顶、立柱、栏杆、角楼、扶壁。所有构件都加进同一个组，由渲染层合并成一个网格。 */
+  const gableGeo = () => gg('gable', () => { // 人字坡屋顶：宽 1（X）、进深 1（Z）、高 1，屋脊沿 X
+    const A = [-0.5, 0, -0.5], B = [0.5, 0, -0.5], C = [0.5, 0, 0.5], Dv = [-0.5, 0, 0.5], E = [-0.5, 1, 0], F = [0.5, 1, 0];
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([Dv, C, F, Dv, F, E, B, A, E, B, E, F, A, Dv, E, C, B, F, A, B, C, A, C, Dv].flat(), 3));
+    g.computeVertexNormals(); return g;
+  });
+  const KIT = [
+    { tile: '#353c4a', ridge: '#566174', wood: '#5a3d2c', stone: '#8f959d', dark: '#5b616b', gold: '#b99a58' },  // 黛瓦、朱木、青石
+    { tile: '#3a2a26', ridge: '#54403a', wood: '#2a1c1a', stone: '#8a7468', dark: '#4a3832', gold: '#b08a60' },
+    { tile: '#2b2934', ridge: '#474456', wood: '#262230', stone: '#5c5a6a', dark: '#3a3846', gold: '#6f9a84' },  // 玄瓦、黑铁、城砖
+    { tile: '#8ea4b4', ridge: '#d9b45a', wood: '#d2e0ec', stone: '#b4c6d6', dark: '#7e96ae', gold: '#d9b45a' },  // 寒玉、鎏金
+  ];
+  Mo.archKit = function (root, ti) {
+    const K = KIT[ti], mats = {}, M = (n) => mats[n] || (mats[n] = lam(K[n]));
+    const box = Mo.geo.box(), gable = gableGeo(), pyr = Mo.geo.cone(4), con = Mo.geo.cone(6);
+    const col8 = gg('col8', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 8)), hex = gg('hex6', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 6));
+    const put = (geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; root.add(m); return m; };
+    const kit = {
+      mats: () => Object.values(mats),
+      /* 沿 X 的瓦顶：屋脊从 x0 到 x0+len，z 是屋脊所在，y 是檐口高度 */
+      roofX(x0, len, z, y, depth, hgt) {
+        const cx = x0 + len / 2, sl = Math.hypot(hgt, depth / 2), ang = Math.atan2(hgt, depth / 2);
+        put(gable, M('tile'), cx, y, z, len + 0.5, hgt, depth);
+        put(box, M('ridge'), cx, y + hgt + 0.03, z, len + 0.34, 0.11, 0.17);                       // 正脊
+        put(box, M('ridge'), cx, y + 0.035, z + depth / 2 - 0.03, len + 0.5, 0.07, 0.1);           // 檐口
+        for (let x = x0 - 0.1; x <= x0 + len + 0.1; x += 0.34) put(box, M('ridge'), x, y + hgt / 2 + 0.035, z + depth / 4, 0.07, 0.05, sl).rotation.x = ang; // 瓦垄
+        for (const e of [-1, 1]) {
+          put(con, M('ridge'), cx + e * (len / 2 + 0.24), y + hgt + 0.16, z, 0.16, 0.42, 0.16).rotation.z = -e * 0.75;                 // 鸱吻
+          const t = put(con, M('ridge'), cx + e * (len / 2 + 0.3), y + 0.1, z + depth / 2 - 0.02, 0.12, 0.34, 0.12); t.rotation.z = -e * 1.0; t.rotation.x = 0.5; // 翘起的檐角
+        }
+      },
+      /* 沿 Z 的墙帽：院墙上的一道小瓦顶 */
+      roofZ(x, z0, len, y, width, hgt) {
+        const m = put(gable, M('tile'), x, y, z0 + len / 2, len + 0.16, hgt, width); m.rotation.y = PI / 2;
+        put(box, M('ridge'), x, y + hgt + 0.02, z0 + len / 2, 0.13, 0.09, len + 0.1);
+        for (let z = z0 + 0.17; z < z0 + len; z += 0.5) for (const e of [-1, 1]) { const r = put(box, M('ridge'), x + e * width / 4, y + hgt / 2 + 0.03, z, Math.hypot(hgt, width / 2), 0.04, 0.06); r.rotation.z = -e * Math.atan2(hgt, width / 2); }
+      },
+      /* 立柱：柱础、柱身、柱头；rings 为真时柱身上箍两道金环 */
+      column(x, z, hgt, r, rings) {
+        put(hex, M('stone'), x, 0.06, z, r * 3.2, 0.12, r * 3.2);
+        put(col8, M('wood'), x, hgt / 2, z, r * 2, hgt, r * 2);
+        put(box, M(rings ? 'gold' : 'dark'), x, hgt - 0.05, z, r * 3.2, 0.1, r * 3.2);
+        if (rings) for (const k of [0.16, 0.8]) put(col8, M('gold'), x, hgt * k, z, r * 2.35, 0.06, r * 2.35);
+      },
+      /* 栏杆：沿 X（alongX）或沿 Z 的一排望柱与寻杖 */
+      balustrade(a0, len, c, alongX) {
+        const P = (u, y, v, su, sy, sv) => (alongX ? put(box, M('stone'), u, y, v, su, sy, sv) : put(box, M('stone'), v, y, u, sv, sy, su));
+        P(a0 + len / 2, 0.07, c, len, 0.14, 0.34);
+        P(a0 + len / 2, 0.34, c, len, 0.05, 0.08); P(a0 + len / 2, 0.47, c, len, 0.06, 0.1);
+        for (let u = a0; u <= a0 + len + 0.01; u += 1) {
+          const px = alongX ? u : c, pz = alongX ? c : u;
+          put(box, M('dark'), px, 0.31, pz, 0.16, 0.5, 0.16);
+          put(pyr, M('gold'), px, 0.63, pz, 0.26, 0.14, 0.26).rotation.y = PI / 4;
+          if (u + 0.5 < a0 + len) { const mx = alongX ? u + 0.5 : c, mz = alongX ? c : u + 0.5; put(box, M('stone'), mx, 0.24, mz, alongX ? 0.07 : 0.07, 0.2, 0.07); }
+        }
+      },
+      /* 角楼：一截方墩，上面是四角攒尖顶 */
+      tower(x, z, hgt, size) {
+        put(box, M('stone'), x, hgt / 2, z, size, hgt, size);
+        put(box, M('dark'), x, hgt + 0.04, z, size * 1.12, 0.08, size * 1.12);
+        put(pyr, M('tile'), x, hgt + 0.08 + size * 0.3, z, size * 1.75, size * 0.6, size * 1.75).rotation.y = PI / 4;
+        put(Mo.geo.sph(8), M('gold'), x, hgt + 0.1 + size * 0.62, z, size * 0.2, size * 0.2, size * 0.2);
+        for (let i = 0; i < 4; i++) { const a = PI / 4 + (i * PI) / 2, t = put(con, M('ridge'), x + Math.cos(a) * size * 0.84, hgt + 0.16, z + Math.sin(a) * size * 0.84, size * 0.13, size * 0.3, size * 0.13); t.rotation.set(Math.sin(a) * 0.95, 0, -Math.cos(a) * 0.95); }
+      },
+      /* 扶壁：城墙外一道上窄下宽的斜撑 */
+      buttress(x, z, hgt) {
+        put(box, M('stone'), x, hgt * 0.36, z + 0.12, 0.5, hgt * 0.72, 0.34);
+        put(box, M('dark'), x, hgt * 0.16, z + 0.3, 0.6, hgt * 0.32, 0.3);
+        put(box, M('dark'), x, hgt * 0.74, z + 0.1, 0.56, 0.06, 0.4);
+      },
+      /* 垛口：城墙顶上的一排齿 */
+      crenel(x, y, z, sx, sz) { put(box, M('stone'), x, y + 0.17, z, sx, 0.34, sz); },
+    };
+    return kit;
   };
 
   /* 接管几样场景物件：山石、松（偶尔是一树桃花）、血枫、石灯 */

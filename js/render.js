@@ -238,6 +238,23 @@
       c.position.set(1 + U.hash(i, h, 1) * (w - 2), -2 - s * 0.9, 1 + U.hash(i, w, 2) * (h - 2)); c.scale.set(s, s * 2, s); c.rotation.x = PI; g.add(c);
     }
 
+    // 山石：岛缘、假山、山岩墙与远山全用它堆出来，最后合并成一个网格
+    const scn = new THREE.Group(); g.add(scn);
+    const rockM = new THREE.MeshLambertMaterial({ vertexColors: true }); rs.mats.push(rockM);
+    const sd = (room.gx || 0) * 31 + (room.gy || 0) * 17 + ti * 7;
+    // rk：放一块山石，top 是它顶面的高度
+    const rk = (x, top, z, s, sy, k) => {
+      const geo = Mo.rockGeo((k + sd) % 4, ti), m = new THREE.Mesh(geo, rockM);
+      m.position.set(x, top - geo.userData.h * s * sy, z); m.scale.set(s, s * sy, s * (0.8 + U.hash(k, 3, sd) * 0.4)); m.rotation.y = U.hash(k, 7, sd) * TAU; scn.add(m); return m;
+    };
+    // 建筑构件（瓦顶、立柱、栏杆、角楼）：同样合并成一个网格
+    const archRoot = new THREE.Group(); g.add(archRoot);
+    const kit = Mo.archKit(archRoot, ti);
+    // 一格山岩：顶面在 top，根部埋进地里
+    let wk = 700;
+    const crag = (x, z, top) => { wk++; const sc = 0.6 + U.hash(wk, 11, sd) * 0.17; rk(x + (U.hash(wk, 13, sd) - 0.5) * 0.2, top, z + (U.hash(wk, 15, sd) - 0.5) * 0.2, sc, (top + 0.3) / (1.1 * sc), wk); return wk; };
+    const treeOn = (x, top, z, kind, sc) => { const tr = Mo.tree(wk + sd, ti, kind, sc); tr.g.position.set(x, top - 0.1, z); tr.g.rotation.y = U.hash(wk, 17, sd) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); };
+
     // 墙体
     const topC = Tx.wallTop(ti), plainC = Tx.wallPlain(ti);
     const topT = (rx, ry) => { const t = tx(ctex(topC, true)); t.repeat.set(rx, ry); return t; };
@@ -249,16 +266,51 @@
       return m;
     };
     const runs = (len, isWall, cb) => { let s = -1; for (let i = 0; i <= len; i++) { const on = i < len && isWall(i); if (on && s < 0) s = i; if (!on && s >= 0) { cb(s, i - s); s = -1; } } };
+    // 北墙。七玄门：粉墙 + 黛瓦坡顶 + 檐柱；血色禁地：一道山岩；燕翎堡：城墙 + 垛口 + 扶壁；虚天殿：玉墙 + 金脊 + 玉柱
     runs(w, (x) => at(x, 0) === 1, (x0, len) => {
+      if (ti === 1) { for (let i = 0; i < len; i++) { const top = 1.25 + U.hash(x0 + i, 1, sd) * 0.75; crag(x0 + i + 0.5, 0.5, top); if (U.hash(x0 + i, 2, sd) < 0.2) treeOn(x0 + i + 0.5, top, 0.4, 'round', 1.15); } return; }
       wallBox(x0, 0, len, 1, HN, tx(ctex(Tx.wallFace(ti, x0, len, room.gx * 7 + room.gy))));
+      if (ti === 0) {
+        kit.roofX(x0, len, 0.5, HN, 1.9, 0.52);
+        for (let cx = x0 + 0.45; cx <= x0 + len - 0.4; cx += 3.05) kit.column(cx, 1.12, HN, 0.1);
+        return;
+      }
       const cap = lm({ map: topT(len, 1.3) });
       mesh(cap, x0 + len / 2, HN + 0.07, 0.56, len + 0.12, 0.14, 1.3);
-      if (ti === 0 || ti === 3) mesh(lm({ color: new THREE.Color(ti === 0 ? th.topHi : '#d9b45a') }), x0 + len / 2, HN + 0.2, 0.5, len + 0.04, 0.12, 0.22);
-      if (ti === 2) for (let i = 0; i < len; i++) mesh(cap, x0 + i + 0.5, HN + 0.3, 0.6, 0.5, 0.34, 1.05); // 垛口
+      if (ti === 3) {
+        mesh(lm({ color: new THREE.Color('#d9b45a') }), x0 + len / 2, HN + 0.2, 0.5, len + 0.04, 0.12, 0.22);
+        for (let cx = x0 + 0.5; cx <= x0 + len - 0.4; cx += 3.05) kit.column(cx, 1.16, HN + 0.14, 0.14, true);
+      } else {
+        for (let i = 0; i < len; i++) kit.crenel(x0 + i + 0.5, HN + 0.14, 0.6, 0.5, 1.05);
+        for (let cx = x0 + 1.5; cx <= x0 + len - 1; cx += 4) kit.buttress(cx, 1.0, HN);
+      }
     });
-    runs(w, (x) => at(x, h - 1) === 1, (x0, len) => wallBox(x0, h - 1, len, 1, HL));
-    for (const x of [0, w - 1]) runs(h - 2, (i) => at(x, i + 1) === 1, (y0, len) => wallBox(x, y0 + 1, 1, len, HS));
-    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) if (at(x, y) === 1) wallBox(x, y, 1, 1, HI);
+    // 南墙。七玄门、虚天殿：石栏杆（看得见栏外的山石）；血色禁地：矮岩；燕翎堡：矮城墙
+    runs(w, (x) => at(x, h - 1) === 1, (x0, len) => {
+      if (ti === 1) { for (let i = 0; i < len; i++) crag(x0 + i + 0.5, h - 0.5, 0.28 + U.hash(x0 + i, 3, sd) * 0.22); }
+      else if (ti === 2) { wallBox(x0, h - 1, len, 1, HL); for (let i = 0; i < len; i += 2) kit.crenel(x0 + i + 0.5, HL - 0.14, h - 0.5, 0.6, 0.7); }
+      else kit.balustrade(x0, len, h - 0.5, true);
+    });
+    // 东西两墙。七玄门：院墙 + 小瓦顶；血色禁地：山岩；燕翎堡：城墙 + 垛口；虚天殿：玉墙 + 金脊
+    for (const x of [0, w - 1]) runs(h - 2, (i) => at(x, i + 1) === 1, (y0, len) => {
+      if (ti === 1) { for (let i = 0; i < len; i++) crag(x + 0.5, y0 + 1 + i + 0.5, 0.72 + U.hash(x, y0 + i, sd) * 0.42); return; }
+      wallBox(x, y0 + 1, 1, len, HS);
+      if (ti === 0) kit.roofZ(x + 0.5, y0 + 1, len, HS, 1.34, 0.3);
+      else if (ti === 2) { for (let i = 0; i < len; i += 2) kit.crenel(x + 0.5, HS - 0.02, y0 + 1 + i + 0.5, 1.04, 0.56); }
+      else mesh(lm({ color: new THREE.Color('#d9b45a') }), x + 0.5, HS + 0.05, y0 + 1 + len / 2, 0.24, 0.1, len + 0.04);
+    });
+    // 四角：角楼（山岩墙没有角楼）
+    if (ti !== 1) for (const [cxx, czz, north] of [[0.5, 0.5, 1], [w - 0.5, 0.5, 1], [0.5, h - 0.5, 0], [w - 0.5, h - 0.5, 0]]) {
+      if (at(Math.floor(cxx), Math.floor(czz)) !== 1) continue;
+      if (north) kit.tower(cxx, czz, HN + 0.42, 1.1); else kit.tower(cxx, czz, ti === 2 ? 0.95 : 0.72, ti === 2 ? 1.04 : 0.62);
+    }
+    // 屋内的隔墙。七玄门：假山，山上偶尔立一棵小松；血色禁地：山岩；虚天殿：覆雪的冰岩；燕翎堡：残垣
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      if (at(x, y) !== 1) continue;
+      if (ti === 2) { wallBox(x, y, 1, 1, HI); if (U.hash(x, y, sd) < 0.6) rk(x + 0.5, HI + 0.2 + U.hash(x, y, sd + 1) * 0.16, y + 0.5, 0.42, 0.6, x * 31 + y); continue; }
+      const top = 0.72 + U.hash(x, y, sd + 2) * 0.45; crag(x + 0.5, y + 0.5, top);
+      if (ti === 0 && U.hash(x, y, sd + 3) < 0.22) treeOn(x + 0.5, top, y + 0.5, 'pine', 0.55);
+    }
 
     // 门：门楼 / 门柱 / 禁制 / 通路微光
     const postM = lm({ color: new THREE.Color(ti === 3 ? '#d9b45a' : ti === 1 ? '#3a2622' : ti === 2 ? '#3c3a47' : '#5a3d2c') });
@@ -315,15 +367,7 @@
         glowSprite(x, y, z + 0.1, L.c, 2.4, 0.3);
       }
     }
-    // 岛缘与远山：全用削面山石堆出来，最后合并成一个网格
-    const scn = new THREE.Group(); g.add(scn);
-    const rockM = new THREE.MeshLambertMaterial({ vertexColors: true }); rs.mats.push(rockM);
-    const sd = (room.gx || 0) * 31 + (room.gy || 0) * 17 + ti * 7;
-    // rk：放一块山石，top 是它顶面的高度
-    const rk = (x, top, z, s, sy, k) => {
-      const geo = Mo.rockGeo((k + sd) % 4, ti), m = new THREE.Mesh(geo, rockM);
-      m.position.set(x, top - geo.userData.h * s * sy, z); m.scale.set(s, s * sy, s * (0.8 + U.hash(k, 3, sd) * 0.4)); m.rotation.y = U.hash(k, 7, sd) * TAU; scn.add(m); return m;
-    };
+    // 岛缘与远山
     const dz = (d) => (room.doors[d] ? room.doors[d].cells[1] : null), nearDoor = (d, val, axis) => { const c = dz(d); return c && Math.abs(c[axis] + 0.5 - val) < 2.3; };
     let kk = 0; const rv = (i) => U.hash(kk, i, sd);
     // 南缘：贴着矮墙外侧的一排矮石，把浮台的直边裹住
@@ -368,7 +412,10 @@
       g.add(isl);
     });
     const mergedScn = mergeStatic(scn);
-    if (mergedScn) { mergedScn.castShadow = false; g.add(mergedScn); rs.geos.push(mergedScn.geometry); rs.mats.push(mergedScn.material); }
+    if (mergedScn) { g.add(mergedScn); rs.geos.push(mergedScn.geometry); rs.mats.push(mergedScn.material); }
+    rs.mats.push(...kit.mats());
+    const mergedArch = mergeStatic(archRoot);
+    if (mergedArch) { g.add(mergedArch); rs.geos.push(mergedArch.geometry); rs.mats.push(mergedArch.material); }
     // 岩浆的光
     if (ti === 3) for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) if (at(x, y) === 3 && U.hash(x, y, 9) < 0.3) glowSprite(x + 0.5, 0.25, y + 0.5, 0xff7a28, 2.4, 0.3);
     return rs;

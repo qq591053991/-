@@ -91,6 +91,16 @@
       c.globalAlpha = 1;
       if (hh(30) < 0.25) { c.fillStyle = th.moss; c.globalAlpha = 0.5; ell(c, px + hh(31) * T, py + hh(32) * TH, 10, 7); c.globalAlpha = 1; }
       if (hh(33) < 0.3) { c.fillStyle = '#6c5a52'; circ(c, px + hh(34) * T, py + hh(35) * TH, 1.5 + hh(36) * 2); }
+      if (hh(40) < 0.17) { // 半埋在土里的踏石
+        const sx = px + 10 + hh(41) * 28, sy = py + 10 + hh(42) * 28, rr = 9 + hh(43) * 8, n = 6;
+        const pth = (k, dy) => { c.beginPath(); for (let i = 0; i < n; i++) { const a = (i / n) * TAU + hh(44) * 3, r2 = rr * k * (0.75 + U.hash(x * 7 + i, y, 45) * 0.45); if (i) c.lineTo(sx + Math.cos(a) * r2, sy + dy + Math.sin(a) * r2 * 0.8); else c.moveTo(sx + Math.cos(a) * r2, sy + dy + Math.sin(a) * r2 * 0.8); } c.closePath(); };
+        c.fillStyle = 'rgba(20,10,10,0.45)'; pth(1.12, 2); c.fill(); c.fillStyle = '#857064'; pth(1, 0); c.fill(); c.fillStyle = 'rgba(255,235,220,0.14)'; pth(0.6, -1.5); c.fill();
+      }
+      if (hh(50) < 0.1) { // 露出地面的树根
+        const x0 = px + hh(51) * T, y0 = py + hh(52) * TH, x1 = px + hh(53) * T, y1 = py + hh(54) * TH;
+        c.lineCap = 'round'; c.strokeStyle = 'rgba(24,12,12,0.7)'; c.lineWidth = 4.5; c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(px + T / 2 + (hh(55) - 0.5) * 30, py + TH / 2, x1, y1); c.stroke();
+        c.strokeStyle = 'rgba(120,90,76,0.6)'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x0, y0 - 1); c.quadraticCurveTo(px + T / 2 + (hh(55) - 0.5) * 30, py + TH / 2 - 1, x1, y1 - 1); c.stroke();
+      }
     } else if (ti === 2) { // 城砖
       c.fillStyle = th.floor2; c.fillRect(px, py, T, TH);
       const off = y % 2 ? T / 2 : 0;
@@ -102,6 +112,8 @@
       }
       if (hh(6) < 0.1) { c.fillStyle = 'rgba(8,6,10,0.22)'; ell(c, px + hh(7) * T, py + hh(8) * TH, 20, 14); }
       if (hh(9) < 0.07) { c.fillStyle = th.grass; c.globalAlpha = 0.5; ell(c, px + hh(10) * T, py + hh(11) * TH, 11, 7); c.globalAlpha = 1; }
+      if (hh(20) < 0.045) { const bx = px + (hh(21) < 0.5 ? 2 : T / 2 + 1), by = py + (hh(22) < 0.5 ? 2 : TH / 2 + 2); c.fillStyle = 'rgba(8,6,12,0.42)'; c.fillRect(bx, by, T / 2 - 3, TH / 2 - 4); c.fillStyle = 'rgba(255,255,255,0.06)'; c.fillRect(bx, by + TH / 2 - 6, T / 2 - 3, 2); } // 缺了一块砖
+      if (hh(23) < 0.08) { c.strokeStyle = 'rgba(6,4,10,0.55)'; c.lineWidth = 1.3; c.beginPath(); c.moveTo(px + hh(24) * T, py); c.lineTo(px + T * 0.3 + hh(25) * T * 0.4, py + TH * 0.4); c.lineTo(px + hh(26) * T, py + TH * 0.7); c.lineTo(px + T * 0.4 + hh(27) * 14, py + TH); c.stroke(); } // 贯穿的裂纹
     } else { // 玉砖 + 金线
       c.fillStyle = ((x >> 1) + (y >> 1)) % 2 ? th.floor : th.floor2; c.fillRect(px, py, T, TH);
       c.fillStyle = `rgba(255,255,255,${0.04 + hh(1) * 0.08})`; c.fillRect(px, py, T, TH);
@@ -111,6 +123,11 @@
       if (y % 2 === 0) { c.beginPath(); c.moveTo(px, py + 0.5); c.lineTo(px + T, py + 0.5); c.stroke(); }
       if (hh(2) < 0.3) { c.strokeStyle = 'rgba(255,255,255,0.35)'; c.lineWidth = 1; c.beginPath(); c.moveTo(px + hh(3) * T, py + hh(4) * TH); c.lineTo(px + hh(5) * T, py + hh(6) * TH); c.stroke(); }
       if (hh(7) < 0.12) { c.fillStyle = 'rgba(232,248,255,0.4)'; ell(c, px + hh(8) * T, py + hh(9) * TH, 12, 8); }
+      if (x % 2 === 0 && y % 2 === 0) { // 金线交点处的菱花
+        c.fillStyle = 'rgba(226,192,104,0.85)'; c.beginPath(); c.moveTo(px, py - 6); c.lineTo(px + 6, py); c.lineTo(px, py + 6); c.lineTo(px - 6, py); c.closePath(); c.fill();
+        c.fillStyle = 'rgba(56,82,106,0.9)'; c.beginPath(); c.moveTo(px, py - 2.6); c.lineTo(px + 2.6, py); c.lineTo(px, py + 2.6); c.lineTo(px - 2.6, py); c.closePath(); c.fill();
+        c.strokeStyle = 'rgba(226,192,104,0.5)'; c.lineWidth = 1; for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { c.beginPath(); c.arc(px + dx * 7, py + dy * 7, 3, 0, TAU); c.stroke(); }
+      }
     }
   }
 
