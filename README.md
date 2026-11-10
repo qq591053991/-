@@ -62,6 +62,12 @@ python3 -m http.server 8000
 - **法宝**（二十余种被动）：金雷竹、噬金虫卵、乾蓝冰焰、大衍诀、金蚨子母刃、万年灵乳……
 - **轮回感悟**：陨落后获得道心，可在「洞府」永久强化根基（存于浏览器本地）。
 
+## 美术哲学
+
+**凡尘为底，灵光点睛。** 凡尘低饱和、不发光，饱和度与亮度只发给灵力；我方的光是清的（白芯、细、直），敌方的光是浊的（暗芯、团、钩），危险区域只用朱砂；韩立是画面里最朴素的修士；每间房是云海里的一方盆景；四章由暖入寒。
+
+完整的法则、造型规范、色板，以及当前版本与它的差距，见 [`docs/art-philosophy.md`](docs/art-philosophy.md)。新增任何模型、特效、界面之前先看它。
+
 ## 渲染是怎么做的
 
 游戏逻辑仍然跑在一张二维平面上（坐标单位是像素，48 像素一格），渲染层把它搬进三维：逻辑坐标 `(x, y)` 加离地高度 `z` → 三维坐标 `(x/48, z/48, y/48)`，一格等于一个单位。
@@ -101,7 +107,8 @@ assets/tripo/      Tripo 生成的角色（精简后的 GLB）
 assets/tripo.js   上述模型的 base64 打包，游戏实际加载的是它
 assets/models.js  社区角色模型数据（精简后的 GLB，base64 内嵌）
 assets/CREDITS.md 素材与第三方代码致谢
-tools/            import-tripo.mjs：导入 Tripo 模型；tripo-prompts.md：各角色提示词；build-models.mjs：生成 KayKit 模型数据
+docs/             art-philosophy.md：美术哲学（所有美术决定的依据）；art-palette.png：色板
+tools/            import-tripo.mjs：导入 Tripo 模型；tripo-prompts.md：各角色提示词；build-models.mjs：生成 KayKit 模型数据；make-palette.py：生成色板图
 js/core.js        命名空间、工具函数、键鼠与触屏输入
 js/audio.js       WebAudio 合成的音效与五声音阶配乐
 js/data.js        剧情文案、章节、敌人、神通、法宝、感悟、灵药、奇遇
