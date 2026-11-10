@@ -24,7 +24,7 @@
       floor: '#5b6a61', floor2: '#52625a', line: 'rgba(14,22,22,0.42)', moss: '#3f6c47', grass: '#6aa860',
       face: '#cfc8b4', faceDark: '#a59d8a', base: '#67635c', top: '#343a47', topHi: '#505a6b',
       water: '#25546a', waterHi: '#86c8d4',
-      bg: 0x060a17, fog: [0x0a1126, 26, 70], hemi: [0xa9c0ff, 0x2a3348, 0.95], sun: [0xd4e0ff, 1.0],
+      bg: 0x050b17, fog: [0x09152a, 26, 70], hemi: [0x9fc6f2, 0x24384a, 0.95], sun: [0xd4e0ff, 1.0],
       lamp: '255,214,150', lampHex: 0xffd696,
       props: ['rock', 'bamboo', 'lantern', 'pine', 'bamboo', 'rock'], mote: 'firefly',
     },
@@ -108,6 +108,71 @@
     }
   }
 
+  /* 青铜地台：嵌在地面里的大圆盘 —— 外圈云雷纹，内圈如意云头，中心一章一字（虚天殿是北斗星图）。
+     凡俗的地面上，只有这一块是"上古留下的东西"：战斗、机缘、首领都发生在它上面。 */
+  const MED = [
+    // 地台是凡尘之物：低饱和、不发光；纹线一律用旧金 / 骨色，绝不用朱砂（朱砂只属于预警）
+    { base: '#2b4643', hi: '#3f6660', line: '#c9ab62', glyph: '玄' }, // 青铜绿锈 + 旧金
+    { base: '#3a2b26', hi: '#54403a', line: '#c2a276', glyph: '禁' }, // 沁色古石 + 骨色
+    { base: '#2a2836', hi: '#3c394c', line: '#8fb89e', glyph: '燕' }, // 玄铁 + 褪了色的铜绿
+    { base: '#38526a', hi: '#587890', line: '#ecca72', glyph: '' },   // 寒玉 + 鎏金星图
+  ];
+  function medallion(c, cx, cy, R, ti, worn, seed) {
+    const M = MED[ti], th = G.Themes[ti], hh = (i) => U.hash(seed, i, 11);
+    c.save(); c.translate(cx, cy);
+    c.fillStyle = 'rgba(0,0,0,0.38)'; circ(c, 0, 0, R * 1.045); // 陷进地面的一圈暗影
+    const g = c.createRadialGradient(0, 0, R * 0.1, 0, 0, R); g.addColorStop(0, M.hi); g.addColorStop(1, M.base);
+    c.fillStyle = g; circ(c, 0, 0, R);
+    c.strokeStyle = M.line; c.lineCap = 'round'; c.lineJoin = 'round';
+    const ring = (r, w, a) => { c.globalAlpha = a; c.lineWidth = w; c.beginPath(); c.arc(0, 0, r, 0, TAU); c.stroke(); };
+    ring(R * 0.972, R * 0.036, 0.9); ring(R * 0.765, 1.7, 0.8); ring(R * 0.735, 1, 0.5); ring(R * 0.455, 1.7, 0.8); ring(R * 0.425, 1, 0.5);
+    // 外圈：云雷纹
+    const n1 = Math.max(12, Math.round(R / 10) * 2), q1 = Math.min(R * 0.075, (Math.PI * R * 0.86) / n1 - 2.5);
+    c.lineWidth = 1.5; c.globalAlpha = 0.78;
+    for (let i = 0; i < n1; i++) {
+      c.save(); c.rotate((i / n1) * TAU); c.translate(0, -R * 0.862); if (i % 2) c.scale(-1, 1);
+      c.beginPath(); c.moveTo(-q1, q1); c.lineTo(-q1, -q1); c.lineTo(q1, -q1); c.lineTo(q1, q1 * 0.55); c.lineTo(-q1 * 0.45, q1 * 0.55); c.lineTo(-q1 * 0.45, -q1 * 0.4); c.lineTo(q1 * 0.4, -q1 * 0.4); c.lineTo(q1 * 0.4, q1 * 0.08); c.stroke();
+      c.restore();
+    }
+    // 内圈：如意云头
+    c.lineWidth = 1.8; c.globalAlpha = 0.72;
+    for (let i = 0; i < 8; i++) {
+      c.save(); c.rotate((i / 8) * TAU + TAU / 16); c.translate(0, -R * 0.6);
+      const q = R * 0.082;
+      c.beginPath(); c.arc(-q * 0.9, 0, q * 0.62, Math.PI * 0.1, Math.PI * 1.75); c.stroke();
+      c.beginPath(); c.arc(q * 0.9, 0, q * 0.62, Math.PI * 1.25, Math.PI * 2.9); c.stroke();
+      c.beginPath(); c.arc(0, -q * 0.5, q * 0.8, Math.PI * 1.05, Math.PI * 1.95); c.stroke();
+      c.beginPath(); c.moveTo(-q * 1.9, q * 0.95); c.quadraticCurveTo(0, q * 0.35, q * 1.9, q * 0.95); c.stroke();
+      c.restore();
+    }
+    // 中心
+    c.globalAlpha = 0.86; c.fillStyle = M.line;
+    if (M.glyph) { c.font = `${Math.round(R * 0.5)}px "STKaiti","KaiTi","Kaiti SC","楷体","Noto Serif CJK SC","Songti SC",serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(M.glyph, 0, R * 0.03); }
+    else { // 北斗七星 + 周天星点
+      const D = [[0.27, 0.0], [0.21, 0.15], [0.07, 0.1], [0.03, -0.06], [-0.08, -0.15], [-0.2, -0.2], [-0.31, -0.12]];
+      c.lineWidth = 1.3; c.beginPath();
+      [0, 1, 2, 3, 0].forEach((k, i) => (i ? c.lineTo(D[k][0] * R, D[k][1] * R) : c.moveTo(D[k][0] * R, D[k][1] * R)));
+      c.moveTo(D[3][0] * R, D[3][1] * R); for (let k = 4; k < 7; k++) c.lineTo(D[k][0] * R, D[k][1] * R);
+      c.stroke();
+      for (const d of D) circ(c, d[0] * R, d[1] * R, Math.max(2.2, R * 0.024));
+      for (let i = 0; i < 28; i++) { const a = (i / 28) * TAU; circ(c, Math.cos(a) * R * 0.36, Math.sin(a) * R * 0.36, i % 7 ? 1.3 : 2.2); }
+    }
+    // 岁月：苔痕、缺损、裂纹
+    c.beginPath(); c.arc(0, 0, R, 0, TAU); c.clip();
+    const nW = Math.round((worn ? 18 : 9) * (R / 110));
+    for (let i = 0; i < nW; i++) { const a = hh(i) * TAU, r = Math.sqrt(hh(i + 40)) * R; c.fillStyle = i % 3 ? th.floor : th.moss; c.globalAlpha = worn ? 0.6 : 0.36; ell(c, Math.cos(a) * r, Math.sin(a) * r, 7 + hh(i + 80) * R * 0.15, 5 + hh(i + 120) * R * 0.09); }
+    c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 1.2; c.globalAlpha = 0.8;
+    for (let i = 0; i < (worn ? 4 : 2); i++) {
+      let a = hh(i + 200) * TAU, r = R; c.beginPath(); c.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      for (let k = 0; k < 4; k++) { a += (hh(i * 9 + k + 210) - 0.5) * 0.5; r -= R * (0.12 + hh(i * 9 + k + 250) * 0.14); c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+      c.stroke();
+    }
+    c.restore();
+  }
+  // 各类房间的地台大小（格）；寻常险地只有三成有，而且残破
+  const MED_R = { boss: 4.4, elite: 3.2, start: 2.8, treasure: 2.5, shop: 2.5, garden: 2.5, event: 2.5 };
+  const LITTER = [['#f0c8d6', '#e8a8c0', '#f8e4ea'], ['#6a2a2a', '#8a3a30', '#4a2420'], ['#1c1a22', '#3a2a2a', '#5a3a20'], ['#eaf6ff', '#cfe6f6', '#ffffff']]; // 落英 / 枯叶 / 余烬 / 霜花
+
   Tx.floor = function (room) {
     const ti = room.theme, th = G.Themes[ti], FS = Tx.FS;
     const w = room.w, h = room.h, tiles = room.tiles;
@@ -119,6 +184,19 @@
       const t = at(x, y); if (t === 1) continue;
       drawFloorTile(c, th, ti, x, y, x * T, y * T);
     }
+    // 青铜地台
+    const seed = (room.gx || 0) * 7 + (room.gy || 0) * 13 + ti * 31;
+    let mr = MED_R[room.type] || (U.hash(seed, 3, 9) < 0.34 ? 2.6 : 0);
+    if (mr) { mr = Math.min(mr, Math.min(w, h) / 2 - 1.6); medallion(c, (w / 2) * T, (h / 2) * T, mr * T, ti, !MED_R[room.type], seed); }
+    // 散落物：成簇的落英 / 枯叶 / 余烬 / 霜花，让地面不那么"干净"
+    const nL = Math.round(w * h * (ti === 2 ? 0.5 : 0.9)), LC = LITTER[ti];
+    for (let i = 0; i < nL; i++) {
+      const k = (i / 7) | 0, lx = U.hash(k, 3, seed) * w * T + (U.hash(i, 7, seed) - 0.5) * 76, ly = U.hash(k, 5, seed) * h * T + (U.hash(i, 9, seed) - 0.5) * 54;
+      const t = at(Math.floor(lx / T), Math.floor(ly / T)); if (t !== 0 && t !== 2) continue;
+      c.save(); c.translate(lx, ly); c.rotate(U.hash(i, 11, seed) * TAU); c.globalAlpha = 0.45 + U.hash(i, 13, seed) * 0.4; c.fillStyle = LC[i % 3];
+      c.beginPath(); c.ellipse(0, 0, ti === 1 ? 4.6 : 3, ti === 1 ? 2.2 : 1.7, 0, 0, TAU); c.fill(); c.restore();
+    }
+    c.globalAlpha = 1;
     // 水面 / 岩浆 / 深渊（圆角）
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       if (at(x, y) !== 3) continue;
@@ -154,6 +232,7 @@
       const t = at(x, y); if (t === 1) continue;
       const px = x * T, py = y * T;
       if (t === 4) { c.fillStyle = 'rgba(255,235,190,0.10)'; c.fillRect(px, py, T, T); }
+      if (ti < 2 && at(x, y - 1) === 1 && U.hash(x, y, 91) < 0.55) { c.fillStyle = th.moss; c.globalAlpha = 0.5; ell(c, px + U.hash(x, y, 92) * T, py + 5, 14 + U.hash(x, y, 93) * 12, 6 + U.hash(x, y, 94) * 5); c.globalAlpha = 1; } // 墙根的苔
       if (at(x, y - 1) === 1) { const g = c.createLinearGradient(0, py, 0, py + 22); g.addColorStop(0, 'rgba(0,0,0,0.45)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(px, py, T, 22); }
       if (at(x - 1, y) === 1) { const g = c.createLinearGradient(px, 0, px + 14, 0); g.addColorStop(0, 'rgba(0,0,0,0.3)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(px, py, 14, T); }
       if (at(x + 1, y) === 1) { const g = c.createLinearGradient(px + T, 0, px + T - 14, 0); g.addColorStop(0, 'rgba(0,0,0,0.3)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(px + T - 14, py, 14, T); }

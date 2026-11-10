@@ -19,6 +19,15 @@
 stylized chibi game character, low-poly, hand-painted flat colors, Chinese xianxia style, full body, A-pose, arms slightly away from the body, no base,
 ```
 
+## 饰物规则（接在角色描述后面，按身份选一条）
+
+衣料素净、饰物精致，饰物只出现在头、颈、腰三处（详见美术哲学的"衣料素，饰物精"）。
+
+- 凡人 / 散修：`plain cloth clothes, no metal ornaments, cloth hair ribbon`
+- 宗门弟子：`plain robe with one colored trim, a single small silver hair clasp`
+- 长老 / 首领：`plain silk robe with one colored trim, ornate silver filigree hair crown, silver necklace with turquoise and coral beads, tassels at the waist`
+- 魔道：`plain black robe, black iron and bone ornaments with hooks and spikes at head and waist`
+
 ## 人形角色
 
 | 键名 | 角色 | 角色描述（接在通用前缀后面） |

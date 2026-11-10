@@ -318,6 +318,26 @@
         glowSprite(x, y, z + 0.1, L.c, 2.4, 0.3);
       }
     }
+    // 远景：云海里的几座小浮岛，岛上有树有灯，天外飞瀑垂落 —— 把"盆景天地"从一方浮台扩成一片
+    const farM = lm({ color: new THREE.Color(Tx.shade(th.base, -0.15)) }), FALL = [0xbfe0ff, 0xd86a78, 0, 0xcfeaff][ti];
+    [[w * 0.16, -5.5], [w * 0.55, -8.5], [w * 0.9, -5.2], [-5.5, h * 0.42], [w + 5.5, h * 0.62]].forEach(([ix, iz], i) => {
+      const hv = (k) => U.hash(i, k, (room.gx || 0) * 5 + (room.gy || 0) * 3 + ti), sc = 2.2 + hv(1) * 1.8;
+      const isl = new THREE.Group(); isl.position.set(ix + (hv(3) - 0.5) * 2, -0.7 + hv(2) * 1.7, iz - hv(4) * 2);
+      const cap = new THREE.Mesh(Mo.geo.cyl(0.5, 0.42, 7), farM); cap.scale.set(sc, 0.5, sc * 0.8); cap.position.y = -0.25; isl.add(cap);
+      const body = new THREE.Mesh(Mo.geo.cone(6), rock2); body.scale.set(sc * 0.9, sc * 1.8, sc * 0.72); body.rotation.x = PI; body.position.y = -0.5 - sc * 0.9; isl.add(body);
+      const put = (kind, v, k, x, z) => {
+        const pm = Mo.prop(kind, v, ti); pm.g.scale.setScalar(k); pm.g.position.set(x, 0, z); pm.g.rotation.y = hv(v) * TAU; isl.add(pm.g); rs.mats.push(...pm.mats); if (pm.anim) rs.anims.push(pm.anim);
+        const L = G.PROP_LIGHT[kind]; if (L) glowSprite(isl.position.x + x, isl.position.y + L.z * S * k, isl.position.z + z, L.c, 3.2, 0.34);
+      };
+      put(th.props[(i * 2 + 3) % th.props.length], i + 11, 1.5, -sc * 0.12, 0);
+      if (i % 2 === 0) put(th.props[(i + 2) % th.props.length], i + 23, 1.1, sc * 0.24, sc * 0.1);
+      if (FALL && i !== 1) { // 飞瀑
+        const wm = new THREE.MeshBasicMaterial({ color: FALL, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
+        const wf = new THREE.Mesh(new THREE.PlaneGeometry(0.34 + hv(5) * 0.3, 11), wm); wf.position.set(sc * 0.36, -5.7, sc * 0.3); isl.add(wf);
+        rs.geos.push(wf.geometry); rs.mats.push(wm); rs.anims.push((t) => { wm.opacity = 0.26 + Math.sin(t * 6 + i * 2) * 0.05 + Math.sin(t * 13.7 + i) * 0.03; });
+      }
+      g.add(isl);
+    });
     // 岩浆的光
     if (ti === 3) for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) if (at(x, y) === 3 && U.hash(x, y, 9) < 0.3) glowSprite(x + 0.5, 0.25, y + 0.5, 0xff7a28, 2.4, 0.3);
     return rs;
@@ -433,6 +453,10 @@
     const kind = th.mote, w = room.w, h = room.h;
     for (const m of motes) {
       let c, a = 0.6, size = 0.12;
+      if (kind === 'firefly' && m.ph < 2.3) { // 落英：花瓣是凡尘之物，不发光
+        m.y -= 0.0015 * m.v; m.x += Math.sin(t * 0.7 + m.ph * 3) * 0.0007; if (m.y < 0) { m.y = 1; m.x = Math.random(); m.z = Math.random(); }
+        dusts.push(m.x * (w + 4) - 2, 0.15 + m.y * 3.2, m.z * (h + 4) - 2, rgb('240,200,214'), 0.85, 0.075); continue;
+      }
       if (kind === 'firefly') { m.x += Math.sin(t * 0.5 * m.v + m.ph) * 0.0006; m.z += Math.cos(t * 0.4 * m.v + m.ph * 2) * 0.0006; a = 0.4 + Math.sin(t * 2 * m.v + m.ph) * 0.4; c = rgb('200,255,140'); size = 0.16; }
       else if (kind === 'spore') { m.y += 0.0018 * m.v; if (m.y > 1) { m.y = 0; m.x = Math.random(); m.z = Math.random(); } c = rgb('255,90,100'); a = 0.5; }
       else if (kind === 'ash') { m.y -= 0.0022 * m.v; if (m.y < 0) { m.y = 1; m.x = Math.random(); m.z = Math.random(); } c = m.ph > 5 ? rgb('130,255,170') : rgb('150,145,160'); a = 0.45; }
