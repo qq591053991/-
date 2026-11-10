@@ -3,7 +3,7 @@
    模型数据在 assets/models.js（base64 内嵌，file:// 下也能用）。加载失败时游戏自动退回 js/models.js 里的几何体模型。 */
 (function () {
   const G = window.G, U = G.U;
-  const As = (G.Assets = { ready: false, failed: false, settled: false, models: {}, clips: {}, tex: {} });
+  const As = (G.Assets = { ready: false, failed: false, settled: false, models: {}, clips: {}, tex: {}, tripo: {} });
 
   /* ---------- 角色配置：基础模型 + 贴图换色 + 默认显示的配件 ----------
      hue:  [起始色相, 结束色相, 新色相, 饱和度倍率, 明度倍率]  —— 只作用于有彩色的像素
@@ -40,12 +40,14 @@
   function b64(s) { const bin = atob(s), n = bin.length, u = new Uint8Array(n); for (let i = 0; i < n; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
 
   As.load = function (done) {
-    const data = window.G_MODEL_DATA;
+    const data = window.G_MODEL_DATA, tdata = window.G_TRIPO_DATA || {};
     const fail = (why) => { if (!this.failed) console.warn('[凡人问道] 社区模型未能加载，改用内置几何体模型：', why); this.failed = true; };
-    if (!data || !THREE.GLTFLoader || !THREE.SkeletonUtils) { fail('缺少模型数据或加载器'); this.settled = true; done && done(); return; }
-    const loader = new THREE.GLTFLoader(), keys = Object.keys(data);
-    let left = keys.length;
-    const fin = () => { if (--left > 0) return; this.ready = !this.failed; this.settled = true; window.G_MODEL_DATA = null; done && done(); };
+    if (!THREE.GLTFLoader || !THREE.SkeletonUtils) { fail('缺少加载器'); this.settled = true; done && done(); return; }
+    if (!data) fail('缺少模型数据');
+    const loader = new THREE.GLTFLoader(), keys = Object.keys(data || {}), tkeys = Object.keys(tdata);
+    let left = keys.length + tkeys.length;
+    if (!left) { this.settled = true; done && done(); return; }
+    const fin = () => { if (--left > 0) return; this.ready = !this.failed && keys.length > 0; this.settled = true; window.G_MODEL_DATA = window.G_TRIPO_DATA = null; done && done(); };
     for (const k of keys) {
       try {
         loader.parse(b64(data[k]), '', (g) => {
@@ -57,6 +59,11 @@
           fin();
         }, (e) => { fail(e && e.message); fin(); });
       } catch (e) { fail(e.message); fin(); }
+    }
+    // Tripo 生成的角色（名字即角色键名：hanli、modaifu、thug……有就用，没有就退回 KayKit / 几何体模型）
+    for (const k of tkeys) {
+      try { loader.parse(b64(tdata[k]), '', (g) => { this.tripo[k] = g.scene; fin(); }, (e) => { console.warn('[凡人问道] Tripo 模型加载失败：', k, e && e.message); fin(); }); }
+      catch (e) { console.warn('[凡人问道] Tripo 模型加载失败：', k, e.message); fin(); }
     }
   };
 
@@ -157,6 +164,85 @@
       for (const mt of mats) { mt.opacity = a; mt.transparent = a < 0.999; mt.depthWrite = a > 0.5; }
     };
     m.dispose = function () { mixer.stopAllAction(); mixer.uncacheRoot(root); for (const mt of mats) mt.dispose(); };
+    return m;
+  };
+  /* ============================ Tripo 角色（Mixamo 骨骼）============================
+     Tripo 导出的模型只带骨骼、不带动画，这里按骨骼直接算姿势：待机、奔跑、出招、闪避。
+     每根骨骼的转动都以「角色空间的坐标轴」给出（X 指向角色左侧，Y 向上，Z 向前），
+     再换算回骨骼自己的局部坐标，所以不依赖模型导出时骨骼轴向怎么摆。 */
+  const RIG = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftArm', 'LeftForeArm', 'RightArm', 'RightForeArm', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'RightUpLeg', 'RightLeg', 'RightFoot'];
+  const STYLE = { chop1: 'chop', chop2: 'chop', punch: 'chop', shoot1: 'shoot', shoot2: 'shoot', cast: 'cast', throw: 'cast', raise: 'raise' };
+  const lerp = (a, b2, t) => a + (b2 - a) * t;
+
+  As.makeRig = function (name, o = {}) {
+    const src = this.tripo[name]; if (!src) return null;
+    const root = THREE.SkeletonUtils.clone(src); root.updateMatrixWorld(true);
+    const B = {}, v = new THREE.Vector3(), mats = [];
+    let top = 0, hx = 0, hz = 0;
+    root.traverse((c) => {
+      if (c.isBone) {
+        const n = c.name.replace(/^mixamorig:?/, ''); c.getWorldPosition(v); top = Math.max(top, v.y);
+        if (n === 'Hips') { hx = v.x; hz = v.z; }
+        if (RIG.includes(n)) { const w = c.getWorldQuaternion(new THREE.Quaternion()); B[n] = { b: c, q0: c.quaternion.clone(), w, wi: w.clone().invert() }; }
+      } else if (c.isMesh) {
+        const m = new THREE.MeshLambertMaterial({ map: c.material.map || null, color: c.material.map ? 0xffffff : c.material.color });
+        m.userData.o0 = 1; m.userData.e0 = m.emissive.clone(); mats.push(m);
+        c.material = m; c.castShadow = true; c.frustumCulled = false;
+      }
+    });
+    if (!B.Hips || !B.LeftUpLeg || !B.LeftArm || !(top > 0)) return null; // 不是 Mixamo 骨骼
+    const sc = ((o.height || 1.2) / top) * (o.scale || 1); // 头顶骨骼对齐到约 1.2 格高
+    root.scale.multiplyScalar(sc); root.position.set(-hx * sc, 0, -hz * sc);
+    const g = new THREE.Group(); g.add(root);
+
+    const E3 = new THREE.Euler(), Q = new THREE.Quaternion(), T2 = new THREE.Quaternion();
+    const set = (n, x, y, z) => { const k = B[n]; if (!k) return; E3.set(x, y, z, 'XYZ'); Q.setFromEuler(E3); k.b.quaternion.copy(k.q0).multiply(T2.copy(k.wi).multiply(Q).multiply(k.w)); };
+    const style = STYLE[o.atk] || o.atk || 'cast';
+    const m = { g, mats, gl: true, rig: true, h: 1.35 * (o.scale || 1), lt: null, wr: 0, wd: 0, ph: Math.random() * 6, _f: 0, _a: 1 };
+
+    m.update = function (e) {
+      const t = e.t || 0; let dt = this.lt === null ? 0.016 : t - this.lt; this.lt = t;
+      if (!(dt >= 0 && dt < 0.25)) dt = 0.016;
+      const k = Math.min(1, dt * 12);
+      this.wr += ((e.moving ? 1 : 0) - this.wr) * k; this.wd += ((e.dashing ? 1 : 0) - this.wd) * Math.min(1, dt * 20);
+      this.ph += dt * (e.charge || e.st === 'lunge' ? 17 : o.walk ? 8 : 11.5) * (0.35 + 0.65 * this.wr);
+      const wr = this.wr, wd = this.wd, s = Math.sin(this.ph), c = Math.cos(this.ph), br = Math.sin(t * 2.2), idle = 1 - wr;
+      const wind = Math.min(1, e.wind || 0), atk = Math.min(1, e.atk || 0);
+      // 腿：摆动 + 抬腿时屈膝
+      let lu = -0.72 * s * wr, ru = 0.72 * s * wr, lk = (0.1 + 0.95 * Math.max(0, c)) * wr, rk = (0.1 + 0.95 * Math.max(0, -c)) * wr;
+      // 手臂：A 字站姿先放低一些；奔跑时与腿反向摆动、屈肘
+      let lax = 0.65 * s * wr, laz = -0.3 + 0.03 * br * idle, lfx = -0.12 - 0.8 * wr;
+      let rax = -0.65 * s * wr, raz = 0.3 - 0.03 * br * idle, rfx = -0.12 - 0.8 * wr;
+      let spx = 0.02 * br * idle + 0.16 * wr, sp2y = 0.12 * s * wr, hpy = -0.1 * s * wr, hdx = -0.03 * br * idle - 0.1 * wr, hdy = 0.06 * Math.sin(t * 0.7) * idle;
+      // 出招
+      if (style === 'cast') { // 并指前递：御剑 / 施法
+        const w = Math.max(wind, atk); if (w > 0.01) { const q = w * (2 - w); rax = lerp(rax, -1.4, q); raz = lerp(raz, 0.5, q); rfx = lerp(rfx, -0.08, q); sp2y = lerp(sp2y, 0.24, q); lax = lerp(lax, 0.3, q * 0.6); }
+      } else if (style === 'chop') { // 举起 → 劈下
+        const up = wind > 0.01 ? wind : atk * atk, q = Math.max(wind, atk > 0.01 ? 1 : 0);
+        if (q > 0) { rax = lerp(rax, lerp(-0.6, -2.7, up), q); raz = lerp(raz, 0.25, q); rfx = lerp(rfx, lerp(-0.2, -0.9, up), q); spx += lerp(0.22, -0.12, up) * q; sp2y = lerp(sp2y, lerp(0.3, -0.25, up), q); }
+      } else if (style === 'raise') { // 双臂高举：召唤 / 落雷
+        const w = Math.max(wind, atk); if (w > 0.01) { const q = w * (2 - w); rax = lerp(rax, -2.35, q); lax = lerp(lax, -2.35, q); raz = lerp(raz, 0.15, q); laz = lerp(laz, -0.15, q); rfx = lerp(rfx, -0.25, q); lfx = lerp(lfx, -0.25, q); hdx -= 0.18 * q; }
+      } else if (style === 'shoot') { // 双手前举
+        const w = Math.max(wind, atk); if (w > 0.01) { const q = w * (2 - w); rax = lerp(rax, -1.45, q); lax = lerp(lax, -1.3, q); raz = lerp(raz, 0.55, q); laz = lerp(laz, -0.55, q); rfx = lerp(rfx, -0.1, q); lfx = lerp(lfx, -0.35, q); }
+      }
+      // 闪避：前倾、双臂后掠、弓步
+      if (wd > 0.01) { spx += 0.5 * wd; lax = lerp(lax, 1.05, wd); rax = lerp(rax, 1.05, wd); lfx = lerp(lfx, -0.1, wd); rfx = lerp(rfx, -0.1, wd); lu = lerp(lu, -0.95, wd); ru = lerp(ru, 0.55, wd); lk = lerp(lk, 0.75, wd); rk = lerp(rk, 0.35, wd); }
+      set('Hips', 0, hpy, 0); set('Spine', spx, 0, 0); set('Spine2', 0, sp2y, 0); set('Head', hdx, hdy, 0);
+      set('LeftArm', lax, 0, laz); set('RightArm', rax, 0, raz); set('LeftForeArm', lfx, 0, 0); set('RightForeArm', rfx, 0, 0);
+      set('LeftUpLeg', lu, 0, 0); set('RightUpLeg', ru, 0, 0); set('LeftLeg', lk, 0, 0); set('RightLeg', rk, 0, 0);
+      set('LeftFoot', -lk * 0.35, 0, 0); set('RightFoot', -rk * 0.35, 0, 0);
+      root.position.y = (Math.abs(c) * 0.035 * wr + br * 0.006 * idle) * sc / 1.45;
+    };
+    m.setFlash = function (f) {
+      f = f > 0 ? 1 : 0; if (f === this._f) return; this._f = f;
+      for (const mt of mats) { mt.emissive.copy(mt.userData.e0); if (f) mt.emissive.addScalar(0.4); }
+    };
+    m.setAlpha = function (a) {
+      a = Math.round(a * 20) / 20; if (a === this._a) return; this._a = a;
+      for (const mt of mats) { mt.opacity = a; mt.transparent = a < 0.999; mt.depthWrite = a > 0.5; }
+    };
+    m.dispose = function () { for (const mt of mats) mt.dispose(); };
+    m.update({ t: 0 });
     return m;
   };
 })();

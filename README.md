@@ -2,7 +2,7 @@
 
 一款以小说《凡人修仙传》为故事背景的 **2.5D 俯视角动作 Roguelike**，使用 **Three.js** 渲染。
 
-真 3D 场景 + 倾斜俯视相机。人形角色用的是社区的免费模型（KayKit 角色包，CC0 许可，带骨骼动画）；妖兽、鬼物和场景物件用 Three.js 基础几何体在代码里拼出来；贴图由 Canvas 程序化烘焙，音效与配乐由 WebAudio 实时合成。**零构建**，所有依赖与素材都随仓库附带，双击即可离线运行。素材来源见 [`assets/CREDITS.md`](assets/CREDITS.md)。
+真 3D 场景 + 倾斜俯视相机。主角韩立是用 Tripo AI 生成的模型；其余人形角色暂用社区的免费模型（KayKit 角色包，CC0 许可，带骨骼动画），可逐个替换成 Tripo 模型；妖兽、鬼物和场景物件用 Three.js 基础几何体在代码里拼出来；贴图由 Canvas 程序化烘焙，音效与配乐由 WebAudio 实时合成。**零构建**，所有依赖与素材都随仓库附带，双击即可离线运行。素材来源见 [`assets/CREDITS.md`](assets/CREDITS.md)。
 
 > 非商业同人作品。故事背景取材自忘语所著小说《凡人修仙传》，相关权利归原作者及权利方所有；游戏内文案均为同人原创改写。
 
@@ -74,15 +74,34 @@ python3 -m http.server 8000
 - **弹幕与特效**：敌方弹幕用 `InstancedMesh` 实例化绘制；粒子与光晕是一个自定义着色器的点云（加色混合）；地面预警圈、火墙、光束是贴地的半透明网格。
 - **叠加层**：伤害飘字、血条、闪电与刀光画在一张 2D 画布上，位置由相机投影换算。
 
+## 用 Tripo 模型替换角色
+
+人形角色可以逐个换成 Tripo 生成的模型，流程：
+
+1. 在 [Tripo Studio](https://studio.tripo3d.ai/) 生成角色（提示词见 [`tools/tripo-prompts.md`](tools/tripo-prompts.md)，风格与韩立统一），**绑骨时选 Mixamo 骨骼规范**，导出 FBX 或 GLB。不需要带动画。
+2. 运行导入工具，名字用角色的键名：
+
+   ```bash
+   npm i @gltf-transform/core @gltf-transform/functions @gltf-transform/extensions sharp fbx2gltf
+   node tools/import-tripo.mjs modaifu ~/Downloads/tripo_convert_xxx.fbx
+   ```
+
+   它会把 FBX 转成 GLB、把 8K 贴图缩到 1K、压缩网格，输出 `assets/tripo/modaifu.glb`，并重新打包 `assets/tripo.js`。
+3. 刷新游戏。只要 `assets/tripo/` 里有与角色键名同名的模型，游戏就会自动用它，否则退回 KayKit 模型。
+
+Tripo 导出的模型只有骨骼、没有动画。`js/assets.js` 里有一套针对 Mixamo 骨骼的程序化动作（待机、奔跑、御剑 / 施法、劈砍、举臂、闪避），所有 Tripo 人形角色共用。
+
 ## 目录结构
 
 ```
 index.html        入口
 css/style.css     界面样式
 lib/              Three.js r147 及其 GLTFLoader、SkeletonUtils（MIT 许可）
+assets/tripo/      Tripo 生成的角色（精简后的 GLB）
+assets/tripo.js   上述模型的 base64 打包，游戏实际加载的是它
 assets/models.js  社区角色模型数据（精简后的 GLB，base64 内嵌）
 assets/CREDITS.md 素材与第三方代码致谢
-tools/            build-models.mjs：从 KayKit 原始文件生成 assets/models.js
+tools/            import-tripo.mjs：导入 Tripo 模型；tripo-prompts.md：各角色提示词；build-models.mjs：生成 KayKit 模型数据
 js/core.js        命名空间、工具函数、键鼠与触屏输入
 js/audio.js       WebAudio 合成的音效与五声音阶配乐
 js/data.js        剧情文案、章节、敌人、神通、法宝、感悟、灵药、奇遇
@@ -90,7 +109,7 @@ js/themes.js      四章的调色板与光照参数；地面 / 墙面贴图的�
 js/world.js       楼层房间图生成、单间地形、碰撞、寻路流场
 js/entities.js    特效、伤害结算、玩家、飞行道具、地面招式、神通
 js/enemies.js     敌人波次、十一类 AI、四位首领的招式脚本
-js/assets.js      社区模型：加载、换色、分层骨骼动画
+js/assets.js      外部模型：加载；KayKit 的换色与分层骨骼动画；Tripo（Mixamo 骨骼）的程序化动作
 js/models.js      几何体模型：妖兽、鬼物、场景物件、交互物（也是人形角色的后备方案）
 js/render.js      Three.js 渲染：场景搭建、相机、光照、实例化弹幕、粒子、叠加层
 js/ui.js          菜单、HUD、三选一、坊市、药园、奇遇、对白、结算

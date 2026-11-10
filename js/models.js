@@ -455,13 +455,17 @@
     return m;
   };
 
+  // 主角：优先用 Tripo 生成的韩立，其次 KayKit，最后几何体
   Mo.hero = function (look) {
-    return (G.Assets.ready && G.Assets.make('hanli', { atk: 'cast' })) || Mo.human(look);
+    return G.Assets.makeRig('hanli', { atk: 'cast' }) || (G.Assets.ready && G.Assets.make('hanli', { atk: 'cast' })) || Mo.human(look);
   };
 
   Mo.forEnemy = function (e) {
     const d = e.def, k = d.draw, o = { scale: e.scale || 1 };
-    if (d.gl && G.Assets.ready) { // 优先用社区模型
+    // 有同名的 Tripo 模型（assets/tripo/<角色键名>.glb）就用它
+    const tm = G.Assets.makeRig(e.key, { atk: d.gl && d.gl.atk, walk: d.gl && d.gl.walk, scale: ((d.gl && d.gl.s) || d.scale || 1) * (e.elite ? 1.22 : 1) });
+    if (tm) return tm;
+    if (d.gl && G.Assets.ready) { // 其次用社区模型
       const c = d.gl, m = G.Assets.make(c.v, { show: c.show, atk: c.atk, walk: c.walk, scale: (c.s || 1) * (e.elite ? 1.22 : 1) });
       if (m) return m;
     }
@@ -653,7 +657,7 @@
     add(box(), lam('#8a2a34'), [0, 1.78, 0], [2.1, 0.06, 0.9], [0.22, 0, 0]);
     const cols = ['#7dffb0', '#ffd45e', '#7ad0ff', '#ff8a6a', '#d0a0ff'], wares = [];
     for (let i = 0; i < 5; i++) { const w = add(i % 2 ? Mo.geo.oct() : sph(8), glow(cols[i]), [-0.64 + i * 0.32, 0.66, 0.22], 0.13); w.castShadow = false; wares.push(w); }
-    const keeper = (G.Assets.ready && G.Assets.make('shopkeeper', { show: ['Rogue_Cape'] })) || Mo.human({ robe: '#8a6a3a', trim: '#f0d890', skin: '#f0d0b0', hat: 'bamboo', weapon: 'none' });
+    const keeper = G.Assets.makeRig('shopkeeper', {}) || (G.Assets.ready && G.Assets.make('shopkeeper', { show: ['Rogue_Cape'] })) || Mo.human({ robe: '#8a6a3a', trim: '#f0d890', skin: '#f0d0b0', hat: 'bamboo', weapon: 'none' });
     keeper.g.position.set(0, 0, -0.26); g.add(keeper.g);
     return { g, mats: c.mats.concat(keeper.mats), update(it, t) { wares.forEach((w, i) => { w.position.y = 0.66 + Math.sin(t * 2 + i) * 0.03; w.rotation.y = t + i; }); keeper.update({ t, moving: false }); } };
   };
