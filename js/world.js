@@ -1,0 +1,335 @@
+'use strict';
+/* 凡人问道 —— 世界：楼层房间图生成、单间地形生成、碰撞与寻路 */
+(function () {
+  const G = window.G, U = G.U, T = G.TILE;
+  const W = (G.World = {});
+
+  const DIRS = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] };
+  const OPP = { n: 's', s: 'n', w: 'e', e: 'w' };
+  W.DIRS = DIRS; W.OPP = OPP;
+
+  /* ---------------- 楼层：房间图 ---------------- */
+  W.genFloor = function (chIdx) {
+    const ch = G.Chapters[chIdx];
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const f = tryFloor(chIdx, ch);
+      if (f) return f;
+    }
+    return tryFloor(chIdx, ch, true);
+  };
+
+  function tryFloor(chIdx, ch, force) {
+    const map = {};
+    const key = (x, y) => x + ',' + y;
+    const mk = (x, y) => (map[key(x, y)] = { gx: x, gy: y, type: 'combat', links: {}, cleared: false, visited: false, seen: false, theme: ch.theme, chapter: chIdx });
+    const nb = (x, y) => Object.values(DIRS).filter(([dx, dy]) => map[key(x + dx, y + dy)]).length;
+    const start = mk(0, 0); start.type = 'start';
+    const list = [start];
+    let guard = 0;
+    while (list.length < ch.rooms && guard++ < 2000) {
+      const base = U.pick(list);
+      const [dx, dy] = U.pick(Object.values(DIRS));
+      const x = base.gx + dx, y = base.gy + dy;
+      if (map[key(x, y)]) continue;
+      if (Math.abs(x) > 4 || Math.abs(y) > 3) continue;
+      if (nb(x, y) > 1 && !U.chance(0.08)) continue;
+      list.push(mk(x, y));
+    }
+    // 追加特殊房（都做成尽头房）
+    const specials = ['boss', 'treasure', 'shop', 'garden', 'event'];
+    const added = [];
+    guard = 0;
+    while (added.length < specials.length && guard++ < 3000) {
+      const base = U.pick(list);
+      if (added.includes(base)) continue;
+      const [dx, dy] = U.pick(Object.values(DIRS));
+      const x = base.gx + dx, y = base.gy + dy;
+      if (map[key(x, y)] || Math.abs(x) > 5 || Math.abs(y) > 4) continue;
+      if (nb(x, y) !== 1) continue;
+      if (base === start && added.length === 0) continue;
+      const r = mk(x, y); added.push(r);
+    }
+    if (added.length < specials.length && !force) return null;
+    const all = Object.values(map);
+    // 连接
+    for (const r of all) for (const d in DIRS) {
+      const o = map[key(r.gx + DIRS[d][0], r.gy + DIRS[d][1])];
+      if (o) r.links[d] = o;
+    }
+    // BFS 距离
+    const dist = new Map([[start, 0]]); const q = [start];
+    while (q.length) { const r = q.shift(); for (const d in r.links) { const o = r.links[d]; if (!dist.has(o)) { dist.set(o, dist.get(r) + 1); q.push(o); } } }
+    for (const r of all) r.depth = dist.get(r) || 0;
+    // 最远的尽头房 = 首领
+    added.sort((a, b) => b.depth - a.depth);
+    if (added[0] && added[0].depth < 3 && !force) return null;
+    const rest = U.shuffle(specials.slice(1));
+    added.forEach((r, i) => { r.type = i === 0 ? 'boss' : rest[i - 1]; });
+    // 精英房
+    const combats = all.filter((r) => r.type === 'combat' && r.depth >= 2);
+    U.shuffle(combats);
+    const nElite = chIdx === 0 ? 1 : 2;
+    for (let i = 0; i < Math.min(nElite, combats.length); i++) combats[i].type = 'elite';
+    return { rooms: all, start, chapter: chIdx };
+  }
+
+  /* ---------------- 单间地形 ---------------- */
+  const SIZES = {
+    start: [[15, 11]], treasure: [[13, 9]], shop: [[15, 9]], garden: [[15, 11]], event: [[13, 9]],
+    combat: [[17, 11], [19, 13], [21, 13], [21, 15], [23, 13], [19, 15]],
+    elite: [[21, 15], [23, 15]], boss: [[27, 19]],
+  };
+
+  W.buildRoom = function (room) {
+    if (room.built) return;
+    const [w, h] = U.pick(SIZES[room.type]);
+    room.w = w; room.h = h;
+    const tiles = (room.tiles = new Uint8Array(w * h));
+    for (let x = 0; x < w; x++) { tiles[x] = 1; tiles[(h - 1) * w + x] = 1; }
+    for (let y = 0; y < h; y++) { tiles[y * w] = 1; tiles[y * w + w - 1] = 1; }
+    const cx = w >> 1, cy = h >> 1;
+    room.doors = {};
+    for (const d in room.links) {
+      const cells = [];
+      for (let i = -1; i <= 1; i++) {
+        if (d === 'n') cells.push([cx + i, 0]);
+        if (d === 's') cells.push([cx + i, h - 1]);
+        if (d === 'w') cells.push([0, cy + i]);
+        if (d === 'e') cells.push([w - 1, cy + i]);
+      }
+      for (const [x, y] of cells) tiles[y * w + x] = 4;
+      room.doors[d] = { cells, to: room.links[d] };
+    }
+    room.props = []; room.lights = []; room.interact = [];
+    room.enemies = []; room.pickups = []; room.puddles = [];
+
+    const reserve = new Set(); // 禁止放障碍的格
+    const res = (x, y) => reserve.add(y * w + x);
+    for (const d in room.doors) for (const [x, y] of room.doors[d].cells) {
+      for (let k = 1; k <= 3; k++) for (let j = -1; j <= 1; j++) {
+        const dx = DIRS[OPP[d]][0], dy = DIRS[OPP[d]][1];
+        res(x + dx * k + (dx ? 0 : j), y + dy * k + (dy ? 0 : j));
+      }
+    }
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) res(cx + i, cy + j);
+
+    const th = G.Themes[room.theme];
+    const put = (x, y, t) => {
+      if (x < 2 || y < 2 || x > w - 3 || y > h - 3) return false;
+      if (reserve.has(y * w + x) || tiles[y * w + x] !== 0) return false;
+      tiles[y * w + x] = t; return true;
+    };
+    const prop = (x, y, kind) => {
+      if (!put(x, y, 2)) return;
+      room.props.push({ tx: x, ty: y, kind, v: U.randi(0, 2) });
+    };
+    const pk = () => U.pick(th.props);
+
+    if (room.type === 'combat' || room.type === 'elite') {
+      const snapshot = tiles.slice();
+      for (let tryN = 0; tryN < 8; tryN++) {
+        tiles.set(snapshot); room.props.length = 0;
+        const pat = U.pick(['pillars', 'pond', 'scatter', 'scatter', 'blocks', 'twin', 'ring', 'mix']);
+        if (pat === 'pillars') {
+          const ox = U.randi(3, 5), oy = U.randi(2, 3), k = pk();
+          for (const [x, y] of [[ox, oy], [w - 1 - ox, oy], [ox, h - 1 - oy], [w - 1 - ox, h - 1 - oy]]) prop(x, y, k);
+          if (w >= 21) { prop(cx, oy, pk()); prop(cx, h - 1 - oy, pk()); }
+        } else if (pat === 'pond') {
+          const rx = U.rand(1.6, 3), ry = U.rand(1.2, 2);
+          const px = cx + U.randi(-3, 3), py = cy + U.randi(-1, 1);
+          for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) {
+            const dx = (x - px) / rx, dy = (y - py) / ry;
+            if (dx * dx + dy * dy < 1 + U.rand(-0.15, 0.15)) put(x, y, 3);
+          }
+          for (let i = 0; i < 4; i++) prop(U.randi(2, w - 3), U.randi(2, h - 3), pk());
+        } else if (pat === 'scatter') {
+          const n = U.randi(6, 10);
+          for (let i = 0; i < n; i++) prop(U.randi(2, w - 3), U.randi(2, h - 3), pk());
+        } else if (pat === 'blocks') {
+          for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+            const bx = cx + sx * U.randi(4, 6), by = cy + sy * U.randi(2, 3);
+            put(bx, by, 1); if (U.chance(0.6)) put(bx + sx, by, 1); if (U.chance(0.4)) put(bx, by + sy, 1);
+          }
+          for (let i = 0; i < 3; i++) prop(U.randi(2, w - 3), U.randi(2, h - 3), pk());
+        } else if (pat === 'twin') {
+          for (const sx of [-1, 1]) {
+            const px = cx + sx * U.randi(4, 6), py = cy + U.randi(-1, 1);
+            for (let y = py - 1; y <= py + 1; y++) for (let x = px - 1; x <= px + 1; x++) if (U.chance(0.85)) put(x, y, 3);
+          }
+          prop(cx, 2, pk()); prop(cx, h - 3, pk());
+        } else if (pat === 'ring') {
+          const k = pk();
+          for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * G.TAU + 0.39;
+            prop(Math.round(cx + Math.cos(a) * (w * 0.28)), Math.round(cy + Math.sin(a) * (h * 0.3)), k);
+          }
+        } else {
+          for (let i = 0; i < 4; i++) prop(U.randi(2, w - 3), U.randi(2, h - 3), pk());
+          const px = U.randi(4, w - 5), py = U.randi(3, h - 4);
+          for (let y = py - 1; y <= py; y++) for (let x = px - 1; x <= px + 1; x++) put(x, y, 3);
+          put(U.randi(3, w - 4), U.randi(3, h - 4), 1);
+        }
+        if (connected(room)) break;
+        if (tryN === 7) { tiles.set(snapshot); room.props.length = 0; }
+      }
+    } else if (room.type === 'boss') {
+      const k = th.props[2];
+      for (const [x, y] of [[4, 3], [w - 5, 3], [4, h - 4], [w - 5, h - 4]]) prop(x, y, k);
+      if (room.chapter === 1) { // 墨蛟的湖：四汪深潭
+        for (const [ox, oy] of [[-7, -4], [7, -4], [-7, 4], [7, 4]]) {
+          for (let y = cy + oy - 2; y <= cy + oy + 2; y++) for (let x = cx + ox - 3; x <= cx + ox + 3; x++) {
+            const dx = (x - cx - ox) / 2.4, dy = (y - cy - oy) / 1.5;
+            if (dx * dx + dy * dy < 1.05) put(x, y, 3);
+          }
+        }
+      }
+    } else {
+      // 安全房：四角点缀
+      const k1 = th.props[2], k2 = th.props[0];
+      prop(2, 2, k1); prop(w - 3, 2, k1);
+      if (room.type !== 'shop') { prop(2, h - 3, k2); prop(w - 3, h - 3, k2); }
+    }
+
+    // 物件光源
+    for (const p of room.props) {
+      const L = G.Art.PROP_LIGHT[p.kind];
+      if (L) room.lights.push({ x: (p.tx + 0.5) * T, y: (p.ty + 0.5) * T, z: L.z, r: L.r, c: L.c, flick: 1 });
+    }
+    // 北墙壁灯
+    for (let x = 3; x < w - 2; x += 5) {
+      if (tiles[x] !== 1) continue;
+      room.lights.push({ x: (x + 0.5) * T, y: T * 1.0, z: 30, r: 130, c: th.lamp, flick: 1, sconce: true });
+    }
+
+    // 交互物
+    const mid = { x: (cx + 0.5) * T, y: (cy + 0.5) * T };
+    if (room.type === 'treasure') room.interact.push({ kind: 'chest', x: mid.x, y: mid.y, r: 46, label: '开启机缘宝匣' });
+    if (room.type === 'shop') room.interact.push({ kind: 'shop', x: mid.x, y: mid.y - T, r: 56, label: '坊市 · 交易' });
+    if (room.type === 'garden') room.interact.push({ kind: 'garden', x: mid.x, y: mid.y, r: 56, label: '药园 · 以绿液催熟灵药' });
+    if (room.type === 'event') room.interact.push({ kind: 'event', x: mid.x, y: mid.y, r: 50, label: '探查' });
+    if (room.type === 'start' || room.type === 'treasure' || room.type === 'shop' || room.type === 'garden' || room.type === 'event') room.cleared = true;
+
+    G.Art.bakeRoom(room);
+    room.built = true;
+  };
+
+  function connected(room) {
+    const { w, h, tiles } = room;
+    let startI = -1, total = 0;
+    for (let i = 0; i < w * h; i++) if (tiles[i] === 0) { total++; if (startI < 0) startI = i; }
+    if (startI < 0) return false;
+    const seen = new Uint8Array(w * h); seen[startI] = 1;
+    const q = [startI]; let n = 1;
+    while (q.length) {
+      const i = q.pop(), x = i % w, y = (i / w) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const j = ny * w + nx;
+        if (!seen[j] && tiles[j] === 0) { seen[j] = 1; n++; q.push(j); }
+      }
+    }
+    return n === total;
+  }
+
+  /* ---------------- 碰撞 ----------------
+     mode: 0 玩家(地面)  1 敌人(地面)  2 飞行  3 飞行道具 */
+  W.solid = function (room, tx, ty, mode) {
+    if (tx < 0 || ty < 0 || tx >= room.w || ty >= room.h) return true;
+    const t = room.tiles[ty * room.w + tx];
+    if (t === 0) return false;
+    if (t === 1) return true;
+    if (t === 2) return mode !== 2;
+    if (t === 3) return mode === 0 || mode === 1;
+    if (t === 4) return mode === 0 ? room.locked : true;
+    return false;
+  };
+
+  W.blocked = function (room, x, y, r, mode) {
+    const x0 = Math.floor((x - r) / T), x1 = Math.floor((x + r) / T);
+    const y0 = Math.floor((y - r) / T), y1 = Math.floor((y + r) / T);
+    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (W.solid(room, tx, ty, mode)) return true;
+    return false;
+  };
+
+  // 分轴移动，返回是否撞墙
+  W.move = function (room, e, dx, dy, mode) {
+    const r = e.r * 0.8;
+    let hit = false;
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / (T * 0.4)));
+    const sx = dx / steps, sy = dy / steps;
+    for (let i = 0; i < steps; i++) {
+      if (sx) { if (!W.blocked(room, e.x + sx, e.y, r, mode)) e.x += sx; else hit = true; }
+      if (sy) { if (!W.blocked(room, e.x, e.y + sy, r, mode)) e.y += sy; else hit = true; }
+    }
+    return hit;
+  };
+
+  W.los = function (room, ax, ay, bx, by, mode = 3) {
+    const d = Math.hypot(bx - ax, by - ay), n = Math.ceil(d / (T * 0.45));
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      if (W.solid(room, Math.floor((ax + (bx - ax) * t) / T), Math.floor((ay + (by - ay) * t) / T), mode)) return false;
+    }
+    return true;
+  };
+
+  /* 以玩家为源的流场（BFS），供地面敌人绕障 */
+  W.flow = function (room, px, py) {
+    const { w, h } = room;
+    if (!room.flowD || room.flowD.length !== w * h) room.flowD = new Int16Array(w * h);
+    const D = room.flowD; D.fill(-1);
+    const sx = U.clamp(Math.floor(px / T), 0, w - 1), sy = U.clamp(Math.floor(py / T), 0, h - 1);
+    const q = [sy * w + sx]; D[sy * w + sx] = 0;
+    let qi = 0;
+    while (qi < q.length) {
+      const i = q[qi++], x = i % w, y = (i / w) | 0, d = D[i];
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const j = ny * w + nx;
+        if (D[j] >= 0 || room.tiles[j] !== 0) continue;
+        D[j] = d + 1; q.push(j);
+      }
+    }
+  };
+
+  W.flowDir = function (room, x, y) {
+    const D = room.flowD; if (!D) return null;
+    const { w, h } = room, tx = Math.floor(x / T), ty = Math.floor(y / T);
+    if (tx < 0 || ty < 0 || tx >= w || ty >= h) return null;
+    let best = D[ty * w + tx], bx = 0, by = 0;
+    if (best < 0) best = 9999;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const nx = tx + dx, ny = ty + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const d = D[ny * w + nx];
+      if (d < 0) continue;
+      if (dx && dy && (D[ty * w + nx] < 0 || D[ny * w + tx] < 0)) continue; // 不穿角
+      if (d < best) { best = d; bx = dx; by = dy; }
+    }
+    if (!bx && !by) return null;
+    // 朝目标格中心走，避免蹭墙
+    const gx = (tx + bx + 0.5) * T - x, gy = (ty + by + 0.5) * T - y, l = Math.hypot(gx, gy) || 1;
+    return { x: gx / l, y: gy / l };
+  };
+
+  W.randomFloor = function (room, awayX, awayY, minD) {
+    for (let i = 0; i < 80; i++) {
+      const tx = U.randi(2, room.w - 3), ty = U.randi(2, room.h - 3);
+      if (room.tiles[ty * room.w + tx] !== 0) continue;
+      const x = (tx + 0.5) * T, y = (ty + 0.5) * T;
+      if (awayX !== undefined && U.dist(x, y, awayX, awayY) < minD) continue;
+      return { x, y };
+    }
+    return { x: (room.w / 2) * T, y: (room.h / 2) * T };
+  };
+
+  /* 进门位置 */
+  W.entryPos = function (room, fromDir) {
+    const d = room.doors[fromDir];
+    if (!d) return { x: (room.w / 2) * T, y: (room.h / 2) * T };
+    const [x, y] = d.cells[1];
+    const o = DIRS[OPP[fromDir]];
+    return { x: (x + 0.5 + o[0] * 1.6) * T, y: (y + 0.5 + o[1] * 1.6) * T };
+  };
+})();

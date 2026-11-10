@@ -1,19 +1,85 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>凡人修仙传 · 斗法录</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet" />
-  </head>
-  <body>
-    <div id="wrap">
-      <canvas id="game"></canvas>
-      <canvas id="hud"></canvas>
-      <div id="overlay"></div>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070b18">
+<title>凡人问道</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- 战斗界面 -->
+<div id="hud">
+  <div id="hud-tl">
+    <div id="realm">炼气期 一层</div>
+    <div class="bar hp"><i id="hp-fill"></i><i id="sh-fill"></i><span id="hp-txt"></span></div>
+    <div class="bar mp"><i id="mp-fill"></i><span id="mp-txt"></span></div>
+    <div class="bar xp"><i id="xp-fill"></i></div>
+    <div id="res">
+      <span class="stone" title="灵石">◆ <b id="r-stone">0</b></span>
+      <span class="potion" title="丹药（C）">丹 <b id="r-potion">0</b></span>
+      <span class="drop" title="掌天瓶绿液">瓶 <b id="r-drop">0</b></span>
     </div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+    <div id="relics"></div>
+  </div>
+
+  <div id="hud-tr">
+    <div id="chap"></div>
+    <canvas id="minimap" width="220" height="150"></canvas>
+  </div>
+
+  <div id="boss"><div id="boss-name"></div><div class="bar bosshp"><i id="boss-fill"></i></div></div>
+
+  <div id="skills">
+    <div class="dash" title="罗烟步（空格）"><span>遁</span><div id="dash-pips"></div><em>空格</em></div>
+    <div class="slot" data-i="0"><span class="g"></span><i class="cd"></i><em>Q</em><b class="lv"></b></div>
+    <div class="slot" data-i="1"><span class="g"></span><i class="cd"></i><em>E</em><b class="lv"></b></div>
+    <div class="slot" data-i="2"><span class="g"></span><i class="cd"></i><em>R</em><b class="lv"></b></div>
+  </div>
+
+  <div id="prompt"></div>
+
+  <div id="touch">
+    <button class="tbtn" id="t-pause">Ⅱ</button>
+    <button class="tbtn" id="t-act">探</button>
+    <button class="tbtn" id="t-potion">丹</button>
+    <button class="tbtn" id="t-dash">遁</button>
+  </div>
+</div>
+
+<div id="title-card"></div>
+<div id="toasts"></div>
+
+<!-- 主菜单 -->
+<div id="menu">
+  <div class="title">
+    <em>《凡人修仙传》同人 · 2.5D 俯视角 Roguelike</em>
+    <h1>凡人问道</h1>
+    <p>资质平平又如何 · 一只小瓶 · 一柄飞剑 · 一条长生路</p>
+  </div>
+  <div class="buttons">
+    <button class="btn big" id="btn-start">踏入仙途</button>
+    <button class="btn" id="btn-meta">洞府 · 轮回感悟</button>
+    <button class="btn" id="btn-help">修行须知</button>
+  </div>
+  <div id="menu-info"></div>
+  <div id="menu-tip"></div>
+  <div class="credit">非商业同人作品 · 故事背景取材自忘语所著小说《凡人修仙传》，相关权利归原作者及权利方所有</div>
+</div>
+
+<div id="overlay"></div>
+
+<script src="js/core.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/data.js"></script>
+<script src="js/art.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+</body>
 </html>
