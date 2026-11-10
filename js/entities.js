@@ -539,6 +539,8 @@
     },
   };
 
+  const SK_LEAD = { fireball: [520, 0], ice: [560, 0], giant: [0, 0.5] }; // [飞行速度, 落地延迟]，供自动瞄准算提前量
+
   E.castSkill = function (slot) {
     const Gm = G.Game, p = Gm.player, s = p.skills[slot];
     if (!s || s.cd > 0) return false;
@@ -546,7 +548,12 @@
     if (p.mp < def.mp) { if (!p.noMpT || p.noMpT <= 0) { FX.text(p.x, p.y, 54, '法力不足', '#7ab8ff', 13); Au.sfx('deny'); p.noMpT = 0.6; } return false; }
     p.mp -= def.mp;
     s.cd = s.max = def.cd * Math.max(0.35, 1 - p.cdr);
-    const aim = Gm.aim();
+    const lead = SK_LEAD[s.id] || [0, 0];
+    let aim = Gm.aim(lead[0], lead[1]);
+    if (s.id === 'blink' && !Gm.isManualNow()) { // 自动瞄准下，风雷翅朝移动方向闪（没在移动才闪向目标）
+      const mv = G.Input.moveVec();
+      if (mv.l > 0.2) aim = { x: p.x + mv.x * 280, y: p.y + mv.y * 280 };
+    }
     SK[s.id](p, aim.x, aim.y, s.lv);
     p.atkAnim = 1; Gm.stats.casts++;
     return true;
@@ -567,9 +574,10 @@
     if (p.dashN < p.dashMax) { p.dashT -= dt; if (p.dashT <= 0) { p.dashN++; p.dashT = p.dashCd; } }
 
     const mv = I.moveVec();
-    const aim = Gm.aim();
-    if (!I.touchMode || E.nearestEnemy(p.x, p.y, 560)) p.face = U.ang(p.x, p.y, aim.x, aim.y);
-    else if (mv.l > 0.1) p.face = Math.atan2(mv.y, mv.x);
+    const manual = Gm.isManualNow();
+    const aim = Gm.aim(760 * (0.8 + 0.2 * p.rangeMul));
+    if (manual || Gm.target) p.face = U.ang(p.x, p.y, aim.x, aim.y); // 手动：朝鼠标；自动：朝目标
+    else if (mv.l > 0.1) p.face = Math.atan2(mv.y, mv.x);            // 没有目标：朝移动方向
 
     // 遁术（罗烟步）
     if (p.dashing <= 0 && p.dashN > 0 && (I.hit('Space') || I.hit('ShiftLeft') || I.hit('dash'))) {
@@ -601,8 +609,8 @@
     if (p.hpRegen) p.hp = Math.min(p.maxHp, p.hp + p.hpRegen * dt);
 
     // 御剑
-    const hasFoe = room.enemies.some((e) => !e.dead);
-    const wantAtk = I.mouse.down || I.held('KeyJ') || I.held('atk') || (I.touchMode && hasFoe && !!E.nearestEnemy(p.x, p.y, 520 * p.rangeMul));
+    // 手动：按住鼠标 / J 出剑；自动：射程内有目标就持续出剑
+    const wantAtk = I.mouse.down || I.held('KeyJ') || I.held('atk') || (Gm.isAuto() && Gm.targetInRange);
     if (wantAtk && p.atkT <= 0 && p.dashing <= 0) { fireSwords(p, aim.x, aim.y); p.atkT = 1 / p.atkSpd; }
 
     // 神通

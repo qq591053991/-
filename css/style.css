@@ -20,6 +20,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: #05080f; color: #e8e4d8; font-family: var(--ui); user-select: none; -webkit-user-select: none; touch-action: none; }
 #game { position: fixed; inset: 0; display: block; cursor: crosshair; }
+body.autoaim #game { cursor: default; }
 #fx2d { position: fixed; inset: 0; display: block; pointer-events: none; }
 #nogl { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 24px; font-family: var(--kai); font-size: 20px; line-height: 2; background: #05080f; z-index: 50; }
 #nogl.show { display: flex; }

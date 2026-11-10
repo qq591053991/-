@@ -667,11 +667,20 @@
   }
 
   /* ============================ 每帧 ============================ */
-  let flowT = 0;
+  let flowT = 0, lastDt = 0;
   E.updateEnemies = function (dt) {
     const Gm = G.Game, room = Gm.room, p = Gm.player, L = room.enemies;
     flowT -= dt;
     if (flowT <= 0) { flowT = 0.25; W.flow(room, p.x, p.y); }
+    // 由上一帧位移估算速度，供自动瞄准算提前量（瞬移类的突变会被限幅）
+    for (const e of L) {
+      if (e._px !== undefined && lastDt > 0.001) {
+        const vx = U.clamp((e.x - e._px) / lastDt, -320, 320), vy = U.clamp((e.y - e._py) / lastDt, -320, 320);
+        e.vx = (e.vx || 0) * 0.6 + vx * 0.4; e.vy = (e.vy || 0) * 0.6 + vy * 0.4;
+      }
+      e._px = e.x; e._py = e.y;
+    }
+    lastDt = dt;
     for (let i = 0; i < L.length; i++) {
       const e = L[i];
       if (e.dead) continue;

@@ -65,7 +65,8 @@
         <div class="cols">
           <div><h3>键鼠</h3>
             <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</p>
-            <p><kbd>鼠标左键</kbd> 御剑攻击（按住连发）</p>
+            <p>飞剑<b>自动瞄准</b>最近的敌人并出剑</p>
+            <p><kbd>鼠标左键</kbd> 按住可改为手动瞄准（朝鼠标出剑）</p>
             <p><kbd>空格</kbd> 罗烟步 · 无敌闪避</p>
             <p><kbd>Q</kbd>/<kbd>右键</kbd>　<kbd>E</kbd>　<kbd>R</kbd> 施展神通</p>
             <p><kbd>V</kbd> 本命法宝 · 蜂云剑阵（结丹后）</p>
@@ -241,9 +242,10 @@
       this.open(`<div class="panel pause"><h2>${G.Chapters[Gm.chapter].title}</h2>
         <div class="cols"><div><h3>修为</h3><div class="stats">${this.statLine(p)}</div></div>
         <div><h3>功法 · 本命法宝</h3><div class="list">${arts}</div><h3>神通</h3><div class="list">${skills}</div><h3>法宝</h3><div class="list scroll">${relics}</div></div></div>
-        <div class="btns"><button class="btn" id="x-close">继续修行</button><button class="btn ghost" id="x-mute">${Au.muted ? '开启声音' : '静音'}</button><button class="btn ghost" id="x-quit">放弃此世</button></div></div>`, 'dim');
+        <div class="btns"><button class="btn" id="x-close">继续修行</button><button class="btn ghost" id="x-aim">瞄准：${Gm.meta.autoAim !== false ? '自动' : '手动'}</button><button class="btn ghost" id="x-mute">${Au.muted ? '开启声音' : '静音'}</button><button class="btn ghost" id="x-quit">放弃此世</button></div></div>`, 'dim');
       $('x-close').onclick = () => { Au.sfx('ui'); this.close(); };
       $('x-mute').onclick = () => { Au.toggleMute(); this.pause(); };
+      $('x-aim').onclick = () => { Au.sfx('ui'); Gm.setAutoAim(Gm.meta.autoAim === false); this.pause(); };
       $('x-quit').onclick = () => { this.close(); Gm.player.hp = 0; Gm.player.dead = true; Gm.onPlayerDead(); };
       this.onKey = (k) => { if (k === 'Escape' || k === 'KeyP') this.close(); };
     },

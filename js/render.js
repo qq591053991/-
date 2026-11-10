@@ -352,7 +352,9 @@
     const halfW = HALF_TAN * aspect * dist, north = ch / Math.tan(PITCH - hf) - cd, south = cd - ch / Math.tan(PITCH + hf);
     let tx = px, tz = pz;
     const I = G.Input;
-    if (!I.touchMode) { tx += ((I.mouse.x / W) * 2 - 1) * 1.1; tz += ((I.mouse.y / H) * 2 - 1) * 0.9; }
+    const Gm = G.Game;
+    if (Gm.state === 'play' && Gm.isManualNow()) { tx += ((I.mouse.x / W) * 2 - 1) * 1.1; tz += ((I.mouse.y / H) * 2 - 1) * 0.9; }
+    else if (Gm.state === 'play' && Gm.target) { tx += U.clamp((Gm.target.x * S - px) * 0.14, -1.1, 1.1); tz += U.clamp((Gm.target.y * S - pz) * 0.14, -0.9, 0.9); }
     const x0 = halfW - 2.5, x1 = room.w - halfW + 2.5, z0 = north * 0.6 - 0.5, z1 = room.h - south * 0.72;
     tx = x0 > x1 ? room.w / 2 : U.clamp(tx, x0, x1);
     tz = z0 > z1 ? (z0 + z1) / 2 : U.clamp(tz, z0, z1);
@@ -539,6 +541,13 @@
       }
     }
     for (const [e, m] of actors) if (m.seen !== frame) { dyn.remove(m.g); m.dispose(); actors.delete(e); }
+    // 自动瞄准的锁定标记
+    const tg = Gm.target;
+    if (tg && !tg.dead && Gm.state === 'play' && !Gm.isManualNow()) {
+      const tc = rgb(Gm.targetInRange ? '160,255,220' : '150,170,165'), rr = tg.r * 1.45 + 6 + Math.sin(t * 7) * 2;
+      flatAt(P.ring, tg.x, tg.y, rr, tc, Gm.targetInRange ? 0.85 : 0.4, 0.04, 5);
+      for (let i = 0; i < 4; i++) { const a = t * 2.4 + i * (TAU / 4); glows.push((tg.x + Math.cos(a) * rr) * S, 0.08, (tg.y + Math.sin(a) * rr) * S, tc, Gm.targetInRange ? 0.95 : 0.4, 0.34); }
+    }
 
     // 主角
     if (p) {

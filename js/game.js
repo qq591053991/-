@@ -11,7 +11,7 @@
 
     /* ---------------- 存档（仅局外成长） ---------------- */
     loadMeta() {
-      const def = { dao: 0, up: {}, best: 0, runs: 0, wins: 0 };
+      const def = { dao: 0, up: {}, best: 0, runs: 0, wins: 0, autoAim: true };
       try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s) Object.assign(def, s); } catch (e) { /* 无存档权限时忽略 */ }
       for (const m of G.Meta) if (!def.up[m.id]) def.up[m.id] = 0;
       this.meta = def;
@@ -24,6 +24,7 @@
       R.init(cv);
       this.loadMeta();
       G.UI.init();
+      document.body.classList.toggle('autoaim', this.isAuto());
       G.UI.showMenu();
       G.Assets.load(() => G.UI.assetsReady());
       Au.music('menu');
@@ -73,7 +74,7 @@
       W.buildRoom(room);
       this.room = room; room.visited = true;
       for (const d in room.links) room.links[d].seen = true;
-      this.projs.length = 0; this.haz.length = 0; this.allies.length = 0; this.ghosts.length = 0; this.barks.length = 0;
+      this.projs.length = 0; this.haz.length = 0; this.allies.length = 0; this.ghosts.length = 0; this.barks.length = 0; this.target = null;
       FX.clear();
       const pos = fromDir ? W.entryPos(room, fromDir) : { x: (room.w / 2) * T, y: (room.h / 2 + 1.5) * T };
       p.x = pos.x; p.y = pos.y; p.dashing = 0; p.formT = 0;
@@ -109,14 +110,45 @@
     shake(a) { this.shakeAmt = Math.min(16, Math.max(this.shakeAmt, a)); },
     toast(m) { G.UI.toast(m); },
     say(e, text) { this.barks.push({ e, text, life: 2.2 }); },
-    aim() {
-      const I = G.Input, p = this.player;
-      if (I.touchMode) {
-        const e = E.nearestEnemy(p.x, p.y, 620);
-        if (e) return { x: e.x, y: e.y };
-        return { x: p.x + Math.cos(p.face) * 220, y: p.y + Math.sin(p.face) * 220 };
+    /* ---------------- 瞄准 ----------------
+       自动瞄准（默认）：锁定最近且有射击视线的敌人；按住鼠标左键可临时改为手动瞄准。
+       手动瞄准：始终指向鼠标位置。触屏下始终自动。 */
+    isAuto() { return G.Input.touchMode || this.meta.autoAim !== false; },
+    isManualNow() { const I = G.Input; return !I.touchMode && (!this.isAuto() || I.mouse.down); },
+
+    // 每帧选定自动瞄准的目标；对当前目标有一点粘性，避免在两个等距敌人间来回跳
+    updateTarget() {
+      const p = this.player, room = this.room, range = 500 * p.rangeMul;
+      let best = null, bs = 1e9, bd = 0, blos = false;
+      for (const e of room.enemies) {
+        if (e.dead || e.st === 'spawn' || e.st === 'intro' || e.untarget) continue;
+        const d = U.dist(p.x, p.y, e.x, e.y);
+        if (d > range * 1.3) continue;
+        const los = W.los(room, p.x, p.y, e.x, e.y);
+        const score = d + (los ? 0 : 420) - (e === this.target ? 60 : 0);
+        if (score < bs) { bs = score; best = e; bd = d; blos = los; }
       }
-      return R.toWorld(I.mouse.x, I.mouse.y);
+      this.target = best;
+      this.targetLos = blos;
+      this.targetInRange = !!best && bd <= range && blos; // 射程内且没被障碍挡住才自动出剑
+    },
+
+    // spd：飞行道具速度（用于提前量）；delay：招式落地延迟（秒）
+    aim(spd, delay) {
+      const I = G.Input, p = this.player;
+      if (this.isManualNow()) return R.toWorld(I.mouse.x, I.mouse.y);
+      const e = this.target;
+      if (e) {
+        const d = U.dist(p.x, p.y, e.x, e.y);
+        const lead = Math.min(0.55, (spd ? d / spd : 0) * 0.9 + (delay || 0));
+        return { x: e.x + (e.vx || 0) * lead, y: e.y + (e.vy || 0) * lead };
+      }
+      return { x: p.x + Math.cos(p.face) * 220, y: p.y + Math.sin(p.face) * 220 };
+    },
+
+    setAutoAim(on) {
+      this.meta.autoAim = !!on; this.saveMeta();
+      document.body.classList.toggle('autoaim', this.isAuto());
     },
 
     addStones(n, show) {
@@ -387,8 +419,9 @@
 
       if (this.state === 'play') {
         this.stats.time += raw;
+        this.updateTarget();
         E.updatePlayer(dt);
-      }
+      } else this.target = null;
       E.updateEnemies(dt);
       E.updateProjs(dt);
       E.updateHaz(dt);
