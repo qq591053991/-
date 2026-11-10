@@ -192,13 +192,13 @@
 
     // 物件光源
     for (const p of room.props) {
-      const L = G.Art.PROP_LIGHT[p.kind];
-      if (L) room.lights.push({ x: (p.tx + 0.5) * T, y: (p.ty + 0.5) * T, z: L.z, r: L.r, c: L.c, flick: 1 });
+      const L = G.PROP_LIGHT[p.kind];
+      if (L) room.lights.push({ x: (p.tx + 0.5) * T, y: (p.ty + 0.5) * T, z: L.z, r: L.r, c: L.c });
     }
     // 北墙壁灯
     for (let x = 3; x < w - 2; x += 5) {
       if (tiles[x] !== 1) continue;
-      room.lights.push({ x: (x + 0.5) * T, y: T * 1.0, z: 30, r: 130, c: th.lamp, flick: 1, sconce: true });
+      room.lights.push({ x: (x + 0.5) * T, y: T * 1.0, z: 40, r: 280, c: th.lampHex, sconce: true });
     }
 
     // 交互物
@@ -209,8 +209,7 @@
     if (room.type === 'event') room.interact.push({ kind: 'event', x: mid.x, y: mid.y, r: 50, label: '探查' });
     if (room.type === 'start' || room.type === 'treasure' || room.type === 'shop' || room.type === 'garden' || room.type === 'event') room.cleared = true;
 
-    G.Art.bakeRoom(room);
-    room.built = true;
+    room.built = true; // 三维场景由渲染器在进入房间时按需搭建
   };
 
   function connected(room) {

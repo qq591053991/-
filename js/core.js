@@ -3,9 +3,7 @@
 (function () {
   const G = (window.G = {});
 
-  G.TILE = 48;        // 世界单位：一格边长
-  G.YS = 0.75;        // 纵向压缩比（俯视倾角带来的透视缩短）
-  G.VIEW_H = 640;     // 逻辑视口高度
+  G.TILE = 48;        // 逻辑坐标：一格边长（渲染时 1 格 = 1 个三维单位）
   G.TAU = Math.PI * 2;
 
   const U = (G.U = {
