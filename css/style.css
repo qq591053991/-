@@ -60,6 +60,8 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px; b
 .bar.mp { height: 13px; width: 86%; } .bar.mp span { line-height: 12px; font-size: 10px; }
 .bar.mp i { background: linear-gradient(180deg, #5aa8f0, #2456b4); }
 .bar.xp { height: 5px; width: 86%; } .bar.xp i { background: linear-gradient(90deg, #c9a84e, #ffe9a0); }
+#gongfa { font-family: var(--kai); font-size: 13px; letter-spacing: 1px; color: #b8ffd2; text-shadow: 0 1px 3px #000; margin: -2px 0 5px; min-height: 16px; }
+#gongfa b { color: #e8ffb0; font-weight: 400; }
 #res { display: flex; gap: 14px; margin-top: 7px; font-size: 14px; text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; }
 #res .stone { color: #8affd8; } #res .potion { color: #ff9c94; } #res .drop { color: #a4ff9a; }
 #res b { color: #fff; }
@@ -90,6 +92,14 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px; b
 .slot em, .dash em { position: absolute; left: 3px; top: 2px; font-style: normal; font-size: 10px; color: rgba(255, 255, 255, 0.7); text-shadow: 0 1px 2px #000; }
 .slot .lv { position: absolute; right: 4px; bottom: 2px; font-size: 10px; color: var(--gold); font-family: var(--kai); }
 .slot.nomp .g { filter: grayscale(1) brightness(0.6); }
+/* 本命法宝 · 青竹蜂云剑 */
+.slot.ult { --c: #b8ff7a; margin-left: 8px; border-radius: 50%; width: 58px; height: 58px; border-color: var(--c); }
+.slot.ult .cd { background: rgba(0, 0, 0, 0.7); }
+.slot.ult .lv { right: 0; left: 0; bottom: 3px; text-align: center; font-size: 10px; color: #e8ffb0; }
+.slot.ult.locked { --c: #6a7a6e; opacity: 0.55; cursor: default; }
+.slot.ult.locked .g { filter: grayscale(1) brightness(0.7); }
+.slot.ult.full { box-shadow: 0 0 16px #b8ff7a, 0 0 4px #ffe36a inset; animation: ultpulse 1s ease-in-out infinite; }
+@keyframes ultpulse { 50% { box-shadow: 0 0 26px #d8ff9a, 0 0 8px #ffe36a inset; transform: scale(1.06); } }
 .dash { width: 46px; height: 46px; border-color: rgba(127, 224, 192, 0.5); cursor: default; }
 .dash span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--kai); font-size: 22px; color: var(--jade); padding-top: 4px; }
 #dash-pips { position: absolute; left: 0; right: 0; bottom: 3px; display: flex; gap: 3px; justify-content: center; }
@@ -112,6 +122,7 @@ body.touch #skills { left: auto; right: calc(112px + var(--sr)); bottom: calc(94
 body.touch #skills .dash { display: none; }
 body.touch .slot { width: 60px; height: 60px; border-radius: 50%; }
 body.touch .slot em { display: none; }
+body.touch .slot.ult { width: 60px; height: 60px; margin-left: 0; }
 body.touch #prompt kbd { display: none; }
 
 #title-card { position: fixed; left: 0; right: 0; top: 26%; text-align: center; pointer-events: none; opacity: 0; }
@@ -203,7 +214,8 @@ body.touch #prompt kbd { display: none; }
 .break { text-align: center; position: relative; animation: fadein 0.5s ease; }
 .break .halo { position: absolute; left: 50%; top: 40%; width: 520px; height: 520px; margin: -260px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 230, 150, 0.35), rgba(255, 230, 150, 0) 65%); animation: pulse 2.4s ease-in-out infinite; pointer-events: none; }
 .break h1 { position: relative; font-family: var(--kai); font-size: clamp(38px, 7vw, 68px); letter-spacing: 0.2em; color: #fff3cf; text-shadow: 0 0 34px rgba(255, 215, 120, 0.8); }
-.break p { position: relative; font-family: var(--kai); font-size: 19px; letter-spacing: 1px; line-height: 1.9; margin: 18px auto 26px; max-width: 560px; color: #e8e4d8; }
+.break p { position: relative; font-family: var(--kai); font-size: 19px; letter-spacing: 1px; line-height: 1.9; margin: 18px auto 26px; max-width: 640px; color: #e8e4d8; }
+.break p b { color: #c8ffa0; font-weight: 400; }
 .break .btn { position: relative; }
 
 .panel.end h1 { font-family: var(--kai); font-size: clamp(44px, 8vw, 72px); letter-spacing: 0.25em; margin-left: 0.25em; color: #d8dfe6; text-shadow: 0 0 26px rgba(120, 160, 200, 0.5); }

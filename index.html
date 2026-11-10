@@ -16,6 +16,7 @@
 <div id="hud">
   <div id="hud-tl">
     <div id="realm">炼气期 一层</div>
+    <div id="gongfa"></div>
     <div class="bar hp"><i id="hp-fill"></i><i id="sh-fill"></i><span id="hp-txt"></span></div>
     <div class="bar mp"><i id="mp-fill"></i><span id="mp-txt"></span></div>
     <div class="bar xp"><i id="xp-fill"></i></div>
@@ -39,6 +40,7 @@
     <div class="slot" data-i="0"><span class="g"></span><i class="cd"></i><em>Q</em><b class="lv"></b></div>
     <div class="slot" data-i="1"><span class="g"></span><i class="cd"></i><em>E</em><b class="lv"></b></div>
     <div class="slot" data-i="2"><span class="g"></span><i class="cd"></i><em>R</em><b class="lv"></b></div>
+    <div class="slot ult locked" id="ult"><span class="g">蜂</span><i class="cd"></i><em>V</em><b class="lv">结丹</b></div>
   </div>
 
   <div id="prompt"></div>
@@ -74,6 +76,9 @@
 <div id="overlay"></div>
 
 <script src="lib/three.min.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script src="lib/SkeletonUtils.js"></script>
+<script src="assets/models.js"></script>
 <script src="js/core.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/data.js"></script>
@@ -81,6 +86,7 @@
 <script src="js/world.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/enemies.js"></script>
+<script src="js/assets.js"></script>
 <script src="js/models.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>

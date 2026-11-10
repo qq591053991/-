@@ -455,8 +455,16 @@
     return m;
   };
 
+  Mo.hero = function (look) {
+    return (G.Assets.ready && G.Assets.make('hanli', { atk: 'cast' })) || Mo.human(look);
+  };
+
   Mo.forEnemy = function (e) {
     const d = e.def, k = d.draw, o = { scale: e.scale || 1 };
+    if (d.gl && G.Assets.ready) { // 优先用社区模型
+      const c = d.gl, m = G.Assets.make(c.v, { show: c.show, atk: c.atk, walk: c.walk, scale: (c.s || 1) * (e.elite ? 1.22 : 1) });
+      if (m) return m;
+    }
     if (k === 'jiao') return Mo.jiao(d.look, e.segs);
     return (Mo[k] || Mo.human)(d.look, o);
   };
@@ -645,8 +653,8 @@
     add(box(), lam('#8a2a34'), [0, 1.78, 0], [2.1, 0.06, 0.9], [0.22, 0, 0]);
     const cols = ['#7dffb0', '#ffd45e', '#7ad0ff', '#ff8a6a', '#d0a0ff'], wares = [];
     for (let i = 0; i < 5; i++) { const w = add(i % 2 ? Mo.geo.oct() : sph(8), glow(cols[i]), [-0.64 + i * 0.32, 0.66, 0.22], 0.13); w.castShadow = false; wares.push(w); }
-    const keeper = Mo.human({ robe: '#8a6a3a', trim: '#f0d890', skin: '#f0d0b0', hat: 'bamboo', weapon: 'none' });
-    keeper.g.position.set(0, 0, -0.22); g.add(keeper.g);
+    const keeper = (G.Assets.ready && G.Assets.make('shopkeeper', { show: ['Rogue_Cape'] })) || Mo.human({ robe: '#8a6a3a', trim: '#f0d890', skin: '#f0d0b0', hat: 'bamboo', weapon: 'none' });
+    keeper.g.position.set(0, 0, -0.26); g.add(keeper.g);
     return { g, mats: c.mats.concat(keeper.mats), update(it, t) { wares.forEach((w, i) => { w.position.y = 0.66 + Math.sin(t * 2 + i) * 0.03; w.rotation.y = t + i; }); keeper.update({ t, moving: false }); } };
   };
 
@@ -663,12 +671,12 @@
   };
 
   /* ============================ 小物 ============================ */
-  Mo.sword = function (hex, mini) {
+  Mo.sword = function (hex, mini, bladeHex, trailHex) {
     const g = new THREE.Group();
     const L = mini ? 0.34 : 0.56;
-    const blade = new THREE.Mesh(oct(), new THREE.MeshBasicMaterial({ color: 0xf2fffb })); blade.scale.set(0.075, 0.03, L); g.add(blade);
+    const blade = new THREE.Mesh(oct(), new THREE.MeshBasicMaterial({ color: bladeHex || 0xf2fffb })); blade.scale.set(0.075, 0.03, L); g.add(blade);
     const edge = new THREE.Mesh(oct(), new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })); edge.scale.set(0.16, 0.05, L * 1.25); g.add(edge);
-    const trail = new THREE.Mesh(cone(6), new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const trail = new THREE.Mesh(cone(6), new THREE.MeshBasicMaterial({ color: trailHex || hex, transparent: true, opacity: trailHex ? 0.5 : 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
     trail.scale.set(0.09, L * 1.9, 0.03); trail.rotation.x = PI / 2; trail.position.z = -L * 1.2; g.add(trail);
     if (!mini) { const hilt = new THREE.Mesh(box(), new THREE.MeshBasicMaterial({ color: 0xd9b45a })); hilt.scale.set(0.16, 0.03, 0.03); hilt.position.z = -L * 0.5; g.add(hilt); }
     return g;

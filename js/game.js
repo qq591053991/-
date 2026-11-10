@@ -25,6 +25,7 @@
       this.loadMeta();
       G.UI.init();
       G.UI.showMenu();
+      G.Assets.load(() => G.UI.assetsReady());
       Au.music('menu');
       this.last = performance.now();
       const loop = (ts) => { this.frame(ts); requestAnimationFrame(loop); };
@@ -201,6 +202,11 @@
         const rar = U.weighted(G.RARITY, (r) => r.w), v = Math.round(u.v * rar.mul);
         return { name: u.name, glyph: u.glyph, tag: '感悟 · ' + rar.name, desc: u.desc(v), cls: rar.cls, pick: () => { u.apply(p, v); p.cdr = Math.min(0.6, p.cdr); p.armor = Math.min(0.6, p.armor); } };
       });
+      // 已修炼青元剑诀且未大成：有机会参悟下一层
+      if (p.qy >= 1 && p.qy < G.Qingyuan.length && U.chance(0.6)) {
+        const L = G.Qingyuan[p.qy];
+        cards[U.randi(0, 2)] = { name: '青元剑诀', glyph: '元', tag: `功法 · 第${G.CN_NUM[p.qy + 1]}层【${L.name}】`, desc: L.desc, cls: 'r3', pick: () => this.gainQingyuan() };
+      }
       G.UI.choice({ title: '修为精进', sub: E.realmName(p) + ' —— 择一感悟', cards, done: () => { p.pendingLv--; } });
     },
 
@@ -247,11 +253,22 @@
       });
     },
 
+    gainQingyuan(quiet) {
+      const p = this.player, L = G.Qingyuan[p.qy];
+      if (!L) return;
+      L.apply(p); p.qy++;
+      if (!quiet) this.toast(`青元剑诀 · 第${G.CN_NUM[p.qy]}层【${L.name}】`);
+      Au.sfx('break');
+    },
+
     applyBreakthrough(i) {
       const p = this.player;
       if (i === 0) { p.maxHp += 25; p.dmgMul += 0.12; }
-      if (i === 1) { p.realm = 1; p.realmLv = 1; p.maxHp += 40; p.maxMp += 30; p.dmgMul += 0.2; }
-      if (i === 2) { p.realm = 2; p.realmLv = 1; p.maxHp += 50; p.maxMp += 40; p.dmgMul += 0.22; p.cdr = Math.min(0.6, p.cdr + 0.08); }
+      if (i === 1) { p.realm = 1; p.realmLv = 1; p.maxHp += 40; p.maxMp += 30; p.dmgMul += 0.2; if (p.qy === 0) this.gainQingyuan(true); }
+      if (i === 2) { // 结丹：炼成本命法宝青竹蜂云剑
+        p.realm = 2; p.realmLv = 1; p.maxHp += 50; p.maxMp += 40; p.dmgMul += 0.22; p.cdr = Math.min(0.6, p.cdr + 0.08);
+        if (!p.fy) { p.fy = 1; p.sp = 100; p.flags.thunder = (p.flags.thunder || 0) + 1; G.UI.skillDirty = true; }
+      }
       p.hp = p.maxHp; p.mp = p.maxMp; p.potions = Math.min(G.POTION_MAX, p.potions + 1);
       FX.ring(p.x, p.y, 10, 300, '255,230,150', 0.8, 8); FX.burst(p.x, p.y, 20, 60, { c: '255,230,150', s1: 300, g: -60, l1: 1.2 });
     },

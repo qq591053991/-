@@ -134,6 +134,8 @@
     P.web = new Pool(flat(circG, { map: webTex }));
     P.beam = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
     P.sword = new Pool(() => Mo.sword(0x96ffdc)); P.mini = new Pool(() => Mo.sword(0xffdc82, true)); P.fsword = new Pool(() => Mo.sword(0x6effc8));
+    P.swQ = new Pool(() => Mo.sword(0x5cff9a, false, 0xe6fff0)); // 青元剑诀：青色剑光
+    P.swF = new Pool(() => Mo.sword(0x9aff4a, false, 0xd8ffa8, 0xffe36a)); // 青竹蜂云剑：竹青剑身 + 金色雷弧
     P.gem = new Pool(() => { const m = new THREE.Mesh(Mo.geo.oct(), new THREE.MeshBasicMaterial({ color: 0x8affd8 })); m.scale.set(0.15, 0.24, 0.15); return m; });
     P.potion = new Pool(() => { const g = new THREE.Group(); const a = new THREE.Mesh(Mo.geo.sph(10), new THREE.MeshLambertMaterial({ color: 0xe0484a, emissive: 0x5a1012 })); a.scale.setScalar(0.24); const b = new THREE.Mesh(Mo.geo.cyl(0.5, 0.5, 8), new THREE.MeshLambertMaterial({ color: 0xd9b45a })); b.scale.set(0.09, 0.14, 0.09); b.position.y = 0.16; g.add(a, b); return g; });
     P.ball = new Pool(() => new THREE.Mesh(Mo.geo.sph(10), new THREE.MeshBasicMaterial({ color: 0xffffff })));
@@ -455,8 +457,16 @@
     for (const pr of Gm.projs) {
       const c = rgb(pr.c || '255,255,255'), x = pr.x * S, y = pr.z * S, z = pr.y * S, a = Math.atan2(pr.vy, pr.vx), r = pr.r * S;
       if (pr.kind === 'sword') {
-        const s = (pr.mini ? P.mini : P.sword).get(); s.position.set(x, y, z); s.rotation.y = PI / 2 - a;
+        const s = (pr.mini ? P.mini : pr.style === 2 ? P.swF : pr.style === 1 ? P.swQ : P.sword).get(); s.position.set(x, y, z); s.rotation.y = PI / 2 - a;
         glows.push(x, y, z, c, 0.55, pr.mini ? 0.7 : 1.1);
+        if (pr.style === 2 && !pr.mini) glows.push(x + U.rand(-0.15, 0.15), y + U.rand(-0.1, 0.1), z + U.rand(-0.15, 0.15), GOLD, 0.9, 0.35);
+      } else if (pr.kind === 'fy') { // 蜂云剑阵的小剑
+        if (ns < 500) {
+          dummy.position.set(x, y, z); dummy.rotation.set(0, PI / 2 - a, 0); dummy.scale.set(0.12, 0.05, 0.62); dummy.updateMatrix();
+          shards.setMatrixAt(ns, dummy.matrix); shards.setColorAt(ns, tmpC.set(0xdcffb0)); ns++;
+        }
+        glows.push(x, y, z, c, 0.5, 0.8);
+        if (((pr.t * 30) | 0) % 5 === 0) glows.push(x, y, z, GOLD, 0.9, 0.45);
       } else if (pr.kind === 'ice' || pr.kind === 'blade' || pr.kind === 'needle' || pr.kind === 'bolt' || pr.kind === 'arrow') {
         if (ns < 500) {
           const thin = pr.kind === 'needle' || pr.kind === 'bolt' || pr.kind === 'arrow';
@@ -480,7 +490,7 @@
     orbs.instanceMatrix.needsUpdate = shards.instanceMatrix.needsUpdate = true;
     orbs.instanceColor.needsUpdate = shards.instanceColor.needsUpdate = true;
   }
-  const WHITE = new THREE.Color(0xffffff);
+  const WHITE = new THREE.Color(0xffffff), GOLD = [1, 0.92, 0.5];
 
   function syncFx(t) {
     for (const p of G.FX.parts) {
@@ -509,7 +519,7 @@
         if (e.stT > 0.25) continue;
       }
       let m = actors.get(e);
-      if (!m) { m = Mo.forEnemy(e); if (!m.world) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); actors.set(e, m); }
+      if (!m) { m = Mo.forEnemy(e); if (!m.world && !m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); actors.set(e, m); }
       m.seen = frame;
       if (!m.world) { m.g.position.set(e.x * S, e.z * S, e.y * S); m.g.rotation.y = PI / 2 - e.face; }
       m.update(e);
@@ -525,20 +535,21 @@
         if (d === 'flame') glows.push(e.x * S, 0.45, e.y * S, rgb('255,140,50'), 0.5, 3);
         if (d === 'ghost' || d === 'skull') glows.push(e.x * S, e.z * S + 0.5, e.y * S, rgb(hexRgb(L.body)), 0.3 * alpha, 2.4);
         if (d === 'crystal') glows.push(e.x * S, 0.78, e.y * S, rgb('200,240,255'), 0.4 + (e.wind || 0) * 0.5, 1.6);
-        if (L.weapon === 'staff') glows.push(e.x * S + Math.cos(e.face) * 0.05, 1.0 * (e.scale || 1), e.y * S, rgb(hexRgb(L.trim)), 0.35 + Math.max(e.wind || 0, e.atk || 0) * 0.5, 1.2);
+        if (L.weapon === 'staff' && !m.gl) glows.push(e.x * S + Math.cos(e.face) * 0.05, 1.0 * (e.scale || 1), e.y * S, rgb(hexRgb(L.trim)), 0.35 + Math.max(e.wind || 0, e.atk || 0) * 0.5, 1.2);
       }
     }
     for (const [e, m] of actors) if (m.seen !== frame) { dyn.remove(m.g); m.dispose(); actors.delete(e); }
 
     // 主角
     if (p) {
-      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = Mo.human(p.look); heroM.g.scale.multiplyScalar(ACTOR); dyn.add(heroM.g); heroOwner = p; }
+      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = Mo.hero(p.look); if (!heroM.gl) heroM.g.scale.multiplyScalar(ACTOR); dyn.add(heroM.g); heroOwner = p; }
       heroM.g.visible = !p.dead && !(p.inv > 0 && p.dashing <= 0 && Math.floor(t * 20) % 2 === 0);
       place(heroM.g, p.x, p.y, 0); heroM.g.rotation.y = PI / 2 - p.face;
       heroM.update({ t: p.t, moving: p.moving, atk: p.atkAnim, dashing: p.dashing > 0 });
       heroM.setFlash(p.flash);
       pLight.position.set(p.x * S, 1.9, p.y * S + 0.7);
       if (!p.dead) flatAt(P.ring, p.x, p.y, 17, rgb('127,224,192'), 0.4, 0.03, 4);
+      if (p.fy && p.sp >= 100 && !p.dead) { flatAt(P.ring, p.x, p.y, 24 + Math.sin(t * 6) * 3, rgb('200,255,120'), 0.7, 0.035, 5); glows.push(p.x * S, 0.5, p.y * S, rgb('200,255,120'), 0.22, 2.4); }
       if (p.shield > 0) { const s = P.shield.get(); place(s, p.x, p.y, 30); s.scale.set(1.4, 1.8, 1.4); s.material.opacity = 0.14 + (p.shield / p.shieldMax) * 0.2; }
       if (p.flags.autoShield && p.autoShieldT <= 0) { const a = t * 2.4; glows.push(p.x * S + Math.cos(a) * 0.5, 0.6, p.y * S + Math.sin(a) * 0.5, rgb('200,215,240'), 0.9, 0.5); }
       if (p.formT > 0) for (let i = 0; i < p.formN; i++) {
@@ -691,11 +702,10 @@
       G.World.buildRoom(menuRoom, true);
     }
     setRoom(menuRoom);
-    if (!menuHero) { menuHero = Mo.human({ robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' }); scene.add(menuHero.g); }
+    if (!menuHero && G.Assets.settled) { menuHero = Mo.hero({ robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' }); scene.add(menuHero.g); }
     if (heroM) heroM.g.visible = false;
     const cx = menuRoom.w / 2, cz = menuRoom.h / 2 + 0.6;
-    menuHero.g.visible = true; menuHero.g.position.set(cx, 0, cz); menuHero.g.rotation.y = 0.5;
-    menuHero.update({ t, moving: false });
+    if (menuHero) { menuHero.g.visible = true; menuHero.g.position.set(cx, 0, cz); menuHero.g.rotation.y = 0.5; menuHero.update({ t, moving: false }); }
     pLight.position.set(cx, 1.8, cz + 0.8);
     beginPools();
     animateRoom(menuRoom, t);

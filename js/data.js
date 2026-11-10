@@ -46,7 +46,7 @@
         ['韩立', '守护灵药的妖兽……竟是一头墨蛟。'],
       ],
       bossOutro: '墨蛟伏诛，湖水尽染墨色。\n你带着满囊灵药走出禁地，换来了那枚梦寐以求的筑基丹。',
-      breakthrough: { realm: true, title: '服筑基丹 · 突破筑基', desc: '灵力化液，寿元大增。气血上限 +40，法力上限 +30，伤害 +20%。' },
+      breakthrough: { realm: true, title: '服筑基丹 · 突破筑基', desc: '灵力化液，寿元大增。气血上限 +40，法力上限 +30，伤害 +20%。\n拜入李化元门下，得授功法【青元剑诀】第一层：飞剑 +1。' },
     },
     {
       name: '燕翎堡', title: '第三章 · 魔焰滔天', theme: 2, music: 'ch2',
@@ -58,7 +58,7 @@
         ['韩立', '鬼灵门少主……看来今日难以善了。'],
       ],
       bossOutro: '血光散尽，王蝉重伤遁走。可七派败局已定。\n你启动了那座尘封的古传送阵——\n阵光亮起，再睁眼，已是万里之外的乱星海。',
-      breakthrough: { realm: true, title: '海外苦修 · 凝结金丹', desc: '金丹一成，方算踏入大道。气血上限 +50，法力上限 +40，伤害 +22%，冷却 -8%。' },
+      breakthrough: { realm: true, title: '海外苦修 · 凝结金丹', desc: '金丹一成，方算踏入大道。气血上限 +50，法力上限 +40，伤害 +22%，冷却 -8%。\n以万年天雷竹炼成本命法宝【青竹蜂云剑】：飞剑命中有几率引动辟邪神雷；\n命中积攒剑意，满后按 V 施展「蜂云剑阵」——七十二口飞剑齐出。' },
     },
     {
       name: '虚天殿', title: '第四章 · 虚天残图', theme: 3, music: 'ch3',
@@ -79,14 +79,14 @@
          swarm 飞扑 / turret 炮台 / tank 重击 / teleporter 瞬移 / exploder 自爆 / summoner 召唤 */
   G.Enemies = {
     // —— 第一章 ——
-    thug: { name: '野狼帮众', ai: 'melee', hp: 30, spd: 108, dmg: 8, r: 13, xp: 5, cost: 1,
+    thug: { name: '野狼帮众', gl: { v: 'thug', show: ['Barbarian_Hat', '1H_Axe'], atk: 'chop1' }, ai: 'melee', hp: 30, spd: 108, dmg: 8, r: 13, xp: 5, cost: 1,
       draw: 'human', look: { robe: '#6a5038', trim: '#33261a', hat: 'band', weapon: 'saber', skin: '#d9a877' } },
-    archer: { name: '野狼帮弓手', ai: 'ranged', hp: 22, spd: 92, dmg: 7, r: 12, xp: 6, cost: 1.4, keep: 300,
+    archer: { name: '野狼帮弓手', gl: { v: 'archer', show: ['2H_Crossbow'], atk: 'shoot2' }, ai: 'ranged', hp: 22, spd: 92, dmg: 7, r: 12, xp: 6, cost: 1.4, keep: 300,
       shot: { kind: 'arrow', spd: 400, n: 1, cd: 2.3 },
       draw: 'human', look: { robe: '#4d5a3a', trim: '#262e1c', hat: 'bamboo', weapon: 'bow', skin: '#d9a877' } },
     wolf: { name: '灰狼', ai: 'charger', hp: 26, spd: 125, dmg: 10, r: 13, xp: 5, cost: 1.2,
       draw: 'wolf', look: { fur: '#7d7f86', dark: '#4a4c54', eye: '#ffd45e' } },
-    ironslave: { name: '铁奴', ai: 'tank', hp: 95, spd: 62, dmg: 14, r: 19, xp: 14, cost: 3,
+    ironslave: { name: '铁奴', gl: { v: 'ironslave', show: ['Knight_Helmet'], atk: 'chop2', s: 1.22, walk: 1 }, ai: 'tank', hp: 95, spd: 62, dmg: 14, r: 19, xp: 14, cost: 3,
       draw: 'brute', look: { body: '#5d6470', dark: '#343943', eye: '#ff5a3c', skin: '#8c8f96' } },
     // —— 第二章 ——
     bat: { name: '血蝠', ai: 'swarm', hp: 15, spd: 190, dmg: 7, r: 10, xp: 3, cost: 0.7, fly: true,
@@ -97,17 +97,17 @@
       draw: 'centipede', look: { body: '#4a3a5c', dark: '#2a2036', leg: '#c9853a', eye: '#ff4d4d' } },
     flower: { name: '食人妖花', ai: 'turret', hp: 50, spd: 0, dmg: 8, r: 15, xp: 8, cost: 1.8, pattern: 'ring', pn: 8, pcd: 3.0,
       draw: 'flower', look: { petal: '#c23a5a', dark: '#7a1f38', stem: '#3f6a34', core: '#ffd45e' } },
-    disciple: { name: '掩月宗弟子', ai: 'ranged', hp: 46, spd: 100, dmg: 9, r: 13, xp: 9, cost: 2, keep: 280,
+    disciple: { name: '掩月宗弟子', gl: { v: 'disciple', show: ['1H_Wand'], atk: 'cast' }, ai: 'ranged', hp: 46, spd: 100, dmg: 9, r: 13, xp: 9, cost: 2, keep: 280,
       shot: { kind: 'fire', spd: 330, n: 3, spread: 0.22, cd: 2.6 },
       draw: 'human', look: { robe: '#7a5fa8', trim: '#e5d7ff', hat: 'bun', weapon: 'staff', skin: '#f0cfae' } },
     // —— 第三章 ——
-    ghostcult: { name: '鬼灵门弟子', ai: 'summoner', hp: 70, spd: 85, dmg: 10, r: 13, xp: 11, cost: 2.2, keep: 320, evil: true,
+    ghostcult: { name: '鬼灵门弟子', gl: { v: 'ghostcult', show: ['Rogue_Cape'], atk: 'raise' }, ai: 'summoner', hp: 70, spd: 85, dmg: 10, r: 13, xp: 11, cost: 2.2, keep: 320, evil: true,
       draw: 'human', look: { robe: '#2f3b33', trim: '#7dffb0', hat: 'hood', weapon: 'staff', skin: '#b9c7b5' } },
-    bloodguard: { name: '血侍', ai: 'melee', hp: 85, spd: 150, dmg: 14, r: 13, xp: 10, cost: 2, lunge: true, evil: true,
+    bloodguard: { name: '血侍', gl: { v: 'bloodguard', show: ['Knife', 'Knife_Offhand'], atk: 'chop1' }, ai: 'melee', hp: 85, spd: 150, dmg: 14, r: 13, xp: 10, cost: 2, lunge: true, evil: true,
       draw: 'human', look: { robe: '#7a1a22', trim: '#2a0a0e', hat: 'mask', weapon: 'saber', skin: '#d0a6a0' } },
-    ironcorpse: { name: '铁尸', ai: 'tank', hp: 210, spd: 58, dmg: 20, r: 19, xp: 18, cost: 3.2, evil: true,
+    ironcorpse: { name: '铁尸', gl: { v: 'ironcorpse', show: ['Skeleton_Warrior_Helmet'], atk: 'chop2', s: 1.2, walk: 1 }, ai: 'tank', hp: 210, spd: 58, dmg: 20, r: 19, xp: 18, cost: 3.2, evil: true,
       draw: 'brute', look: { body: '#3f5548', dark: '#22302a', eye: '#9dff6a', skin: '#7c9484', talisman: true } },
-    flamecult: { name: '魔焰门修士', ai: 'caster', hp: 75, spd: 88, dmg: 15, r: 13, xp: 11, cost: 2.3, keep: 300, evil: true,
+    flamecult: { name: '魔焰门修士', gl: { v: 'flamecult', show: ['2H_Staff'], atk: 'raise' }, ai: 'caster', hp: 75, spd: 88, dmg: 15, r: 13, xp: 11, cost: 2.3, keep: 300, evil: true,
       draw: 'human', look: { robe: '#3b2a55', trim: '#ff7b3a', hat: 'hood', weapon: 'staff', skin: '#c9b0a8' } },
     wraith: { name: '鬼影', ai: 'teleporter', hp: 55, spd: 120, dmg: 13, r: 13, xp: 9, cost: 1.8, fly: true, evil: true,
       draw: 'ghost', look: { body: '#9dffd0', dark: '#2f6a58', eye: '#ffffff' } },
@@ -121,24 +121,24 @@
     puppetarcher: { name: '机关傀儡', ai: 'ranged', hp: 130, spd: 105, dmg: 14, r: 14, xp: 13, cost: 2.4, keep: 300,
       shot: { kind: 'bolt', spd: 460, n: 1, burst: 3, cd: 2.6 },
       draw: 'puppet', look: { body: '#b89a5a', dark: '#6a5428', eye: '#6affea' } },
-    golem: { name: '镇殿石卫', ai: 'tank', hp: 380, spd: 60, dmg: 26, r: 21, xp: 22, cost: 3.5,
+    golem: { name: '镇殿石卫', gl: { v: 'golem', show: ['Knight_Helmet', '2H_Sword'], atk: 'chop2', s: 1.36, walk: 1 }, ai: 'tank', hp: 380, spd: 60, dmg: 26, r: 21, xp: 22, cost: 3.5,
       draw: 'brute', look: { body: '#7f8fa8', dark: '#465066', eye: '#6ad0ff', skin: '#aab8cc', stone: true } },
     yinhun: { name: '玄阴魂', ai: 'teleporter', hp: 110, spd: 130, dmg: 18, r: 13, xp: 12, cost: 2, fly: true, evil: true,
       draw: 'ghost', look: { body: '#b79dff', dark: '#3d2f7a', eye: '#ffe07a' } },
-    corpse: { name: '铜甲尸', ai: 'melee', hp: 260, spd: 110, dmg: 22, r: 16, xp: 10, cost: 2.5, evil: true, minion: true,
+    corpse: { name: '铜甲尸', gl: { v: 'corpse', show: [], atk: 'punch', s: 1.12 }, ai: 'melee', hp: 260, spd: 110, dmg: 22, r: 16, xp: 10, cost: 2.5, evil: true, minion: true,
       draw: 'brute', look: { body: '#8a6a3a', dark: '#4a3618', eye: '#a0ff6a', skin: '#8f9a7a', talisman: true } },
   };
 
   G.Bosses = {
-    modaifu: { name: '墨大夫', title: '神手谷主 · 夺舍者', xp: 60, hp: 2800, r: 16, spd: 120, dmg: 14, evil: false,
+    modaifu: { name: '墨大夫', gl: { v: 'modaifu', show: [], atk: 'punch', s: 1.2 }, title: '神手谷主 · 夺舍者', xp: 60, hp: 2800, r: 16, spd: 120, dmg: 14, evil: false,
       draw: 'human', scale: 1.25,
       look: { robe: '#4a4f58', trim: '#c9ccd4', hat: 'elder', weapon: 'silverhand', skin: '#cdbfa8', hair: '#9a9a9a' } },
     mojiao: { name: '墨蛟', title: '禁地湖主', xp: 110, hp: 5400, r: 26, spd: 150, dmg: 22, evil: false, draw: 'jiao',
       look: { body: '#232838', dark: '#0e111a', belly: '#5a6a8a', eye: '#ffd45e' } },
-    wangchan: { name: '王蝉', title: '鬼灵门少主', xp: 160, hp: 17000, r: 16, spd: 140, dmg: 30, evil: true,
+    wangchan: { name: '王蝉', gl: { v: 'wangchan', show: ['Knight_Cape'], atk: 'cast', s: 1.22 }, title: '鬼灵门少主', xp: 160, hp: 18500, r: 16, spd: 140, dmg: 30, evil: true,
       draw: 'human', scale: 1.25,
       look: { robe: '#5a0f1a', trim: '#ff5a6a', hat: 'crown', weapon: 'none', skin: '#e6d0d0', hair: '#1a0a0e' } },
-    jiyin: { name: '极阴祖师', title: '极阴岛主 · 元婴老怪', xp: 0, hp: 34000, r: 17, spd: 130, dmg: 40, evil: true,
+    jiyin: { name: '极阴祖师', gl: { v: 'jiyin', show: ['2H_Staff', 'Mage_Cape'], atk: 'raise', s: 1.3 }, title: '极阴岛主 · 元婴老怪', xp: 0, hp: 56000, r: 17, spd: 130, dmg: 40, evil: true,
       draw: 'human', scale: 1.35,
       look: { robe: '#1c2a24', trim: '#6aff9a', hat: 'elder', weapon: 'none', skin: '#a9b8a6', hair: '#d8e0d8' } },
   };
@@ -171,7 +171,6 @@
     changchun: { name: '长春功', glyph: '春', rar: 1, desc: '每秒回复 1.2 点气血。', apply: (p) => { p.hpRegen += 1.2; } },
     zhayan: { name: '眨眼剑法', glyph: '瞬', rar: 1, desc: '暴击率 +12%。', apply: (p) => { p.crit += 0.12; } },
     luoyan: { name: '罗烟步', glyph: '烟', rar: 2, desc: '遁术可用次数 +1。', apply: (p) => { p.dashMax += 1; p.dashN += 1; } },
-    qingyuan: { name: '青元剑诀', glyph: '元', rar: 3, desc: '每次出剑额外多御一柄飞剑。', apply: (p) => { p.swords += 1; }, stack: 3 },
     dayan: { name: '大衍诀', glyph: '衍', rar: 2, desc: '神识大涨，神通冷却 -18%。', apply: (p) => { p.cdr += 0.18; } },
     jinlei: { name: '金雷竹', glyph: '竹', rar: 3, desc: '飞剑命中有 25% 几率引动辟邪神雷，在敌人间跳跃 3 次。', apply: (p) => { p.flags.thunder = (p.flags.thunder || 0) + 1; } },
     chongluan: { name: '噬金虫卵', glyph: '卵', rar: 2, desc: '击杀敌人时有 40% 几率孵出一只噬金虫助战。', apply: (p) => { p.flags.beetle = 1; } },
@@ -183,7 +182,6 @@
     lingshui: { name: '明清灵水', glyph: '明', rar: 1, desc: '灵目洞明：显露本层全部房间，灵石获取 +40%。', apply: (p) => { p.flags.reveal = 1; p.stoneMul += 0.4; } },
     lingru: { name: '万年灵乳', glyph: '乳', rar: 3, desc: '气血归零时，立刻回复全部气血法力（仅一次）。', apply: (p) => { p.flags.revive = (p.flags.revive || 0) + 1; } },
     zhuji: { name: '定灵丹', glyph: '丹', rar: 1, desc: '气血上限 +30，并回复等量气血。', apply: (p) => { p.maxHp += 30; p.hp += 30; }, stack: 9 },
-    fengyun: { name: '青竹蜂云剑', glyph: '蜂', rar: 3, desc: '飞剑穿透 +1，飞剑伤害 +15%。', apply: (p) => { p.pierce += 1; p.swordMul += 0.15; }, stack: 2 },
     lianqi: { name: '敛气术', glyph: '敛', rar: 1, desc: '对每个敌人的首次命中必定暴击。', apply: (p) => { p.flags.firstCrit = 1; } },
     zimu: { name: '金蚨子母刃', glyph: '蚨', rar: 2, desc: '飞剑命中后分出两柄子刃，向两侧激射。', apply: (p) => { p.flags.split = 1; } },
     tianjia: { name: '六丁天甲符', glyph: '甲', rar: 2, desc: '受到的伤害 -15%，受击后的无敌时间延长。', apply: (p) => { p.armor += 0.15; p.invDur += 0.35; } },
@@ -196,6 +194,22 @@
     qingsuo: { name: '青索飞剑', glyph: '索', rar: 1, desc: '攻击速度 +18%。', apply: (p) => { p.atkSpd *= 1.18; }, stack: 3 },
   });
   for (const k in R) R[k].id = k;
+
+  /* ---------------- 青元剑诀（功法）----------------
+     筑基后习得第一层；此后升层时有机会参悟下一层。 */
+  G.Qingyuan = [
+    { name: '剑光分化', desc: '飞剑 +1', apply: (p) => { p.swords += 1; } },
+    { name: '青元剑气', desc: '飞剑伤害 +15%，射程 +10%', apply: (p) => { p.swordMul += 0.15; p.rangeMul += 0.1; } },
+    { name: '剑光再分', desc: '飞剑 +1', apply: (p) => { p.swords += 1; } },
+    { name: '剑芒吞吐', desc: '飞剑穿透 +1，暴击率 +5%', apply: (p) => { p.pierce += 1; p.crit += 0.05; } },
+    { name: '三分剑光', desc: '飞剑 +1', apply: (p) => { p.swords += 1; } },
+    { name: '剑诀大成', desc: '攻击速度 +20%，飞剑伤害 +15%', apply: (p) => { p.atkSpd *= 1.2; p.swordMul += 0.15; } },
+  ];
+  G.CN_NUM = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+
+  /* ---------------- 青竹蜂云剑（本命法宝）----------------
+     结丹后炼成。飞剑命中积攒剑意，满 100 可施展「蜂云剑阵」：七十二口飞剑倾巢而出。 */
+  G.Fengyun = { swords: 72, bites: 4, life: 7.5, dmgMul: 0.45, thunder: 0.1, perHit: 0.5, perKill: 1.5 };
 
   /* ---------------- 修为感悟（升级三选一） ---------------- */
   G.Upgrades = [
@@ -317,5 +331,7 @@
     '房间不必全清，但机缘、坊市与药园往往值得绕路。',
     '重复获得同一门神通会令其升阶。',
     '陨落后会获得道心，可在洞府中永久强化根基。',
+    '筑基之后方可修炼青元剑诀；结丹之后才能炼成本命法宝青竹蜂云剑。',
+    '青竹蜂云剑的剑意靠飞剑命中积攒，满了按 V —— 七十二口飞剑齐出。',
   ];
 })();

@@ -5,7 +5,7 @@
   const E = G.Ent, FX = G.FX, Au = G.Audio;
 
   const FLY_Z = { bat: 26, skull: 18, wraith: 6, yinhun: 6, firespirit: 8 };
-  const HPM = [1.6, 2.3, 3.4, 5.0], DMGM = [1, 1.25, 1.5, 1.8];
+  const HPM = [1.6, 2.3, 3.4, 5.6], DMGM = [1, 1.25, 1.5, 1.8];
   const SHOT_C = { arrow: '235,225,195', fire: '255,140,60', bolt: '110,255,234', orb: '255,90,90', ice: '150,220,255' };
 
   /* ============================ 生成 ============================ */

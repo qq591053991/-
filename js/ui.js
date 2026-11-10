@@ -14,7 +14,8 @@
       window.addEventListener('keydown', (e) => {
         if (this.blocking && this.onKey) { this.onKey(e.code); e.preventDefault(); }
       });
-      $('btn-start').onclick = () => { Au.init(); Au.sfx('pick'); G.Game.startRun(); };
+      $('btn-start').onclick = () => { if (!G.Assets.settled) return; Au.init(); Au.sfx('pick'); G.Game.startRun(); };
+      $('btn-start').disabled = true; $('btn-start').textContent = '载入中…';
       $('btn-meta').onclick = () => { Au.init(); Au.sfx('ui'); this.metaPanel(); };
       $('btn-help').onclick = () => { Au.init(); Au.sfx('ui'); this.help(); };
       // 触屏按钮
@@ -27,7 +28,13 @@
         el.addEventListener('mousedown', down); el.addEventListener('mouseup', up); el.addEventListener('mouseleave', up);
       };
       bind($('t-dash'), 'dash'); bind($('t-potion'), 'potion'); bind($('t-act'), 'act'); bind($('t-pause'), 'pause');
-      document.querySelectorAll('#skills .slot').forEach((el) => bind(el, 'skill' + el.dataset.i));
+      document.querySelectorAll('#skills .slot[data-i]').forEach((el) => bind(el, 'skill' + el.dataset.i));
+      bind($('ult'), 'ult');
+    },
+
+    assetsReady() {
+      const b = $('btn-start'); b.disabled = false; b.textContent = '踏入仙途';
+      if (G.Assets.failed) this.toast('社区模型未能加载，已改用内置模型');
     },
 
     /* ---------------- 通用弹层 ---------------- */
@@ -61,6 +68,7 @@
             <p><kbd>鼠标左键</kbd> 御剑攻击（按住连发）</p>
             <p><kbd>空格</kbd> 罗烟步 · 无敌闪避</p>
             <p><kbd>Q</kbd>/<kbd>右键</kbd>　<kbd>E</kbd>　<kbd>R</kbd> 施展神通</p>
+            <p><kbd>V</kbd> 本命法宝 · 蜂云剑阵（结丹后）</p>
             <p><kbd>C</kbd> 服用丹药　<kbd>F</kbd> 交互</p>
             <p><kbd>Esc</kbd> 暂停/查看　<kbd>M</kbd> 静音</p>
           </div>
@@ -155,7 +163,7 @@
     },
 
     breakthrough(title, desc, done) {
-      this.open(`<div class="break"><div class="halo"></div><h1>${esc(title)}</h1><p>${esc(desc)}</p><button class="btn" id="x-close">继续</button></div>`, 'dim');
+      this.open(`<div class="break"><div class="halo"></div><h1>${esc(title)}</h1><p>${esc(desc).replace(/\n/g, '<br>').replace(/【(.+?)】/g, '<b>【$1】</b>')}</p><button class="btn" id="x-close">继续</button></div>`, 'dim');
       const fin = () => { this.close(); done && done(); };
       $('x-close').onclick = fin;
       let ready = false; setTimeout(() => (ready = true), 500);
@@ -227,10 +235,12 @@
     pause() {
       const Gm = G.Game, p = Gm.player;
       const skills = p.skills.map((s, i) => { const d = G.Skills[s.id]; return `<div class="row"><span class="glyph" style="color:${d.color};border-color:${d.color}">${d.glyph}</span><div class="info"><b>${d.name} · 第${ROMAN[s.lv]}重 <small>[${'QER'[i]}]</small></b><em>${esc(d.desc(s.lv))}</em></div></div>`; }).join('');
+      const arts = `<div class="row"><span class="glyph r3">${p.qy ? '元' : '春'}</span><div class="info"><b>${p.qy ? '青元剑诀 · 第' + G.CN_NUM[p.qy] + '层' : '长春功'}</b><em>${p.qy ? G.Qingyuan.slice(0, p.qy).map((x) => x.desc).join('；') : '炼气期功法。筑基之后方可修炼青元剑诀。'}</em></div></div>` +
+        `<div class="row ${p.fy ? '' : 'sold'}"><span class="glyph r3">蜂</span><div class="info"><b>青竹蜂云剑 ${p.fy ? '<small>[V] 剑意 ' + Math.floor(p.sp) + '/100</small>' : '<small>未炼成</small>'}</b><em>${p.fy ? '本命法宝。飞剑命中有几率引动辟邪神雷；命中积攒剑意，满后施展「蜂云剑阵」，七十二口飞剑齐出。' : '结丹之后，以万年天雷竹炼成的本命法宝。'}</em></div></div>`;
       const relics = p.relicList.map((id) => { const r = G.Relics[id]; return `<div class="row"><span class="glyph r${r.rar}">${r.glyph}</span><div class="info"><b>${r.name}${p.relics[id] > 1 ? ' ×' + p.relics[id] : ''}</b><em>${esc(r.desc)}</em></div></div>`; }).join('') || '<p class="sub">尚无法宝。</p>';
       this.open(`<div class="panel pause"><h2>${G.Chapters[Gm.chapter].title}</h2>
         <div class="cols"><div><h3>修为</h3><div class="stats">${this.statLine(p)}</div></div>
-        <div><h3>神通</h3><div class="list">${skills}</div><h3>法宝</h3><div class="list scroll">${relics}</div></div></div>
+        <div><h3>功法 · 本命法宝</h3><div class="list">${arts}</div><h3>神通</h3><div class="list">${skills}</div><h3>法宝</h3><div class="list scroll">${relics}</div></div></div>
         <div class="btns"><button class="btn" id="x-close">继续修行</button><button class="btn ghost" id="x-mute">${Au.muted ? '开启声音' : '静音'}</button><button class="btn ghost" id="x-quit">放弃此世</button></div></div>`, 'dim');
       $('x-close').onclick = () => { Au.sfx('ui'); this.close(); };
       $('x-mute').onclick = () => { Au.toggleMute(); this.pause(); };
@@ -287,19 +297,30 @@
       // 神通栏
       if (this.skillDirty) {
         this.skillDirty = false;
-        document.querySelectorAll('#skills .slot').forEach((el) => {
+        document.querySelectorAll('#skills .slot[data-i]').forEach((el) => {
           const s = p.skills[+el.dataset.i];
           if (s) { const d = G.Skills[s.id]; el.className = 'slot on'; el.style.setProperty('--c', d.color); el.querySelector('.g').textContent = d.glyph; el.querySelector('.lv').textContent = PIP[s.lv]; el.title = `${d.name}（第${ROMAN[s.lv]}重）\n${d.desc(s.lv)}\n法力 ${d.mp}`; }
           else { el.className = 'slot'; el.querySelector('.g').textContent = ''; el.querySelector('.lv').textContent = ''; el.title = '空 —— 可在机缘、坊市习得神通'; }
         });
       }
-      document.querySelectorAll('#skills .slot').forEach((el) => {
+      document.querySelectorAll('#skills .slot[data-i]').forEach((el) => {
         const s = p.skills[+el.dataset.i]; if (!s) return;
         const k = s.cd > 0 ? Math.round((s.cd / s.max) * 100) : 0, key = 'cd' + el.dataset.i;
         if (this.cache[key] !== k) { this.cache[key] = k; el.querySelector('.cd').style.height = k + '%'; }
         const low = p.mp < G.Skills[s.id].mp, lk = 'lo' + el.dataset.i;
         if (this.cache[lk] !== low) { this.cache[lk] = low; el.classList.toggle('nomp', low); }
       });
+      // 功法与本命法宝
+      const gf = (p.qy ? `青元剑诀 · 第${G.CN_NUM[p.qy]}层` : '长春功') + (p.fy ? '|青竹蜂云剑' : '');
+      if (this.cache.gf !== gf) { this.cache.gf = gf; const a = gf.split('|'); $('gongfa').innerHTML = '功法 · ' + a[0] + (a[1] ? '<br><b>本命 · ' + a[1] + '</b>' : ''); }
+      const ue = $('ult'), uk = p.fy ? Math.floor(p.sp) : -1;
+      if (this.cache.ult !== uk) {
+        this.cache.ult = uk;
+        ue.classList.toggle('locked', !p.fy); ue.classList.toggle('full', p.fy && p.sp >= 100);
+        ue.querySelector('.cd').style.height = p.fy ? 100 - uk + '%' : '0%';
+        ue.querySelector('.lv').textContent = p.fy ? (p.sp >= 100 ? '剑意满' : uk) : '结丹';
+        ue.title = p.fy ? '本命法宝【青竹蜂云剑】\n飞剑命中积攒剑意，满 100 后按 V：七十二口飞剑倾巢而出，自行追击并引动辟邪神雷。' : '本命法宝 —— 结丹之后方可炼成';
+      }
       // 法宝栏
       if (this.relicDirty) {
         this.relicDirty = false;

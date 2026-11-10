@@ -74,6 +74,7 @@
       stones: meta.luck * 30, potions: 1 + meta.bag, drops: meta.vial,
       level: 1, xp: 0, xpNeed: 40, realm: 0, realmLv: 1, pendingLv: 0,
       atkT: 0, atkAnim: 0, shield: 0, shieldT: 0, shieldMax: 0, autoShieldT: 0,
+      qy: 0, fy: 0, sp: 0, // 青元剑诀层数 / 是否炼成青竹蜂云剑 / 剑意
       formT: 0, formN: 0, formLv: 1, formTick: 0, potionCd: 0,
       look: { robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' },
     };
@@ -170,6 +171,7 @@
       for (let i = 0; i < n; i++) E.dropPickup('stone', e.x, e.y, Math.round(U.randi(2, 4) * (1 + ch * 0.25) * (e.boss ? 3 : 1)));
       if (!e.boss && U.chance(e.elite ? 0.5 : 0.035)) E.dropPickup('potion', e.x, e.y, 1);
     }
+    if (p.fy) p.sp = Math.min(100, p.sp + G.Fengyun.perKill);
     if (p.flags.leech) p.hp = Math.min(p.maxHp, p.hp + p.flags.leech);
     if (p.flags.evilBane && e.def.evil) p.mp = Math.min(p.maxMp, p.mp + 6);
     if (p.flags.beetle && U.chance(0.4)) E.spawnBeetle(e.x, e.y, 1);
@@ -210,7 +212,7 @@
     const spd = 760 * (0.8 + 0.2 * p.rangeMul), life = (470 * p.rangeMul) / spd;
     for (let i = 0; i < n; i++) {
       const a = base + (i - (n - 1) / 2) * 0.13;
-      E.shootP(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { kind: 'sword', spd, life, dmg: swordDamage(p), pierce: p.pierce, sword: true, r: 9, c: '150,255,220' });
+      E.shootP(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { kind: 'sword', spd, life, dmg: swordDamage(p), pierce: p.pierce, sword: true, r: 9, style: p.fy ? 2 : p.qy ? 1 : 0, c: p.fy ? '170,255,110' : p.qy ? '110,255,170' : '150,255,220' });
     }
     p.atkAnim = 1; Au.sfx('sword');
   }
@@ -222,7 +224,8 @@
     FX.burst(pr.x, pr.y, pr.z, 4, { c: pr.c, s1: 130, l1: 0.3 });
     if (pr.mini) return;
     if (p.flags.iceflame && !e.dead) { e.slowT = Math.max(e.slowT, 1.6); e.burnT = Math.max(e.burnT, 2.4); }
-    if (p.flags.thunder && U.chance(0.25)) E.chainThunder(e, pr.dmg * 0.7, 3);
+    if (p.fy) p.sp = Math.min(100, p.sp + G.Fengyun.perHit);
+    if (p.flags.thunder && U.chance(0.06 + 0.14 * p.flags.thunder)) E.chainThunder(e, pr.dmg * 0.7, 3);
     if (p.flags.split && !pr.back) {
       const a = Math.atan2(pr.vy, pr.vx);
       for (const d of [-1, 1]) {
@@ -253,7 +256,26 @@
 
   E.spawnBeetle = function (x, y, lv) {
     const p = G.Game.player, a = U.rand(TAU);
-    E.shootP(x, y, a, { kind: 'beetle', spd: 250, life: 7, dmg: 7 * (1 + 0.25 * (lv - 1)) * p.spellMul * p.dmgMul, bites: 4, cool: 0.2, homing: 9, r: 7, z: 14, c: '255,210,80', ghost: true });
+    E.shootP(x, y, a, { kind: 'beetle', swarm: true, spd: 250, life: 7, dmg: 7 * (1 + 0.25 * (lv - 1)) * p.spellMul * p.dmgMul, bites: 4, cool: 0.2, homing: 9, r: 7, z: 14, c: '255,210,80', ghost: true });
+  };
+
+  /* 青竹蜂云剑 · 蜂云剑阵：七十二口飞剑倾巢而出，自行追击 */
+  E.castUlt = function () {
+    const Gm = G.Game, p = Gm.player, F = G.Fengyun;
+    if (!p.fy || p.sp < 100 || p.dead) { if (p.fy && !(p.noMpT > 0)) { FX.text(p.x, p.y, 58, '剑意未满', '#b8ff8a', 13); Au.sfx('deny'); p.noMpT = 0.6; } return false; }
+    p.sp = 0;
+    const dmg = swordDamage(p) * F.dmgMul;
+    for (let i = 0; i < F.swords; i++) {
+      const a = (i / F.swords) * TAU + U.rand(-0.1, 0.1);
+      E.shootP(p.x + Math.cos(a) * 16, p.y + Math.sin(a) * 16, a, { kind: 'fy', swarm: true, fy: true, spd: U.rand(330, 460), life: F.life + U.rand(-0.6, 0.6), dmg, bites: F.bites,
+        cool: 0.15 + (i / F.swords) * 0.55, homing: 7.5, r: 7, z: U.rand(16, 40), c: '170,255,110', ghost: true });
+    }
+    FX.ring(p.x, p.y, 10, 240, '170,255,110', 0.5, 6); FX.ring(p.x, p.y, 10, 150, '255,235,130', 0.4, 4);
+    FX.burst(p.x, p.y, 24, 40, { c: '200,255,140', s1: 320, l1: 0.7 });
+    FX.text(p.x, p.y, 70, '蜂云剑阵', '#d8ffb0', 22);
+    Gm.shake(8); Gm.flash = 0.14; Au.sfx('bigsword'); Au.sfx('thunder');
+    Gm.stats.casts++; p.atkAnim = 1;
+    return true;
   };
 
   E.explode = function (x, y, r, dmg, c, opts = {}) {
@@ -284,7 +306,7 @@
         else {
           if (!pr.tgt || pr.tgt.dead || pr.tgt.untarget) { pr.tgt = E.nearestEnemy(pr.x, pr.y, 600); }
           if (pr.tgt) { tx = pr.tgt.x; ty = pr.tgt.y; ok = true; }
-          else if (pr.kind === 'beetle') { tx = p.x + Math.cos(pr.t * 3 + i) * 50; ty = p.y + Math.sin(pr.t * 3 + i) * 50; ok = true; }
+          else if (pr.swarm) { const rr = pr.fy ? 70 + (i % 5) * 9 : 50; tx = p.x + Math.cos(pr.t * 3 + i) * rr; ty = p.y + Math.sin(pr.t * 3 + i) * rr; ok = true; }
         }
         if (ok) {
           const sp = Math.hypot(pr.vx, pr.vy) || 1, cur = Math.atan2(pr.vy, pr.vx);
@@ -327,10 +349,11 @@
           if (!hitIt) continue;
           pr.hit.add(e);
           if (pr.sword) swordHit(e, pr);
-          else if (pr.kind === 'beetle') {
-            E.dmgEnemy(e, pr.dmg, { noCrit: true, c: '#ffd24a' });
-            pr.bites--; pr.cool = 0.4; pr.hit.clear();
-            const a = U.rand(TAU); pr.vx = Math.cos(a) * 250; pr.vy = Math.sin(a) * 250;
+          else if (pr.swarm) {
+            E.dmgEnemy(e, pr.dmg, { noCrit: true, c: pr.fy ? '#c8ff8a' : '#ffd24a' });
+            if (pr.fy) { FX.burst(pr.x, pr.y, pr.z, 3, { c: '255,235,130', s1: 110, l1: 0.25 }); if (!e.dead && U.chance(G.Fengyun.thunder)) E.chainThunder(e, pr.dmg * 1.2, 1); }
+            pr.bites--; pr.cool = pr.fy ? 0.32 : 0.4; pr.hit.clear(); pr.tgt = null;
+            const a = U.rand(TAU), sp = pr.fy ? 380 : 250; pr.vx = Math.cos(a) * sp; pr.vy = Math.sin(a) * sp;
             if (pr.bites <= 0) dead = true;
           } else if (pr.kind === 'fire') { dead = true; }
           else {
@@ -339,7 +362,7 @@
             if (pr.slow && !e.dead) e.slowT = Math.max(e.slowT, pr.slow);
             FX.burst(pr.x, pr.y, pr.z, 4, { c: pr.c, s1: 120, l1: 0.3 });
           }
-          if (pr.kind !== 'beetle') { if (pr.pierce > 0) pr.pierce--; else if (!pr.back) dead = true; }
+          if (!pr.swarm) { if (pr.pierce > 0) pr.pierce--; else if (!pr.back) dead = true; }
           if (dead) break;
         }
       } else if (!dead && pr.from === 1) {
@@ -586,6 +609,7 @@
     if (I.hit('KeyQ') || I.hit('Mouse2') || I.hit('skill0')) E.castSkill(0);
     if (I.hit('KeyE') || I.hit('skill1')) E.castSkill(1);
     if (I.hit('KeyR') || I.hit('skill2')) E.castSkill(2);
+    if (I.hit('KeyV') || I.hit('ult')) E.castUlt();
 
     // 丹药
     if ((I.hit('KeyC') || I.hit('KeyG') || I.hit('potion')) && p.potionCd <= 0) {
