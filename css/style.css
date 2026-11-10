@@ -33,7 +33,7 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px; b
 .btn.green:not(:disabled) { border-color: rgba(125, 255, 176, 0.5); color: #b8ffd2; }
 
 /* ---------- 主菜单 ---------- */
-#menu { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 26px; text-align: center; padding: 20px; }
+#menu { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 26px; text-align: center; padding-block: 20px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 #menu.show { display: flex; }
 #menu .title em { font-style: normal; font-size: 13px; letter-spacing: 4px; color: rgba(200, 225, 215, 0.7); }
 #menu .title h1 { font-family: var(--kai); font-size: clamp(56px, 11vw, 112px); font-weight: 700; letter-spacing: 0.18em; margin: 8px 0 8px 0.18em; color: #f4efe0;
@@ -104,7 +104,7 @@ body.touch #t-dash { right: calc(22px + var(--sr)); bottom: calc(26px + var(--sb
 body.touch #t-potion { right: calc(112px + var(--sr)); bottom: calc(20px + var(--sb)); color: #ff9c94; border-color: #ff9c94; }
 body.touch #t-act { right: calc(26px + var(--sr)); bottom: calc(196px + var(--sb)); display: none; border-color: var(--gold); color: var(--gold); }
 body.touch #t-act.show { display: block; }
-body.touch #t-pause { right: calc(250px + var(--sr)); top: calc(12px + var(--st)); width: 40px; height: 40px; font-size: 16px; }
+body.touch #t-pause { right: calc(14px + var(--sr)); top: calc(198px + var(--st)); width: 40px; height: 40px; font-size: 16px; }
 body.touch #skills { left: auto; right: calc(112px + var(--sr)); bottom: calc(94px + var(--sb)); transform: none; gap: 8px; }
 body.touch #skills .dash { display: none; }
 body.touch .slot { width: 60px; height: 60px; border-radius: 50%; }
@@ -123,7 +123,7 @@ body.touch #prompt kbd { display: none; }
 @keyframes toastin { from { opacity: 0; transform: translateY(8px); } }
 
 /* ---------- 弹层 ---------- */
-#overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+#overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); z-index: 10; }
 #overlay.show { display: flex; }
 #overlay.dim { background: rgba(4, 7, 12, 0.72); backdrop-filter: blur(2px); }
 #overlay.black { background: radial-gradient(ellipse at center, rgba(14, 24, 34, 0.96), rgba(2, 4, 8, 0.99)); cursor: pointer; }
@@ -211,6 +211,7 @@ body.touch #prompt kbd { display: none; }
 @media (max-width: 760px), (max-height: 520px) {
   #hud-tl { width: 200px; left: calc(10px + var(--sl)); top: calc(8px + var(--st)); } #realm { font-size: 16px; }
   #minimap { width: 150px; height: 102px; } #chap { font-size: 13px; }
+  body.touch #t-pause { top: calc(142px + var(--st)); }
   .card { width: 30%; min-width: 150px; min-height: 200px; padding: 14px 10px; } .card .glyph { width: 44px; height: 44px; font-size: 24px; } .card b { font-size: 18px; } .card p { font-size: 12px; }
   .choice h2, .panel h2 { font-size: 24px; } .sub { margin-bottom: 10px; }
   .cols { grid-template-columns: 1fr; gap: 6px; } .panel { padding: 16px 14px; }
