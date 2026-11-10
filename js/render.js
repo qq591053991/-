@@ -17,7 +17,7 @@
   let cur = null, curRoom = null, frame = 0, camSnap = true, maxAniso = 1;
   const camT = new THREE.Vector3(), built = new Set();
   const roomLights = [], mists = [], motes = [];
-  const actors = new Map(), inters = new Map(), allyM = new Map();
+  const actors = new Map(), inters = new Map(), allyM = new Map(), petM = new Map();
   let heroM = null, heroOwner = null, menuRoom = null, menuHero = null;
   let vignette = null, glowTex = null, webTex = null, glyphTex = null;
   const v3 = new THREE.Vector3(), dummy = new THREE.Object3D(), tmpC = new THREE.Color();
@@ -76,7 +76,7 @@
   };
 
   let glows, dusts, orbs, shards, orbRims, shardRims, fySw, bugs, P = {};
-  let trailMesh, trPos, trCol, trQ = 0, arrayTex = null, bugSeq = 0;
+  let trailMesh, trPos, trCol, trQ = 0, arrayTex = null, bugSeq = 0, fyN = 0, heroS0 = 1;
   const ZHU = '255,74,50';       // 朱砂：一切危险区域的预警色
   const formTr = [], menuTr = [{}, {}, {}], hoverTr = [];
 
@@ -182,6 +182,11 @@
     P.potion = new Pool(() => { const g = new THREE.Group(); const a = new THREE.Mesh(Mo.geo.sph(10), new THREE.MeshLambertMaterial({ color: 0xe0484a, emissive: 0x5a1012 })); a.scale.setScalar(0.24); const b = new THREE.Mesh(Mo.geo.cyl(0.5, 0.5, 8), new THREE.MeshLambertMaterial({ color: 0xd9b45a })); b.scale.set(0.09, 0.14, 0.09); b.position.y = 0.16; g.add(a, b); return g; });
     P.ball = new Pool(() => new THREE.Mesh(Mo.geo.sph(10), new THREE.MeshBasicMaterial({ color: 0xffffff })));
     P.giant = new Pool(() => Mo.giantSword());
+    // 法宝的实体：金光砖、元磁神山、混元钵、土牢的石柱
+    P.brick = new Pool(() => { const g = new THREE.Group(), a = new THREE.Mesh(Mo.geo.box(), new THREE.MeshBasicMaterial({ color: 0xffe9a8 })), b = new THREE.Mesh(Mo.geo.box(), new THREE.MeshBasicMaterial({ color: 0xffb93c, side: THREE.BackSide })); b.scale.setScalar(1.16); g.add(a, b); return g; });
+    P.hill = new Pool(() => { const g = new THREE.Group(), a = new THREE.Mesh(Mo.geo.cone(6), new THREE.MeshPhongMaterial({ color: 0x5c6470, emissive: 0x2c2416, flatShading: true, shininess: 6 })), b = new THREE.Mesh(Mo.geo.cone(6), new THREE.MeshBasicMaterial({ color: 0xd0a858, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false })); b.scale.setScalar(1.14); g.add(a, b); return g; });
+    P.bowl = new Pool(() => { const m = new THREE.Mesh(Mo.geo.dome(), new THREE.MeshLambertMaterial({ color: 0xd6a04e, emissive: 0x5a3a10, side: THREE.DoubleSide })); m.rotation.x = PI; return m; });
+    P.rock = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshLambertMaterial({ color: 0x8e7650, emissive: 0x1c140a })));
     P.shield = new Pool(() => new THREE.Mesh(Mo.geo.sph(14), new THREE.MeshBasicMaterial({ color: 0xbcd8ff, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending })));
 
     window.addEventListener('resize', () => this.resize());
@@ -357,6 +362,7 @@
     for (const m of actors.values()) { dyn.remove(m.g); m.dispose(); } actors.clear();
     for (const m of inters.values()) { dyn.remove(m.g); for (const mt of m.mats) mt.dispose(); } inters.clear();
     for (const m of allyM.values()) { dyn.remove(m.g); m.dispose(); } allyM.clear();
+    for (const m of petM.values()) { dyn.remove(m.g); m.dispose(); } petM.clear();
   }
 
   function setRoom(room) {
@@ -450,6 +456,7 @@
     for (const h of Gm.haz) {
       // c 是招式本身的颜色（流派色）；wc 是预警色：敌方一律朱砂
       const c = rgb(h.c), foe = h.from === 1, wc = foe ? rgb(ZHU) : c;
+      if (h.type === 'zone') { syncZone(h, c, t); continue; }
       if (h.type === 'circle' || h.type === 'lob') {
         const k = Math.min(1, h.t / (h.type === 'lob' ? h.dur : h.delay));
         if (h.kind === 'giant') { // 巨剑术：阵图 + 光柱 + 自天而降的巨剑
@@ -459,6 +466,18 @@
           const gsw = P.giant.get(); place(gsw, h.x, h.y, 520 * (1 - k * k)); gsw.rotation.y = t * 1.5;
           for (const mt of gsw.userData.mats) mt.opacity = mt.userData.o0 * (0.3 + k * 0.7);
           glows.push(gsw.position.x, gsw.position.y + 1.4, gsw.position.z, c, 0.5, 4);
+          continue;
+        }
+        if (!foe) { // 我方的落点：不用朱砂，只画一圈流派色的细环，再加上法宝本身
+          flatAt(P.circ, h.x, h.y, h.r, c, 0.05 + k * 0.1, 0.02, 2); flatAt(P.ring, h.x, h.y, h.r, c, 0.55, 0.03, 4);
+          const fall = 1 - k * k;
+          if (h.kind === 'brick') { const b = P.brick.get(); b.position.set(h.x * S, 0.3 + fall * 9, h.y * S); b.rotation.set(0, t * 2 + h.x, 0); b.scale.set(1.0, 0.5, 0.66); glows.push(b.position.x, b.position.y, b.position.z, c, 0.6, 2.6); }
+          else if (h.kind === 'hill') {
+            const m = P.hill.get(), sc = h.r * S * 1.05; m.position.set(h.x * S, sc * 0.55 + fall * 13, h.y * S); m.rotation.set(0, h.x, 0); m.scale.set(sc, sc * 1.1, sc);
+            for (let i = 0; i < 5; i++) { const a = t * 3 + i * 1.26, rr = (h.pull || h.r) * (1 - ((t * 1.4 + i * 0.2) % 1)); glows.push((h.x + Math.cos(a) * rr) * S, 0.2, (h.y + Math.sin(a) * rr) * S, c, 0.6, 0.5); }
+          } else if (h.kind === 'leizi') { const b = P.ball.get(); place(b, U.lerp(h.sx, h.x, k), U.lerp(h.sy, h.y, k), 16 + Math.sin(k * PI) * 110); b.scale.setScalar(0.2); b.material.color.setRGB(1, 0.96, 0.7); glows.push(b.position.x, b.position.y, b.position.z, c, 0.8, 1.2); }
+          else if (h.kind === 'burrow') { for (let i = 0; i < 3; i++) dusts.push((h.x + U.rand(-h.r, h.r) * 0.5) * S, 0.08 + Math.random() * 0.2, (h.y + U.rand(-h.r, h.r) * 0.5) * S, rgb('150,120,80'), 0.7, 0.3); }
+          else if (h.kind === 'xueying') { for (let i = 0; i < 4; i++) glows.push(h.x * S, 0.25 + i * 0.3, h.y * S, c, 0.5 + k * 0.4, 1.5 - i * 0.2); }
           continue;
         }
         flatAt(P.circ, h.x, h.y, h.r, wc, 0.12 + k * 0.14, 0.02, 2);
@@ -480,6 +499,8 @@
           const b = P.beam.get(), dx = h.x2 - h.x1, dy = h.y2 - h.y1, len = Math.hypot(dx, dy);
           b.position.set(((h.x1 + h.x2) / 2) * S, 0.45, ((h.y1 + h.y2) / 2) * S); b.rotation.set(0, -Math.atan2(dy, dx), 0);
           b.scale.set(len * S, 0.9, h.w * S * 0.8); b.material.color.copy(c.col); b.material.opacity = 0.3 + f * 0.25;
+          if (h.kind === 'rift') bandAt(h.x1, h.y1, h.x2, h.y2, h.w * 0.45, rgb('8,4,20'), 0.92 * f, 0.03, 5);          // 空间裂缝：漆黑的缝
+          if (h.kind === 'xuantian') bandAt(h.x1, h.y1, h.x2, h.y2, h.w * 0.3, rgb('255,255,255'), 0.9 * f, 0.03, 5); // 玄天剑光：白炽的芯
         }
       } else if (h.type === 'puddle') {
         const f = Math.min(1, h.life / 0.5) * Math.min(1, h.t / 0.25);
@@ -502,6 +523,41 @@
     }
   }
 
+  /* 我方的阵：大庚剑阵、颠倒五行阵、土牢 */
+  const WUXING = ['255,240,200', '110,255,170', '110,160,255', '255,120,60', '208,168,88']; // 金 木 水 火 土
+  function syncZone(h, c, t) {
+    const f = Math.min(1, h.t / 0.35) * Math.min(1, h.life / 0.4), grow = 0.25 + 0.75 * Math.min(1, h.t / 0.35), r = h.r * grow;
+    const arr = (rr, rot, col, op) => { const m = P.arr.get(); m.position.set(h.x * S, 0.045, h.y * S); m.scale.set(rr * S, rr * S, 1); m.rotation.z = rot; m.material.color.copy(col.col); m.material.opacity = op; m.renderOrder = 5; };
+    if (h.kind === 'dageng') { // 七十二口青竹蜂云剑，剑尖朝下，环立成阵
+      const gold = rgb('255,235,130');
+      arr(r * 1.02, t * 0.7, c, 0.75 * f); arr(r * 0.56, -t * 1.5, gold, 0.6 * f);
+      flatAt(P.ring, h.x, h.y, r, c, 0.9 * f, 0.035, 4); flatAt(P.circ, h.x, h.y, r, c, 0.07 * f, 0.02, 2);
+      for (let i = 0; i < 72 && fyN < 240; i++) {
+        const a = (i / 72) * TAU + t * 0.45, x = (h.x + Math.cos(a) * r) * S, z = (h.y + Math.sin(a) * r) * S, y = 0.66 + Math.sin(t * 3 + i * 0.7) * 0.07 + (1 - f) * 1.6;
+        dummy.position.set(x, y, z); dummy.rotation.set(PI / 2, 0, a + t * 2); dummy.scale.set(0.105, 0.042, 0.74); dummy.updateMatrix();
+        fySw.setMatrixAt(fyN, dummy.matrix); fySw.setColorAt(fyN, tmpC.set(i % 3 ? 0xc4f296 : 0xf4ffe2)); fyN++;
+        if (i % 4 === 0) glows.push(x, y, z, c, 0.5 * f, 0.8);
+        if (((t * 24 + i * 7) | 0) % 31 === 0) glows.push(x, y - 0.2, z, GOLD, 0.95, 0.5); // 剑身上游走的辟邪神雷
+      }
+      if (h.t < 0.5) { const b = P.beam.get(), k = h.t / 0.5; b.position.set(h.x * S, 4, h.y * S); b.rotation.set(0, t * 3, 0); b.scale.set(0.3 + k, 8, 0.3 + k); b.material.color.copy(c.col); b.material.opacity = 0.3 * (1 - k); }
+      glows.push(h.x * S, 0.3, h.y * S, c, 0.12 * f, 9);
+    } else if (h.kind === 'wuxing') { // 五色灵光绕阵流转
+      arr(r, t * 0.6, c, 0.6 * f); flatAt(P.ring, h.x, h.y, r, c, 0.6 * f, 0.035, 4); flatAt(P.circ, h.x, h.y, r, c, 0.05 * f, 0.02, 2);
+      for (let i = 0; i < 5; i++) {
+        const a = t * 0.8 + (i / 5) * TAU, ec = rgb(WUXING[i]), x = h.x + Math.cos(a) * r * 0.82, y = h.y + Math.sin(a) * r * 0.82;
+        flatAt(P.circ, x, y, 9, ec, 0.5 * f, 0.03, 4);
+        glows.push(x * S, 0.3 + Math.sin(t * 3 + i) * 0.08, y * S, ec, 0.8 * f, 1.1); glows.push(x * S, 0.9, y * S, ec, 0.3 * f, 0.6);
+      }
+    } else if (h.kind === 'tulao') { // 一圈石柱拔地而起
+      const k = Math.min(1, h.t / 0.14) * Math.min(1, h.life / 0.25);
+      flatAt(P.ring, h.x, h.y, h.r, c, 0.6 * f, 0.035, 4); flatAt(P.circ, h.x, h.y, h.r, c, 0.08 * f, 0.02, 2);
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * TAU, m = P.rock.get(), hh = 1.0 + (i % 3) * 0.16;
+        m.position.set((h.x + Math.cos(a) * h.r) * S, hh * (k - 0.5), (h.y + Math.sin(a) * h.r) * S); m.rotation.set(0, a + i, 0); m.scale.set(0.42, hh, 0.36);
+      }
+    }
+  }
+
   /* 色相定流派，芯定敌我：我方的芯是亮的（近白），敌方的芯是暗的；外圈一律是流派色 */
   function putOrb(i, x, y, z, sx, sy, sz, ry, c, foe, rim) {
     dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.set(sx, sy, sz); dummy.updateMatrix();
@@ -519,7 +575,7 @@
   }
 
   function syncProjs(Gm, t) {
-    let no = 0, ns = 0, nf = 0, nb = 0;
+    let no = 0, ns = 0, nf = fyN, nb = 0; // fyN：大庚剑阵已经占用的小剑实例
     for (const pr of Gm.projs) {
       const c = rgb(pr.c || '255,255,255'), x = pr.x * S, y = pr.z * S, z = pr.y * S, a = Math.atan2(pr.vy, pr.vx), r = pr.r * S, foe = pr.from === 1, ry = PI / 2 - a;
       if (pr.kind === 'sword') { // 飞剑：按功法进境换形，带拖尾
@@ -544,16 +600,24 @@
         const f = Math.sin(t * 70 + pr._i) * 0.07 + 0.11, sx = Math.sin(a), sz = -Math.cos(a);
         glows.push(x + sx * f, y + 0.05, z + sz * f, WHITE3, 0.75, 0.22); glows.push(x - sx * f, y + 0.05, z - sz * f, WHITE3, 0.75, 0.22);
         glows.push(x, y, z, c, 0.35, 0.6);
-      } else if (pr.kind === 'ice' || pr.kind === 'blade' || pr.kind === 'needle' || pr.kind === 'bolt' || pr.kind === 'arrow') {
+      } else if (pr.kind === 'jiao') { // 青蛟旗：一条青蛟，身子由走过的位置连成
+        const hh = pr._h || (pr._h = []); hh.push(x, z); if (hh.length > 24) hh.splice(0, 2);
+        for (let j = hh.length - 2, q = 0; j >= 0 && no < 900; j -= 2, q++) {
+          const sc = r * (1.5 - q * 0.09) * (q ? 1 : 1.25), yy = y + Math.sin(t * 9 - q * 0.8) * 0.12;
+          putOrb(no, hh[j], yy, hh[j + 1], sc, sc * 0.9, sc, 0, c, false, 1.25); no++;
+          if (q % 3 === 0) glows.push(hh[j], yy, hh[j + 1], c, 0.5, r * 5);
+        }
+        trail(pr, x, y, z, c, r * 1.4, 0.8);
+      } else if (pr.kind === 'ice' || pr.kind === 'blade' || pr.kind === 'needle' || pr.kind === 'bolt' || pr.kind === 'arrow' || pr.kind === 'hook' || pr.kind === 'drill') {
         const thin = pr.kind === 'needle' || pr.kind === 'bolt' || pr.kind === 'arrow';
-        if (ns < 500) { putShard(ns, x, y, z, thin ? 0.08 : r * 1.4, thin ? 0.08 : r * 0.95, thin ? 0.66 : r * 4.0, ry, c, foe); ns++; }
+        if (ns < 500) { putShard(ns, x, y, z, thin ? 0.08 : r * 1.4, thin ? 0.08 : r * 0.95, thin ? 0.66 : r * 4.0, pr.spin ? t * 22 : ry, c, foe); ns++; }
         if (pr.kind !== 'arrow') glows.push(x, y, z, c, foe ? 0.36 : 0.6, r * 4.2); // 凡人的箭不发光
         if (!foe) trail(pr, x, y, z, c, r * 0.9, 0.6);
       } else {
         const big = pr.kind === 'fire' && !foe;
         if (no < 900) { putOrb(no, x, y, z, r * 1.5, r * 1.5, r * 1.5, 0, c, foe, foe ? 1.42 : 1.3); no++; }
         glows.push(x, y, z, c, foe ? 0.36 : 0.75, r * (big ? 6.5 : 4.6));
-        if (big) trail(pr, x, y, z, c, r * 1.3, 0.8);
+        if (big || pr.kind === 'spirit' || pr.kind === 'flame') trail(pr, x, y, z, c, r * (big ? 1.3 : 0.9), big ? 0.8 : 0.6);
         else if (pr.kind === 'ghostfire' || pr.kind === 'skullp') glows.push(x - Math.cos(a) * r * 2.4, y, z - Math.sin(a) * r * 2.4, c, 0.3, r * 3.4);
       }
     }
@@ -630,7 +694,8 @@
 
     // 主角
     if (p) {
-      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = Mo.hero(p.look); if (!heroM.gl) heroM.g.scale.multiplyScalar(ACTOR); dyn.add(heroM.g); heroOwner = p; }
+      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = Mo.hero(p.look); if (!heroM.gl) heroM.g.scale.multiplyScalar(ACTOR); heroS0 = heroM.g.scale.x; dyn.add(heroM.g); heroOwner = p; }
+      heroM.g.scale.setScalar(heroS0 * (p.apeT > 0 ? 1.3 * Math.min(1, 0.8 + (p.apeT > 0.3 ? 0.2 : 0)) : 1)); // 惊蛰十二变：身形暴涨
       heroM.g.visible = !p.dead && !(p.inv > 0 && p.dashing <= 0 && Math.floor(t * 20) % 2 === 0);
       place(heroM.g, p.x, p.y, 0); heroM.g.rotation.y = PI / 2 - p.face;
       heroM.update({ t: p.t, moving: p.moving, atk: p.atkAnim, dashing: p.dashing > 0 });
@@ -653,6 +718,7 @@
         for (let i = 0; i < 2; i++) { const a = t * 3.2 + i * PI, pl = P.plate.get(); pl.position.set(p.x * S + Math.cos(a) * 0.78, 0.78, p.y * S + Math.sin(a) * 0.78); pl.rotation.set(0, PI / 2 - a, 0); pl.scale.setScalar(0.95); }
       }
       if (p.flags.autoShield && p.autoShieldT <= 0) { const a = t * 2.4, pl = P.plate.get(); pl.position.set(p.x * S + Math.cos(a) * 0.62, 0.95, p.y * S + Math.sin(a) * 0.62); pl.rotation.set(0, PI / 2 - a, 0); pl.scale.setScalar(0.5); }
+      if (!p.dead) syncGear(p, t);
       // 青元剑阵：脚下阵图 + 环身飞剑
       if (p.formT > 0) {
         const fc = rgb('110,255,200'), fade = Math.min(1, p.formT * 2), ar = P.arr.get();
@@ -666,6 +732,29 @@
         }
       } else if (formTr.length) formTr.length = 0;
     } else if (heroM) heroM.g.visible = false;
+
+    // 灵宠灵虫
+    for (const pt of Gm.pets) {
+      let m = petM.get(pt);
+      if (!m) { m = Mo.pet(pt.id); if (!m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); }
+      m.seen = frame; m.g.visible = !(pt.hide > 0);
+      const fly = pt.z ? pt.z + Math.sin(t * 3 + pt.slot) * 4 : 0;
+      place(m.g, pt.x, pt.y, fly); m.g.rotation.y = PI / 2 - pt.face;
+      m.update({ t: pt.t, moving: pt.moving || !!pt.z, atk: pt.atk, charge: pt.charge, wind: pt.atk > 0.5 ? 1 : 0 });
+      if (pt.hide > 0) continue;
+      const pc = rgb(E_PET_C[pt.id] || '127,224,192'), x = pt.x * S, z = pt.y * S;
+      flatAt(P.ring, pt.x, pt.y, 11, rgb('127,224,192'), 0.4, 0.03, 4); // 与主角脚下同色的环：这是自己人
+      if (pt.id === 'shuangwu') { // 六翼：三对振动的霜翼
+        const sx = Math.sin(pt.face), sz = -Math.cos(pt.face), y = fly * S + 0.35;
+        for (let i = 0; i < 3; i++) { const fl = 0.22 + Math.abs(Math.sin(t * 34 + i * 1.3)) * 0.22, bx = x - Math.cos(pt.face) * i * 0.14, bz = z - Math.sin(pt.face) * i * 0.14; glows.push(bx + sx * fl, y + 0.08, bz + sz * fl, WHITE3, 0.7, 0.34); glows.push(bx - sx * fl, y + 0.08, bz - sz * fl, WHITE3, 0.7, 0.34); }
+        glows.push(x, y, z, pc, 0.3, 1.6);
+      } else if (pt.id === 'baolin') { if (pt.charge || ((t * 20) | 0) % 3 === 0) glows.push(x + U.rand(-0.25, 0.25), 0.3 + Math.random() * 0.4, z + U.rand(-0.25, 0.25), GOLD, 0.9, 0.3); if (pt.charge) trail(pt, x, 0.4, z, pc, 0.16, 0.9); else pt._tr = null; }
+      else if (pt.id === 'yinyue') glows.push(x, 0.4, z, pc, 0.24 + Math.sin(t * 2) * 0.06, 1.8);
+      else if (pt.id === 'zhizhu') glows.push(x, 0.26, z, pc, 0.3, 0.9);
+      else if (pt.id === 'tihun') { glows.push(x, 0.4, z, pc, 0.2 + pt.atk * 0.5, 1.4 + pt.atk * 2); }
+      else if (pt.id === 'renxing') glows.push(x, 0.62, z + 0.05, pc, 0.3, 0.6);
+    }
+    for (const [a, m] of petM) if (m.seen !== frame) { dyn.remove(m.g); m.dispose(); petM.delete(a); }
 
     // 傀儡
     for (const a of Gm.allies) {
@@ -699,6 +788,25 @@
     }
   }
 
+  /* 主角身上常驻的法宝：混元钵、皇鳞甲的鳞光、紫罗极火、惊蛰十二变的灵光 */
+  const E_PET_C = { zhizhu: '255,90,110', tihun: '154,120,255', shuangwu: '150,220,255', yinyue: '255,200,235', tujia: '208,168,88', baolin: '255,235,130', quhun: '200,205,215', renxing: '255,190,90' };
+  function syncGear(p, t) {
+    const x = p.x * S, z = p.y * S;
+    if (p.flags.bowl) {
+      const b = G.Ent.bowlPos(p), m = P.bowl.get(), on = p.bowlN > 0;
+      m.position.set(b.x * S, 0.9 + Math.sin(t * 3) * 0.05, b.y * S); m.rotation.set(PI, t * 2, 0); m.scale.setScalar(on ? 0.5 : 0.3);
+      if (on) glows.push(m.position.x, m.position.y - 0.1, m.position.z, rgb('224,180,106'), 0.4, 1.3);
+    }
+    if (p.lin > 0) { const lc = rgb('255,215,120'); flatAt(P.ring, p.x, p.y, 22, lc, 0.7, 0.04, 5); for (let i = 0; i < 6; i++) { const a = t * 1.6 + i * (TAU / 6); glows.push(x + Math.cos(a) * 0.42, 0.35 + (i % 3) * 0.32, z + Math.sin(a) * 0.42, lc, 0.7, 0.26); } }
+    if (p.flags.ziluo) {
+      const zc = rgb('190,120,255');
+      flatAt(P.circ, p.x, p.y, 112, zc, 0.05, 0.02, 2); flatAt(P.ring, p.x, p.y, 112, zc, 0.3, 0.03, 3);
+      for (let i = 0; i < 12; i++) { const a = t * 1.3 + i * (TAU / 12), rr = 104 + Math.sin(t * 4 + i * 2) * 7, fl = (t * 1.6 + i * 0.37) % 1; glows.push((p.x + Math.cos(a) * rr) * S, 0.1 + fl * 0.75, (p.y + Math.sin(a) * rr) * S, zc, 0.85 * (1 - fl), 0.75 - fl * 0.4); }
+    }
+    if (p.apeT > 0) { const ac = rgb('224,184,120'); flatAt(P.ring, p.x, p.y, 30 + Math.sin(t * 8) * 2, ac, 0.7, 0.04, 5); glows.push(x, 1.0, z, ac, 0.3, 4.5); }
+    if (p.wardT > 0) glows.push(x, 0.5, z, rgb('232,208,138'), 0.18, 2.6);
+  }
+
   /* ============================ 2D 叠加层 ============================ */
   const HGT = { human: 50, brute: 60, wolf: 32, bat: 18, toad: 28, centipede: 24, flower: 50, ghost: 54, skull: 20, crystal: 50, flame: 44, puppet: 50, jiao: 70 };
 
@@ -721,6 +829,13 @@
           c.strokeStyle = `rgba(255,255,255,${k})`; c.lineWidth = q.w * 0.8; c.stroke();
           for (const br of q.br || []) { path(br); c.strokeStyle = `rgba(${q.c},${k * 0.85})`; c.lineWidth = q.w * 0.9; c.stroke(); }
           c.globalCompositeOperation = 'source-over';
+        } else if (q.kind === 'thread') { // 剑丝
+          const s1 = proj(q.x1, q.y1, 20), s2 = proj(q.x2, q.y2, 20);
+          c.globalCompositeOperation = 'lighter';
+          c.beginPath(); c.moveTo(s1.x, s1.y); c.lineTo(s2.x, s2.y);
+          c.strokeStyle = `rgba(${q.c},${k * 0.45})`; c.lineWidth = 4; c.stroke();
+          c.strokeStyle = `rgba(255,255,255,${k * 0.95})`; c.lineWidth = 1.1; c.stroke();
+          c.globalCompositeOperation = 'source-over';
         } else if (q.kind === 'slash') {
           c.globalCompositeOperation = 'lighter';
           c.beginPath(); const rr = q.r * (1.05 - k * 0.25);
@@ -728,6 +843,19 @@
           c.strokeStyle = `rgba(${q.c},${k})`; c.lineWidth = 8 * k + 1.5; c.stroke();
           c.globalCompositeOperation = 'source-over';
         }
+      }
+      // 大庚剑阵：阵中往复穿梭的万千剑丝
+      for (const h of Gm.haz) {
+        if (h.kind !== 'dageng' || h.type !== 'zone') continue;
+        const f = Math.min(1, h.t / 0.35) * Math.min(1, h.life / 0.4), step = (t * 16) | 0;
+        c.globalCompositeOperation = 'lighter'; c.lineWidth = 1.3;
+        for (let i = 0; i < 18; i++) {
+          const a = U.hash(i, step, 3) * TAU, b = a + 1.2 + U.hash(i, step, 5) * 3.9;
+          const s1 = proj(h.x + Math.cos(a) * h.r, h.y + Math.sin(a) * h.r, 22), s2 = proj(h.x + Math.cos(b) * h.r, h.y + Math.sin(b) * h.r, 22);
+          c.strokeStyle = `rgba(200,255,160,${(0.28 + U.hash(i, step, 7) * 0.45) * f})`;
+          c.beginPath(); c.moveTo(s1.x, s1.y); c.lineTo(s2.x, s2.y); c.stroke();
+        }
+        c.globalCompositeOperation = 'source-over';
       }
       // 蜂云剑阵：飞剑之间游走的辟邪神雷
       const fy = Gm.projs.filter((x) => x.fy);
@@ -792,7 +920,7 @@
     }
   }
 
-  function beginPools() { for (const k in P) P[k].begin(); glows.n = 0; dusts.n = 0; trQ = 0; }
+  function beginPools() { for (const k in P) P[k].begin(); glows.n = 0; dusts.n = 0; trQ = 0; fyN = 0; }
   function endPools() {
     for (const k in P) P[k].end(); glows.end(); dusts.end();
     const g = trailMesh.geometry; g.setDrawRange(0, trQ * 6); g.attributes.position.needsUpdate = g.attributes.color.needsUpdate = true;

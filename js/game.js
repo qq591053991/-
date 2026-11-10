@@ -6,7 +6,7 @@
 
   const Game = (G.Game = {
     state: 'menu', meta: null, chapter: 0, floor: null, room: null, player: null,
-    projs: [], haz: [], allies: [], ghosts: [], barks: [], timers: [],
+    projs: [], haz: [], allies: [], pets: [], ghosts: [], barks: [], timers: [],
     shakeAmt: 0, hurtFlash: 0, flash: 0, fade: 0, slowT: 0, god: false, stats: null, last: 0,
 
     /* ---------------- 存档（仅局外成长） ---------------- */
@@ -78,8 +78,11 @@
       FX.clear();
       const pos = fromDir ? W.entryPos(room, fromDir) : { x: (room.w / 2) * T, y: (room.h / 2 + 1.5) * T };
       p.x = pos.x; p.y = pos.y; p.dashing = 0; p.formT = 0;
+      E.resetPets(); p.dingReady = true;
       if (!room.cleared) {
         room.locked = true;
+        // 阵法：每进一处险地，先在脚下布一座颠倒五行阵
+        if (p.craft.zhen) { E.zone('wuxing', p.x, p.y, 150, 4 + p.craft.zhen * 2, { dmg: 5 * p.dmgMul, c: '232,208,138' }); FX.array(p.x, p.y, 30, 165, '232,208,138', 0.5, 2); }
         if (room.type === 'boss') this.startBoss(room);
         else { if (!room.waves) E.makeWaves(room); room.waveI = 0; room.waveT = 0.5; }
       } else room.locked = false;
@@ -177,9 +180,11 @@
         const have = p.relics[r.id] || 0;
         if (exclude.includes(r.id)) return false;
         if (have >= (r.stack || 1)) return false;
+        if (r.req && !r.req(p)) return false;                                        // 有前置条件的（大庚剑阵要先炼成青竹蜂云剑）
+        if (r.kind === 'pet' && p.pets.length >= p.petCap) return false;             // 灵兽袋满了
         return exact ? r.rar === minRar : r.rar >= minRar;
       });
-      if (!pool.length) pool = Object.values(G.Relics).filter((r) => (p.relics[r.id] || 0) < (r.stack || 1) && !exclude.includes(r.id));
+      if (!pool.length) pool = Object.values(G.Relics).filter((r) => (p.relics[r.id] || 0) < (r.stack || 1) && !exclude.includes(r.id) && !(r.req && !r.req(p)) && !(r.kind === 'pet' && p.pets.length >= p.petCap));
       if (!pool.length) return 'zhuji';
       return U.weighted(pool, (r) => [0, 60, 30, 12][r.rar]).id;
     },
@@ -188,16 +193,22 @@
       p.relics[id] = (p.relics[id] || 0) + 1;
       if (p.relics[id] === 1) p.relicList.push(id);
       r.apply(p);
+      if (r.kind === 'pet' && p.relics[id] === 1) { p.pets.push(id); E.resetPets(); }
+      // 百脉炼宝诀：每件法宝 +3% 伤害
+      const bm = p.flags.baimai ? 0.03 * p.relicList.filter((k) => G.Relics[k].kind === 'bao').length : 0;
+      p.dmgMul += bm - p.bmB; p.bmB = bm;
+      p.cdr = Math.min(0.6, p.cdr); p.armor = Math.min(0.6, p.armor);
       p.hp = Math.min(p.hp, p.maxHp);
-      this.toast(`获得法宝【${r.name}】`);
+      this.toast(r.kind === 'craft' ? `${r.name} · 第 ${p.relics[id]} 重` : `获得${G.KIND[r.kind]}【${r.name}】`);
       Au.sfx('pick'); G.UI.relicDirty = true;
     },
-    randomSkill(exclude = []) {
+    // noNew：神通栏已满时不给新神通（坊市、奇遇这类没法弹出"舍弃哪一门"的地方用）
+    randomSkill(exclude = [], noNew = false) {
       const p = this.player;
       const owned = p.skills.map((s) => s.id);
       let pool = [];
-      if (p.skills.length < 3) pool = Object.keys(G.Skills).filter((k) => !owned.includes(k));
-      for (const s of p.skills) if (s.lv < 3) pool.push(s.id);
+      if (p.skills.length < 3 || !noNew) pool = Object.keys(G.Skills).filter((k) => !owned.includes(k));
+      for (const s of p.skills) if (s.lv < 3) { pool.push(s.id); if (p.skills.length >= 3) pool.push(s.id, s.id); } // 栏满之后，升阶出现得更多
       pool = pool.filter((k) => !exclude.includes(k));
       return pool.length ? U.pick(pool) : null;
     },
@@ -205,25 +216,40 @@
       const p = this.player, s = p.skills.find((x) => x.id === id);
       if (s) { s.lv = Math.min(3, s.lv + 1); this.toast(`【${G.Skills[id].name}】升至第 ${s.lv} 重`); }
       else if (p.skills.length < 3) { p.skills.push({ id, lv: 1, cd: 0 }); this.toast(`习得神通【${G.Skills[id].name}】`); }
+      else return this.replaceSkill(id);
       Au.sfx('pick'); G.UI.skillDirty = true;
+    },
+    // 神通栏已满：舍弃一门，换上新的；或者不换，折成灵石
+    replaceSkill(id) {
+      const p = this.player, nd = G.Skills[id];
+      const cards = p.skills.map((s, i) => {
+        const d = G.Skills[s.id];
+        return { name: '舍弃 ' + d.name, glyph: d.glyph, sch: d.sch, color: d.color, cls: 'r1 skill', tag: `第 ${s.lv} 重 · [${'QER'[i]}]`, desc: d.desc(s.lv),
+          pick: () => { p.skills[i] = { id, lv: 1, cd: 0 }; this.toast(`舍弃【${d.name}】，习得【${nd.name}】`); Au.sfx('pick'); G.UI.skillDirty = true; } };
+      });
+      cards.push({ name: '不换', glyph: '罢', cls: 'r1', tag: '保留现有神通', desc: `放弃【${nd.name}】，将玉简折价换成 25 块灵石。`, pick: () => this.addStones(25, true) });
+      G.UI.choice({ title: `习得【${nd.name}】`, sub: '神通只能同修三门 —— 舍弃哪一门？', cards });
     },
 
     relicCard(id) {
       const r = G.Relics[id], have = this.player.relics[id] || 0;
-      return { name: r.name, glyph: r.glyph, sch: r.sch, tag: ['', '法宝 · 凡品', '法宝 · 珍品', '法宝 · 至宝'][r.rar] + (have ? ` · 已有 ${have}` : ''), desc: r.desc, cls: 'r' + r.rar, pick: () => this.giveRelic(id) };
+      return { name: r.name, glyph: r.glyph, sch: r.sch, tag: G.KIND[r.kind] + ' · ' + ['', '凡品', '珍品', '至宝'][r.rar] + (r.kind === 'craft' ? ` · 第 ${have + 1} 重` : have ? ` · 已有 ${have}` : ''), desc: r.desc, cls: 'r' + r.rar, pick: () => this.giveRelic(id) };
     },
     skillCard(id) {
       const d = G.Skills[id], s = this.player.skills.find((x) => x.id === id), lv = s ? s.lv + 1 : 1;
       return { name: d.name, glyph: d.glyph, sch: d.sch, tag: s ? `神通 · 升至第 ${lv} 重` : '神通 · 新习得', desc: d.desc(lv) + `　耗法力 ${d.mp}，冷却 ${d.cd} 秒。`, cls: 'r2 skill', color: d.color, pick: () => this.giveSkill(id) };
     },
 
-    openLootChoice(title, sub, minRar, done) {
+    openLootChoice(title, sub, minRar, done, sure) {
       const cards = [], usedR = [], usedS = [];
       for (let i = 0; i < 3; i++) {
         const sk = U.chance(i === 0 && this.player.skills.length < 2 ? 0.75 : 0.3) ? this.randomSkill(usedS) : null;
         if (sk) { usedS.push(sk); cards.push(this.skillCard(sk)); }
         else { const r = this.randomRelic(minRar, false, usedR); usedR.push(r); cards.push(this.relicCard(r)); }
       }
+      // 炼成青竹蜂云剑之后，大庚剑阵的阵图会找上门来（sure：必出）
+      const p = this.player;
+      if (p.fy && !p.relics.dageng && !usedR.includes('dageng') && (sure || U.chance(0.4))) cards[0] = this.relicCard('dageng');
       G.UI.choice({ title, sub, cards, done });
     },
 
@@ -251,6 +277,7 @@
       if (p.drops < 9) { const n = Math.min(9 - p.drops, p.flags.vial ? 2 : 1); p.drops += n; this.toast(n > 1 ? '掌天瓶吞吐月华，凝出两滴灵露' : '玉瓶里凝出一滴灵露'); }
       const n = U.randi(2, 3) + (room.type === 'elite' ? 3 : 0);
       for (let i = 0; i < n; i++) E.dropPickup('stone', p.x + U.rand(-60, 60), p.y + U.rand(-60, 60), Math.round(U.randi(2, 4) * (1 + room.chapter * 0.25)));
+      if (p.craft.dan && p.potions < G.POTION_MAX && U.chance(0.1 * p.craft.dan)) { p.potions++; this.toast('炼丹术：就地开炉，炼成一枚丹药'); }
       if (room.type === 'elite') {
         room.interact.push({ kind: 'chest', x: (room.w / 2) * T, y: (room.h / 2) * T, r: 46, label: '开启精英宝匣', elite: true });
         FX.ring((room.w / 2) * T, (room.h / 2) * T, 10, 90, '255,220,130', 0.5, 5);
@@ -279,7 +306,7 @@
             this.openLootChoice('首领遗物', '择一而取', 2, () => {
               room.interact.push({ kind: 'portal', x: (room.w / 2) * T, y: (room.h / 2) * T, r: 50, label: '踏入传送阵 · 前往下一章' });
               this.toast('传送阵已开启'); Au.sfx('portal');
-            });
+            }, true);
           });
         });
       });
@@ -364,13 +391,13 @@
       } else if (it.kind === 'shop') {
         if (!it.items) {
           const ex = [];
-          const mkRelic = (minRar) => { const id = this.randomRelic(minRar, false, ex); ex.push(id); const r = G.Relics[id]; return { type: 'relic', id, name: r.name, glyph: r.glyph, desc: r.desc, cls: 'r' + r.rar, price: Math.round([0, 55, 85, 130][r.rar] * pm) }; };
+          const mkRelic = (minRar) => { const id = this.randomRelic(minRar, false, ex); ex.push(id); const r = G.Relics[id]; return { type: 'relic', id, name: r.name, kind: G.KIND[r.kind], glyph: r.glyph, desc: r.desc, cls: 'r' + r.rar, price: Math.round([0, 55, 85, 130][r.rar] * pm) }; };
           it.items = [
             { type: 'potion', name: '黄龙丹', glyph: '丹', desc: `丹药 +1（上限 ${G.POTION_MAX}）。服用回复 38% 气血。`, cls: 'r1', price: Math.round(26 * pm), repeat: 2 },
             { type: 'heal', name: '疗伤灵茶', glyph: '茶', desc: '立刻回复 50% 气血。', cls: 'r1', price: Math.round(18 * pm), repeat: 1 },
             mkRelic(1), mkRelic(1), mkRelic(2),
           ];
-          const sk = this.randomSkill();
+          const sk = this.randomSkill([], true);
           if (sk) { const d = G.Skills[sk], s = p.skills.find((x) => x.id === sk); it.items.push({ type: 'skill', id: sk, name: d.name + (s ? ' · 升阶' : ''), glyph: d.glyph, desc: d.desc(s ? s.lv + 1 : 1), cls: 'r2', price: Math.round(70 * pm) }); }
         }
         G.UI.shop(it.items);
@@ -390,6 +417,7 @@
       const p = this.player;
       if (item.sold || p.stones < item.price) { Au.sfx('deny'); return false; }
       if (item.type === 'potion' && p.potions >= G.POTION_MAX) { Au.sfx('deny'); this.toast('丹药已达携带上限'); return false; }
+      if (item.type === 'relic' && G.Relics[item.id].kind === 'pet' && p.pets.length >= p.petCap) { Au.sfx('deny'); this.toast('灵兽袋已满'); return false; }
       p.stones -= item.price;
       if (item.type === 'potion') p.potions++;
       else if (item.type === 'heal') p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.5);

@@ -52,6 +52,11 @@
     wings(life = 0.5) {
       this.parts.push({ kind: 'wings', x: 0, y: 0, z: 0, life, max: life, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
     },
+    // 剑丝：一道转瞬即逝的直线
+    thread(x1, y1, x2, y2, c, life = 0.24) {
+      if (this.parts.length > 900) return;
+      this.parts.push({ kind: 'thread', x1, y1, x2, y2, x: x1, y: y1, z: 0, c, life, max: life, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
+    },
     text(x, y, z, str, c = '#fff', size = 14) {
       if (this.texts.length > 60) this.texts.shift();
       this.texts.push({ x: x + U.rand(-8, 8), y, z, str: String(str), c, size, life: 0.75, max: 0.75, vx: U.rand(-18, 18), vz: 70 });
@@ -92,6 +97,9 @@
       atkT: 0, atkAnim: 0, shield: 0, shieldT: 0, shieldMax: 0, autoShieldT: 0,
       qy: 0, fy: 0, sp: 0, // 青元剑诀层数 / 是否炼成青竹蜂云剑 / 剑意
       formT: 0, formN: 0, formLv: 1, formTick: 0, potionCd: 0,
+      // 流派增伤 / 法宝 / 灵宠 / 技艺
+      schMul: {}, baoMul: 1, baoCd: 1, petMul: 1, kuiMul: 1, potionMul: 1, craft: {}, pets: [], petCap: 3, autoT: {},
+      dageng: 0, lin: 0, linT: 0, apeT: 0, apeB: 0, wardT: 0, fanT: 0, bowlN: 0, bowlT: 0, fuT: 6, auraT: 0, bmB: 0,
       look: { robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' },
     };
     p.hp = p.maxHp;
@@ -111,7 +119,13 @@
       FX.ring(p.x, p.y, 10, 60, '200,220,255', 0.3, 4); FX.text(p.x, p.y, 50, '飞天盾', '#c9d4e8', 14); Au.sfx('block');
       return false;
     }
-    d *= 1 - Math.min(0.65, p.armor);
+    d *= 1 - Math.min(0.7, p.armor + (p.apeT > 0 ? 0.3 : 0));
+    if (p.wardT > 0) d *= 0.75; // 身在颠倒五行阵中
+    if (p.lin > 0) {            // 皇鳞甲的鳞光
+      const a = Math.min(p.lin, d); p.lin -= a; d -= a; p.linT = 0;
+      FX.burst(p.x, p.y, 20, 6, { c: '255,215,120', s1: 120 });
+      if (d <= 0.5) { p.inv = 0.2; Au.sfx('block'); return false; }
+    }
     if (p.shield > 0) {
       const a = Math.min(p.shield, d); p.shield -= a; d -= a;
       Au.sfx('block'); FX.burst(p.x, p.y, 20, 6, { c: '200,220,255', s1: 120 });
@@ -125,12 +139,28 @@
     FX.text(p.x, p.y, 52, '-' + d, '#ff5a5a', 17);
     FX.burst(p.x, p.y, 20, 8, { c: '255,80,80', s1: 150, add: false });
     Au.sfx('hurt');
+    if (p.flags.fansheng && !(p.fanT > 0)) { // 梵圣真魔功：法相反震
+      p.fanT = 1; FX.ring(p.x, p.y, 16, 140, '224,184,120', 0.35, 6);
+      for (const e of Gm.room.enemies) {
+        if (e.dead || e.untarget || e.st === 'spawn' || U.dist(p.x, p.y, e.x, e.y) > 135 + e.r) continue;
+        const a = U.ang(p.x, p.y, e.x, e.y);
+        E.dmgEnemy(e, 20 * p.dmgMul, { kx: Math.cos(a) * 460, ky: Math.sin(a) * 460, noCrit: true, c: '#e0b878' });
+      }
+    }
     if (p.hp <= 0) {
-      if (p.flags.revive > 0) {
+      if (p.flags.ding && p.dingReady) {
+        p.dingReady = false; p.hp = Math.round(p.maxHp * 0.25); p.inv = 2.5;
+        FX.ring(p.x, p.y, 10, 200, '255,225,150', 0.6, 7); FX.burst(p.x, p.y, 20, 36, { c: '255,225,150', s1: 260 });
+        FX.text(p.x, p.y, 66, '虚天鼎', '#ffe6a0', 18); Gm.toast('虚天鼎嗡鸣一声，将你罩入鼎中'); Au.sfx('block'); Au.sfx('break');
+      } else if (p.flags.revive > 0) {
         p.flags.revive--; p.hp = p.maxHp; p.mp = p.maxMp; p.inv = 2;
         FX.ring(p.x, p.y, 10, 220, '160,255,200', 0.6, 6); FX.burst(p.x, p.y, 20, 40, { c: '160,255,200', s1: 260 });
         Gm.toast('万年灵乳化开，气血尽复！'); Au.sfx('break');
         for (const e of Gm.room.enemies) if (!e.boss) { const a = U.ang(p.x, p.y, e.x, e.y); e.kx += Math.cos(a) * 500; e.ky += Math.sin(a) * 500; }
+      } else if (p.flags.huiyang > 0) {
+        p.flags.huiyang--; p.hp = Math.round(p.maxHp * 0.5); p.inv = 2;
+        FX.ring(p.x, p.y, 10, 200, '255,200,140', 0.6, 6); FX.burst(p.x, p.y, 20, 30, { c: '255,200,140', s1: 240 });
+        Gm.toast('回阳水化开，一线生机重续'); Au.sfx('break');
       } else { p.hp = 0; p.dead = true; Gm.onPlayerDead(); }
     }
     return true;
@@ -189,6 +219,7 @@
     }
     if (p.fy) p.sp = Math.min(100, p.sp + G.Fengyun.perKill);
     if (p.flags.leech) p.hp = Math.min(p.maxHp, p.hp + p.flags.leech);
+    if (p.flags.xuanyin) { p.hp = Math.min(p.maxHp, p.hp + 3); p.mp = Math.min(p.maxMp, p.mp + 4); }
     if (p.flags.evilBane && e.def.evil) p.mp = Math.min(p.maxMp, p.mp + 6);
     if (p.flags.beetle && U.chance(0.4)) E.spawnBeetle(e.x, e.y, 1);
     if (e.affix === 'burst') for (let i = 0; i < 10; i++) E.shootE(e.x, e.y, (i / 10) * TAU, 170, { dmg: e.dmg * 0.7, c: '255,150,60' });
@@ -280,6 +311,7 @@
     const Gm = G.Game, p = Gm.player, F = G.Fengyun;
     if (!p.fy || p.sp < 100 || p.dead) { if (p.fy && !(p.noMpT > 0)) { FX.text(p.x, p.y, 58, '剑意未满', '#b8ff8a', 13); Au.sfx('deny'); p.noMpT = 0.6; } return false; }
     p.sp = 0;
+    if (p.dageng) return E.castDageng();
     const dmg = swordDamage(p) * F.dmgMul;
     for (let i = 0; i < F.swords; i++) {
       const ring = i % 3, a = (i / F.swords) * TAU * 3 + ring * 0.7; // 三圈，逐圈错开
@@ -309,11 +341,13 @@
       const a = U.ang(x, y, e.x, e.y);
       E.dmgEnemy(e, dmg, { kx: Math.cos(a) * 200, ky: Math.sin(a) * 200, c: opts.tc });
       if (opts.burn && !e.dead) e.burnT = Math.max(e.burnT, 3);
+      if (opts.stun && !e.dead && !e.boss) e.stunT = Math.max(e.stunT, opts.stun);
     }
   };
 
   E.updateProjs = function (dt) {
     const Gm = G.Game, room = Gm.room, p = Gm.player, P = Gm.projs;
+    const bowl = p.flags.bowl && p.bowlN > 0 ? E.bowlPos(p) : null; // 混元钵：收走碰到的敌方弹幕
     for (let i = P.length - 1; i >= 0; i--) {
       const pr = P[i];
       pr.t += dt; pr.life -= dt;
@@ -341,10 +375,13 @@
         const sp = Math.hypot(pr.vx, pr.vy) || 1, nx = -pr.vy / sp, ny = pr.vx / sp, w = Math.cos(pr.t * pr.wave) * pr.waveAmp;
         pr.x += nx * w * dt; pr.y += ny * w * dt;
       }
-      pr.x += pr.vx * dt; pr.y += pr.vy * dt;
+      // 元磁神光：靠近的敌方弹幕减速
+      const mk = pr.from === 1 && p.flags.yuanci && U.dist2(pr.x, pr.y, p.x, p.y) < 150 * 150 ? 0.6 : 1;
+      pr.x += pr.vx * dt * mk; pr.y += pr.vy * dt * mk;
 
-      // 回旋
-      if (pr.sword && !pr.mini && p.flags.boomerang && pr.life <= 0 && !pr.back) {
+      // 回旋（金蚨子母刃的飞剑，以及乌龙夺这类去而复返的法宝）
+      const canRet = pr.ret || (pr.sword && !pr.mini && p.flags.boomerang);
+      if (canRet && pr.life <= 0 && !pr.back) {
         pr.back = true; pr.life = pr.max * 1.4; pr.hit.clear(); pr.ghost = true;
       }
       if (pr.back) {
@@ -355,7 +392,7 @@
 
       // 撞墙
       if (!pr.ghost && W.solid(room, Math.floor(pr.x / T), Math.floor(pr.y / T), 3)) {
-        if (pr.sword && !pr.mini && p.flags.boomerang && !pr.back) { pr.back = true; pr.life = pr.max * 1.4; pr.hit.clear(); pr.ghost = true; pr.x -= pr.vx * dt; pr.y -= pr.vy * dt; }
+        if (canRet && !pr.back) { pr.back = true; pr.life = pr.max * 1.4; pr.hit.clear(); pr.ghost = true; pr.x -= pr.vx * dt; pr.y -= pr.vy * dt; }
         else { dead = true; FX.burst(pr.x, pr.y, pr.z, 3, { c: pr.c, s1: 90, l1: 0.25 }); }
       }
       if (pr.x < -60 || pr.y < -60 || pr.x > room.w * T + 60 || pr.y > room.h * T + 60) dead = true;
@@ -373,14 +410,17 @@
           else if (pr.swarm) {
             E.dmgEnemy(e, pr.dmg, { noCrit: true, c: pr.fy ? '#c8ff8a' : '#ffd24a' });
             if (pr.fy) { FX.burst(pr.x, pr.y, pr.z, 3, { c: '255,235,130', s1: 110, l1: 0.25 }); if (!e.dead && U.chance(G.Fengyun.thunder)) E.chainThunder(e, pr.dmg * 1.2, 1); }
-            pr.bites--; pr.cool = pr.fy ? 0.32 : 0.4; pr.hit.clear(); pr.tgt = null;
+            pr.bites--; pr.cool = pr.biteCd || (pr.fy ? 0.32 : 0.4); pr.hit.clear(); pr.tgt = null;
             const a = U.rand(TAU), sp = pr.fy ? 380 : 250; pr.vx = Math.cos(a) * sp; pr.vy = Math.sin(a) * sp;
             if (pr.bites <= 0) dead = true;
           } else if (pr.kind === 'fire') { dead = true; }
           else {
             const sp = Math.hypot(pr.vx, pr.vy) || 1;
-            E.dmgEnemy(e, pr.dmg, { kx: (pr.vx / sp) * 70, ky: (pr.vy / sp) * 70, c: pr.tc });
+            const kb = pr.kb === undefined ? 70 : pr.kb;
+            E.dmgEnemy(e, pr.dmg, { kx: (pr.vx / sp) * kb, ky: (pr.vy / sp) * kb, c: pr.tc });
             if (pr.slow && !e.dead) e.slowT = Math.max(e.slowT, pr.slow);
+            if (pr.burn && !e.dead) e.burnT = Math.max(e.burnT, pr.burn);
+            if (pr.leech) p.hp = Math.min(p.maxHp, p.hp + pr.leech);
             FX.burst(pr.x, pr.y, pr.z, 4, { c: pr.c, s1: 120, l1: 0.3 });
           }
           if (!pr.swarm) { if (pr.pierce > 0) pr.pierce--; else if (!pr.back) dead = true; }
@@ -388,7 +428,10 @@
         }
       } else if (!dead && pr.from === 1) {
         const rr = p.r * 0.72 + pr.r;
-        if (U.dist2(pr.x, pr.y, p.x, p.y) < rr * rr) {
+        if (bowl && p.bowlN > 0 && U.dist2(pr.x, pr.y, bowl.x, bowl.y) < (26 + pr.r) * (26 + pr.r)) {
+          dead = true; p.bowlN--; FX.burst(pr.x, pr.y, pr.z, 4, { c: '224,180,106', s1: 90, l1: 0.25 });
+          if (p.bowlN <= 0) FX.text(p.x, p.y, 58, '钵满', '#e0b46a', 12);
+        } else if (U.dist2(pr.x, pr.y, p.x, p.y) < rr * rr) {
           if (E.hurtPlayer(pr.dmg, pr.x, pr.y)) dead = true;
           else if (p.dashing <= 0 && p.inv <= 0) dead = true;
         }
@@ -444,6 +487,13 @@
       if (h.type === 'circle') {
         if (h.follow) { if (h.follow.dead) { H[i] = H[H.length - 1]; H.pop(); continue; } if (h.t < h.delay) { h.x = h.follow.x; h.y = h.follow.y; } }
         if (h.track && h.t < h.delay - (h.lockT || 0.35)) { h.x = U.lerp(h.x, p.x, Math.min(1, dt * h.track)); h.y = U.lerp(h.y, p.y, Math.min(1, dt * h.track)); }
+        if (h.pull && h.from === 0) { // 元磁之力：把周围的敌人吸向落点
+          for (const e of room.enemies) {
+            if (e.dead || e.boss || e.untarget || e.st === 'spawn') continue;
+            const d = U.dist(h.x, h.y, e.x, e.y);
+            if (d < h.pull && d > 12) { const a = U.ang(e.x, e.y, h.x, h.y), sp = Math.min(d, 260 * dt); W.move(room, e, Math.cos(a) * sp, Math.sin(a) * sp, e.mode); }
+          }
+        }
         if (h.t >= h.delay) {
           done = true;
           if (h.from === 1) {
@@ -453,7 +503,7 @@
             if (h.sfx !== false) Au.sfx('boom');
             if (h.r >= 90) Gm.shake(4);
           } else {
-            E.explode(h.x, h.y, h.r, h.dmg, h.c, { shake: h.shake || 0 });
+            E.explode(h.x, h.y, h.r, h.dmg, h.c, { shake: h.shake || 0, stun: h.stun, tc: h.tc });
             if (h.kind === 'giant') FX.array(h.x, h.y, h.r * 0.4, h.r * 1.25, h.c, 0.5, 2);
           }
           if (h.onBoom) h.onBoom(h);
@@ -461,7 +511,17 @@
       } else if (h.type === 'line') {
         if (h.visual) { if (h.t >= h.delay) done = true; }
         else if (h.t >= h.delay) {
-          if (!h.fired) { h.fired = true; if (h.sfx !== false) Au.sfx('fire'); }
+          if (!h.fired) {
+            h.fired = true; if (h.sfx !== false) Au.sfx(h.from === 0 ? 'bigsword' : 'fire');
+            if (h.from === 0) { // 我方的线：出手的一瞬结算一次
+              const a = Math.atan2(h.y2 - h.y1, h.x2 - h.x1);
+              for (const e of room.enemies) {
+                if (e.dead || e.untarget || e.st === 'spawn') continue;
+                if (U.segDist(e.x, e.y, h.x1, h.y1, h.x2, h.y2) < h.w / 2 + e.r) E.dmgEnemy(e, h.dmg, { kx: Math.cos(a) * 120, ky: Math.sin(a) * 120, c: h.tc });
+              }
+              if (h.shake) Gm.shake(h.shake);
+            }
+          }
           if (h.from === 1 && U.segDist(p.x, p.y, h.x1, h.y1, h.x2, h.y2) < h.w / 2 + p.r * 0.4) E.hurtPlayer(h.dmg, p.x, p.y);
           if (Math.random() < 0.6) { const t = Math.random(); FX.p(U.lerp(h.x1, h.x2, t), U.lerp(h.y1, h.y2, t), 2, { c: h.c, vz: U.rand(60, 160), life: 0.4, size: U.rand(3, 6) }); }
           if (h.t >= h.delay + h.stay) done = true;
@@ -484,6 +544,10 @@
           else for (const e of room.enemies) { if (!e.dead && U.dist(h.x, h.y, e.x, e.y) < h.r + e.r) { e.slowT = Math.max(e.slowT, 0.6); if (h.dps) E.dmgEnemy(e, h.dps * 0.4, { noCrit: true }); } }
         }
         if (h.life <= 0) done = true;
+      } else if (h.type === 'zone') { // 我方的阵：持续一段时间，逻辑在 arsenal.js 的 E.ZONE 里
+        h.life -= dt; h.tick -= dt;
+        E.ZONE[h.kind](h, dt, p, room);
+        if (h.life <= 0) { done = true; if (h.onEnd) h.onEnd(h); }
       } else if (h.type === 'lob') {
         if (h.t >= h.dur) {
           done = true;
@@ -538,7 +602,7 @@
     puppet(p, ax, ay, lv) {
       const Gm = G.Game; let x = p.x + U.rand(-40, 40), y = p.y + U.rand(-40, 40);
       if (W.blocked(Gm.room, x, y, 12, 1)) { x = p.x; y = p.y; }
-      Gm.allies.push({ x, y, r: 12, life: 10 + lv * 2, t: 0, atkT: 0.3, lv, face: 0 });
+      Gm.allies.push({ x, y, r: 12, life: 10 + lv * 2 + (p.craft.kui || 0) * 3, t: 0, atkT: 0.3, lv, face: 0 });
       FX.ring(x, y, 4, 50, '224,180,106', 0.3); Au.sfx('spawn');
     },
     blink(p, ax, ay, lv) {
@@ -562,7 +626,10 @@
     },
   };
 
-  const SK_LEAD = { fireball: [520, 0], ice: [560, 0], giant: [0, 0.5] }; // [飞行速度, 落地延迟]，供自动瞄准算提前量
+  const SK_LEAD = { fireball: [520, 0], ice: [560, 0], giant: [0, 0.5], xuezuan: [760, 0], tulao: [0, 0.1] }; // [飞行速度, 落地延迟]，供自动瞄准算提前量
+  E.SK = SK; // arsenal.js 往里补充新神通
+  E.swordDamage = swordDamage;
+  E.bowlPos = (p) => ({ x: p.x + Math.cos(p.t * 2.6) * 46, y: p.y + Math.sin(p.t * 2.6) * 46 });
 
   E.castSkill = function (slot) {
     const Gm = G.Game, p = Gm.player, s = p.skills[slot];
@@ -581,7 +648,9 @@
         aim = { x: aim.x + ((aim.x - p.x) / d) * 90, y: aim.y + ((aim.y - p.y) / d) * 90 };
       }
     }
+    const sv = p.spellMul; p.spellMul *= 1 + (p.schMul[def.sch] || 0); // 流派增伤只在这一次施放里生效
     SK[s.id](p, aim.x, aim.y, s.lv);
+    p.spellMul = sv;
     p.atkAnim = 1; Gm.stats.casts++;
     return true;
   };
@@ -597,6 +666,9 @@
     if (p.noMpT > 0) p.noMpT -= dt;
     if (p.potionCd > 0) p.potionCd -= dt;
     if (p.autoShieldT > 0) p.autoShieldT -= dt;
+    if (p.fanT > 0) p.fanT -= dt;
+    if (p.wardT > 0) p.wardT -= dt;
+    if (p.apeT > 0) { p.apeT -= dt; if (p.apeT <= 0) { p.dmgMul -= p.apeB; p.apeB = 0; FX.ring(p.x, p.y, 60, 10, '224,184,120', 0.3); } }
     for (const s of p.skills) if (s.cd > 0) s.cd -= dt;
     if (p.dashN < p.dashMax) { p.dashT -= dt; if (p.dashT <= 0) { p.dashN++; p.dashT = p.dashCd; } }
 
@@ -638,7 +710,10 @@
     // 御剑
     // 手动：按住鼠标 / J 出剑；自动：射程内有目标就持续出剑
     const wantAtk = I.mouse.down || I.held('KeyJ') || I.held('atk') || (Gm.isAuto() && Gm.targetInRange);
-    if (wantAtk && p.atkT <= 0 && p.dashing <= 0) { fireSwords(p, aim.x, aim.y); p.atkT = 1 / p.atkSpd; }
+    if (wantAtk && p.atkT <= 0 && p.dashing <= 0) {
+      fireSwords(p, aim.x, aim.y);
+      p.atkT = 1 / (p.atkSpd * (1 + (p.flags.bloodHaste ? 0.6 * (1 - p.hp / p.maxHp) : 0))); // 血灵大法：气血越低出手越快
+    }
 
     // 神通
     if (I.hit('KeyQ') || I.hit('Mouse2') || I.hit('skill0')) E.castSkill(0);
@@ -650,7 +725,7 @@
     if ((I.hit('KeyC') || I.hit('KeyG') || I.hit('potion')) && p.potionCd <= 0) {
       if (p.potions > 0 && p.hp < p.maxHp) {
         p.potions--; p.potionCd = 0.8;
-        const heal = Math.round(p.maxHp * 0.38); p.hp = Math.min(p.maxHp, p.hp + heal);
+        const heal = Math.round(p.maxHp * 0.38 * p.potionMul); p.hp = Math.min(p.maxHp, p.hp + heal);
         FX.text(p.x, p.y, 54, '+' + heal, '#7dffb0', 17); FX.burst(p.x, p.y, 10, 16, { c: '125,255,176', s1: 90, g: -120, vz1: 60, l1: 0.8 });
         Au.sfx('heal');
       } else { Au.sfx('deny'); p.potionCd = 0.3; }
@@ -681,12 +756,15 @@
         const e = E.nearestEnemy(a.x, a.y, 440, true);
         if (e) {
           a.face = U.ang(a.x, a.y, e.x, e.y); a.atkT = 0.42; a.atk = 1;
-          E.shootP(a.x, a.y, a.face, { kind: 'bolt', spd: 640, life: 0.8, dmg: 9 * (1 + 0.3 * (a.lv - 1)) * p.spellMul * p.dmgMul, r: 7, z: 24, c: '255,190,90', tc: '#ffd28a' });
+          E.shootP(a.x, a.y, a.face, { kind: 'bolt', spd: 640, life: 0.8, dmg: 9 * (1 + 0.3 * (a.lv - 1)) * p.spellMul * p.dmgMul * p.kuiMul, r: 7, z: 24, c: '255,190,90', tc: '#ffd28a' });
           Au.sfx('shoot');
         } else a.atkT = 0.2;
       }
       if (a.atk > 0) a.atk -= dt * 4;
     }
+
+    // 自动祭出的法宝、灵宠灵虫、技艺
+    E.updateArsenal(dt);
 
     // 拾取
     for (let i = room.pickups.length - 1; i >= 0; i--) {

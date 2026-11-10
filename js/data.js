@@ -149,7 +149,7 @@
      目前打磨完成的是「青竹一脉」——剑、雷、虫、傀这几路，也就是韩立所修的那一套。 */
   G.Schools = {
     sword:   { name: '剑', color: '#6effc8' },
-    thunder: { name: '雷', sch: 'thunder', color: '#ffe36a' },
+    thunder: { name: '雷', color: '#ffe36a' },
     fire:    { name: '火', color: '#ff9a3c' },
     ice:     { name: '冰', color: '#8fd8ff' },
     bug:     { name: '虫', color: '#e0b040' },
@@ -157,6 +157,8 @@
     body:    { name: '体', color: '#c8d4e8' },
     blood:   { name: '魔', color: '#e8305a' },
     poison:  { name: '毒', color: '#9ac832' },
+    earth:   { name: '土', color: '#d0a858' },
+    ghost:   { name: '鬼', color: '#9a78ff' },
     misc:    { name: '杂', color: '#b8b0a0' },
   };
 
@@ -168,7 +170,7 @@
       desc: (lv) => `扇形射出 ${4 + lv} 枚冰锥，各造成 ${Math.round(13 * (1 + 0.3 * (lv - 1)))} 点伤害并减速。` },
     formation: { name: '青元剑阵', sch: 'sword', glyph: '阵', color: '#6affc0', mp: 28, cd: 10,
       desc: (lv) => `${4 + lv * 2} 柄飞剑环身飞旋 6 秒，持续绞杀近身之敌。` },
-    thunder: { name: '辟邪神雷', glyph: '雷', color: '#ffe36a', mp: 26, cd: 6,
+    thunder: { name: '辟邪神雷', sch: 'thunder', glyph: '雷', color: '#ffe36a', mp: 26, cd: 6,
       desc: (lv) => `金色神雷劈向目标附近至多 ${3 + lv} 个敌人，造成 ${Math.round(34 * (1 + 0.35 * (lv - 1)))} 点伤害并短暂麻痹；对鬼、尸、魔修伤害 +60%。` },
     giant: { name: '巨剑术', sch: 'sword', glyph: '剑', color: '#a8e0ff', mp: 32, cd: 8,
       desc: (lv) => `一柄巨剑自天而降，对落点造成 ${Math.round(95 * (1 + 0.35 * (lv - 1)))} 点大范围伤害。` },
@@ -178,6 +180,16 @@
       desc: (lv) => `祭出飞天盾，5 秒内吸收 ${35 + lv * 20} 点伤害；破碎或结束时震退周围敌人。` },
     puppet: { name: '傀儡术', sch: 'puppet', glyph: '傀', color: '#e0b46a', mp: 36, cd: 16,
       desc: (lv) => `放出一具机关傀儡，${10 + lv * 2} 秒内自动射击附近敌人。` },
+    wuxing: { name: '颠倒五行阵', sch: 'earth', glyph: '五', color: '#e8d08a', mp: 30, cd: 14,
+      desc: (lv) => `在脚下布下颠倒五行阵 ${6 + lv * 2} 秒：阵中敌人迟滞难行，你在阵中受到的伤害 -25%。` },
+    tulao: { name: '土牢术', sch: 'earth', glyph: '牢', color: '#d0a858', mp: 22, cd: 9,
+      desc: (lv) => `在目标处升起土牢，困住范围内的敌人 ${(1.6 + lv * 0.4).toFixed(1)} 秒，并造成 ${Math.round(22 * (1 + 0.35 * (lv - 1)))} 点伤害。` },
+    xueying: { name: '血影遁', sch: 'blood', glyph: '影', color: '#e8305a', mp: 10, cd: 7,
+      desc: (lv) => `燃血化影，远遁而去（消耗 8% 气血）；留在原地的血影随即爆开，造成 ${Math.round(60 * (1 + 0.35 * (lv - 1)))} 点范围伤害。` },
+    xuezuan: { name: '血灵钻', sch: 'blood', glyph: '钻', color: '#ff5a7a', mp: 20, cd: 5,
+      desc: (lv) => `射出一道血灵钻，贯穿沿途所有敌人，造成 ${Math.round(42 * (1 + 0.35 * (lv - 1)))} 点伤害；每贯穿一个敌人回复 2 点气血。` },
+    jingzhe: { name: '惊蛰十二变', sch: 'body', glyph: '变', color: '#e0b878', mp: 40, cd: 22,
+      desc: (lv) => `化身山岳巨猿 ${6 + lv * 2} 秒：伤害 +${40 + lv * 20}%，受到的伤害 -30%。` },
     blink: { name: '风雷翅', sch: 'thunder', glyph: '翅', color: '#b79dff', mp: 14, cd: 5,
       desc: (lv) => `化作雷光闪至目标位置，沿途造成 ${Math.round(26 * (1 + 0.35 * (lv - 1)))} 点雷击伤害，其间无敌。` },
   };
@@ -185,33 +197,79 @@
   /* ---------------- 法宝 / 功法（被动） ----------------
      rar: 1 凡品 2 珍品 3 至宝 */
   const R = (G.Relics = {
-    changchun: { name: '长春功', sch: 'body', glyph: '春', rar: 1, desc: '每秒回复 1.2 点气血。', apply: (p) => { p.hpRegen += 1.2; } },
-    zhayan: { name: '眨眼剑法', sch: 'sword', glyph: '瞬', rar: 1, desc: '暴击率 +12%。', apply: (p) => { p.crit += 0.12; } },
-    luoyan: { name: '罗烟步', sch: 'body', glyph: '烟', rar: 2, desc: '遁术可用次数 +1。', apply: (p) => { p.dashMax += 1; p.dashN += 1; } },
-    dayan: { name: '大衍诀', sch: 'puppet', glyph: '衍', rar: 2, desc: '神识大涨，神通冷却 -18%。', apply: (p) => { p.cdr += 0.18; } },
-    jinlei: { name: '金雷竹', sch: 'thunder', glyph: '竹', rar: 3, desc: '飞剑命中有 25% 几率引动辟邪神雷，在敌人间跳跃 3 次。', apply: (p) => { p.flags.thunder = (p.flags.thunder || 0) + 1; } },
-    chongluan: { name: '噬金虫卵', sch: 'bug', glyph: '卵', rar: 2, desc: '击杀敌人时有 40% 几率孵出一只噬金虫助战。', apply: (p) => { p.flags.beetle = 1; } },
-    bingyan: { name: '乾蓝冰焰', sch: 'ice', glyph: '焰', rar: 2, desc: '飞剑附带冰焰：命中使敌人减速并持续灼伤。', apply: (p) => { p.flags.iceflame = 1; } },
-    feitiandun: { name: '飞天盾', sch: 'body', glyph: '御', rar: 2, desc: '每 12 秒自动抵挡一次伤害。', apply: (p) => { p.flags.autoShield = 1; p.autoShieldT = 0; } },
-    pingshan: { name: '平山印', sch: 'misc', glyph: '印', rar: 2, desc: '伤害 +10%；对精英与首领再 +20%。', apply: (p) => { p.dmgMul += 0.1; p.flags.bossBane = 1; } },
-    zhizhu: { name: '血玉蜘蛛', sch: 'bug', glyph: '蛛', rar: 1, desc: '施展遁术后在原地留下蛛网，大幅减速范围内敌人。', apply: (p) => { p.flags.web = 1; } },
-    sanzhuan: { name: '三转重元功', sch: 'body', glyph: '转', rar: 1, desc: '法力上限 +40，法力回复 +35%。', apply: (p) => { p.maxMp += 40; p.mp += 40; p.mpRegen *= 1.35; } },
-    lingshui: { name: '明清灵水', sch: 'misc', glyph: '明', rar: 1, desc: '灵目洞明：显露本层全部房间，灵石获取 +40%。', apply: (p) => { p.flags.reveal = 1; p.stoneMul += 0.4; } },
-    lingru: { name: '万年灵乳', sch: 'misc', glyph: '乳', rar: 3, desc: '气血归零时，立刻回复全部气血法力（仅一次）。', apply: (p) => { p.flags.revive = (p.flags.revive || 0) + 1; } },
-    zhuji: { name: '定灵丹', sch: 'misc', glyph: '丹', rar: 1, desc: '气血上限 +30，并回复等量气血。', apply: (p) => { p.maxHp += 30; p.hp += 30; }, stack: 9 },
-    lianqi: { name: '敛气术', sch: 'body', glyph: '敛', rar: 1, desc: '对每个敌人的首次命中必定暴击。', apply: (p) => { p.flags.firstCrit = 1; } },
-    zimu: { name: '金蚨子母刃', sch: 'sword', glyph: '蚨', rar: 2, desc: '飞剑命中后分出两柄子刃，向两侧激射。', apply: (p) => { p.flags.split = 1; } },
-    tianjia: { name: '六丁天甲符', sch: 'body', glyph: '甲', rar: 2, desc: '受到的伤害 -15%，受击后的无敌时间延长。', apply: (p) => { p.armor += 0.15; p.invDur += 0.35; } },
-    tihun: { name: '啼魂兽', sch: 'misc', glyph: '魂', rar: 2, desc: '对鬼、尸、魔修的伤害 +40%，击杀它们回复 6 点法力。', apply: (p) => { p.flags.evilBane = 1; } },
-    juling: { name: '聚灵阵盘', sch: 'misc', glyph: '聚', rar: 1, desc: '站立不动时，法力回复速度变为 3 倍。', apply: (p) => { p.flags.focus = 1; } },
-    huixuan: { name: '回旋剑意', sch: 'sword', glyph: '旋', rar: 2, desc: '飞剑飞至尽头后折返，归途同样伤敌。', apply: (p) => { p.flags.boomerang = 1; } },
-    xuemo: { name: '煞气诀', sch: 'blood', glyph: '煞', rar: 2, desc: '气血低于 40% 时，伤害 +40%。', apply: (p) => { p.flags.rage = 1; } },
-    xutian: { name: '虚天残图', sch: 'misc', glyph: '图', rar: 3, desc: '伤害 +12%，气血上限 +25，冷却 -8%，移速 +6%。', apply: (p) => { p.dmgMul += 0.12; p.maxHp += 25; p.hp += 25; p.cdr += 0.08; p.speed *= 1.06; } },
-    xueling: { name: '嗜血环', sch: 'blood', glyph: '嗜', rar: 2, desc: '每击杀一个敌人回复 2 点气血。', apply: (p) => { p.flags.leech = (p.flags.leech || 0) + 2; } },
-    zhangtian: { name: '掌天瓶', sch: 'misc', glyph: '瓶', rar: 3, desc: '来历不明的碧绿小瓶，夜吸月华。每清空一间房多凝一滴灵露；药园里催熟灵药少费一滴（最少一滴）。', apply: (p) => { p.flags.vial = 1; } },
-    qingsuo: { name: '青索飞剑', sch: 'sword', glyph: '索', rar: 1, desc: '攻击速度 +18%。', apply: (p) => { p.atkSpd *= 1.18; }, stack: 3 },
+    changchun: { name: '长春功', kind: 'gong', sch: 'body', glyph: '春', rar: 1, desc: '每秒回复 1.2 点气血。', apply: (p) => { p.hpRegen += 1.2; } },
+    zhayan: { name: '眨眼剑法', kind: 'gong', sch: 'sword', glyph: '瞬', rar: 1, desc: '暴击率 +12%。', apply: (p) => { p.crit += 0.12; } },
+    luoyan: { name: '罗烟步', kind: 'gong', sch: 'body', glyph: '烟', rar: 2, desc: '遁术可用次数 +1。', apply: (p) => { p.dashMax += 1; p.dashN += 1; } },
+    dayan: { name: '大衍诀', kind: 'gong', sch: 'puppet', glyph: '衍', rar: 2, desc: '神识大涨，神通冷却 -18%。', apply: (p) => { p.cdr += 0.18; } },
+    jinlei: { name: '金雷竹', kind: 'bao', sch: 'thunder', glyph: '竹', rar: 3, desc: '飞剑命中有 25% 几率引动辟邪神雷，在敌人间跳跃 3 次。', apply: (p) => { p.flags.thunder = (p.flags.thunder || 0) + 1; } },
+    chongluan: { name: '噬金虫', kind: 'pet', sch: 'bug', glyph: '虫', rar: 2, desc: '灵虫。一群金银相间的甲虫常驻身侧，自行追咬敌人；击杀敌人时有 40% 几率再孵出一只。', apply: (p) => { p.flags.beetle = 1; } },
+    bingyan: { name: '乾蓝冰焰', kind: 'bao', sch: 'ice', glyph: '焰', rar: 2, desc: '飞剑附带冰焰：命中使敌人减速并持续灼伤。', apply: (p) => { p.flags.iceflame = 1; } },
+    feitiandun: { name: '飞天盾', kind: 'bao', sch: 'body', glyph: '御', rar: 2, desc: '每 12 秒自动抵挡一次伤害。', apply: (p) => { p.flags.autoShield = 1; p.autoShieldT = 0; } },
+    pingshan: { name: '平山印', kind: 'bao', sch: 'misc', glyph: '印', rar: 2, desc: '伤害 +10%；对精英与首领再 +20%。', apply: (p) => { p.dmgMul += 0.1; p.flags.bossBane = 1; } },
+    zhizhu: { name: '血玉蜘蛛', kind: 'pet', sch: 'bug', glyph: '蛛', rar: 2, desc: '灵虫。跟在身侧，不时向敌人喷吐蛛网，网中敌人迟滞并持续中毒；你施展遁术后原地也会留下蛛网。', apply: (p) => { p.flags.web = 1; } },
+    sanzhuan: { name: '三转重元功', kind: 'gong', sch: 'body', glyph: '转', rar: 1, desc: '法力上限 +40，法力回复 +35%。', apply: (p) => { p.maxMp += 40; p.mp += 40; p.mpRegen *= 1.35; } },
+    lingshui: { name: '明清灵水', kind: 'dan', sch: 'misc', glyph: '明', rar: 1, desc: '灵目洞明：显露本层全部房间，灵石获取 +40%。', apply: (p) => { p.flags.reveal = 1; p.stoneMul += 0.4; } },
+    lingru: { name: '万年灵乳', kind: 'dan', sch: 'misc', glyph: '乳', rar: 3, desc: '气血归零时，立刻回复全部气血法力（仅一次）。', apply: (p) => { p.flags.revive = (p.flags.revive || 0) + 1; } },
+    zhuji: { name: '定灵丹', kind: 'dan', sch: 'misc', glyph: '丹', rar: 1, desc: '气血上限 +30，并回复等量气血。', apply: (p) => { p.maxHp += 30; p.hp += 30; }, stack: 9 },
+    lianqi: { name: '敛气术', kind: 'gong', sch: 'body', glyph: '敛', rar: 1, desc: '对每个敌人的首次命中必定暴击。', apply: (p) => { p.flags.firstCrit = 1; } },
+    zimu: { name: '金蚨子母刃', kind: 'bao', sch: 'sword', glyph: '蚨', rar: 2, desc: '飞剑命中后分出两柄子刃，向两侧激射。', apply: (p) => { p.flags.split = 1; } },
+    tianjia: { name: '六丁天甲符', kind: 'bao', sch: 'body', glyph: '甲', rar: 2, desc: '受到的伤害 -15%，受击后的无敌时间延长。', apply: (p) => { p.armor += 0.15; p.invDur += 0.35; } },
+    tihun: { name: '啼魂兽', kind: 'pet', sch: 'ghost', glyph: '魂', rar: 3, desc: '灵宠。专克阴魂：一声啼叫震慑身周的鬼、尸、魔修，并吞噬其中气血不足两成半者。你对它们的伤害 +40%。', apply: (p) => { p.flags.evilBane = 1; } },
+    juling: { name: '聚灵阵盘', kind: 'bao', sch: 'misc', glyph: '聚', rar: 1, desc: '站立不动时，法力回复速度变为 3 倍。', apply: (p) => { p.flags.focus = 1; } },
+    huixuan: { name: '回旋剑意', kind: 'gong', sch: 'sword', glyph: '旋', rar: 2, desc: '飞剑飞至尽头后折返，归途同样伤敌。', apply: (p) => { p.flags.boomerang = 1; } },
+    xuemo: { name: '煞气诀', kind: 'gong', sch: 'blood', glyph: '煞', rar: 2, desc: '气血低于 40% 时，伤害 +40%。', apply: (p) => { p.flags.rage = 1; } },
+    xutian: { name: '虚天残图', kind: 'bao', sch: 'misc', glyph: '图', rar: 3, desc: '伤害 +12%，气血上限 +25，冷却 -8%，移速 +6%。', apply: (p) => { p.dmgMul += 0.12; p.maxHp += 25; p.hp += 25; p.cdr += 0.08; p.speed *= 1.06; } },
+    xueling: { name: '嗜血环', kind: 'bao', sch: 'blood', glyph: '嗜', rar: 2, desc: '每击杀一个敌人回复 2 点气血。', apply: (p) => { p.flags.leech = (p.flags.leech || 0) + 2; } },
+    zhangtian: { name: '掌天瓶', kind: 'bao', sch: 'misc', glyph: '瓶', rar: 3, desc: '来历不明的碧绿小瓶，夜吸月华。每清空一间房多凝一滴灵露；药园里催熟灵药少费一滴（最少一滴）。', apply: (p) => { p.flags.vial = 1; } },
+    // —— 功法 ——
+    mingwang: { name: '明王诀', kind: 'gong', sch: 'body', glyph: '王', rar: 2, desc: '佛门炼体之术。受到的伤害 -12%，气血上限 +25。', apply: (p) => { p.armor += 0.12; p.maxHp += 25; p.hp += 25; } },
+    fansheng: { name: '梵圣真魔功', kind: 'gong', sch: 'body', glyph: '梵', rar: 3, desc: '上古魔功炼体。气血上限 +60；受击时法相一震，击退身周敌人并反震伤害。', apply: (p) => { p.maxHp += 60; p.hp += 60; p.flags.fansheng = 1; } },
+    baimai: { name: '百脉炼宝诀', kind: 'gong', sch: 'misc', glyph: '脉', rar: 2, desc: '以身养宝。每拥有一件法宝，伤害 +3%。', apply: (p) => { p.flags.baimai = 1; } },
+    xuanyin: { name: '玄阴经', kind: 'gong', sch: 'blood', glyph: '阴', rar: 2, desc: '玄阴魔气护体。击杀敌人回复 3 点气血、4 点法力；魔、鬼两道的神通与法宝伤害 +25%。', apply: (p) => { p.flags.xuanyin = 1; p.schMul.blood = (p.schMul.blood || 0) + 0.25; p.schMul.ghost = (p.schMul.ghost || 0) + 0.25; } },
+    xuelingfa: { name: '血灵大法', kind: 'gong', sch: 'blood', glyph: '灵', rar: 3, desc: '以血养法。气血越低出手越快：每损失一成气血，攻击速度 +6%。', apply: (p) => { p.flags.bloodHaste = 1; } },
+    yuanci: { name: '元磁神光', kind: 'gong', sch: 'earth', glyph: '磁', rar: 2, desc: '周身元磁之力流转。靠近你的敌方弹幕减速四成。', apply: (p) => { p.flags.yuanci = 1; } },
+    dageng: { name: '大庚剑阵', kind: 'gong', sch: 'sword', glyph: '庚', rar: 3, req: (p) => p.fy, desc: '以七十二口青竹蜂云剑布成的上古剑阵。蜂云剑阵化为大庚剑阵：在目标处布阵 7 秒，困住阵中敌人，万千剑丝往复绞杀，收阵时降下辟邪神雷。', apply: (p) => { p.dageng = 1; } },
+    // —— 法宝：自动祭出 ——
+    jinguang: { name: '金光砖', kind: 'bao', sch: 'earth', glyph: '砖', rar: 1, auto: 7, desc: '符宝。每 7 秒自动祭出：一块金砖砸向目标，造成 60 点范围伤害并震晕。', apply: () => {} },
+    wulong: { name: '乌龙夺', kind: 'bao', sch: 'misc', glyph: '夺', rar: 1, auto: 4, desc: '每 4 秒自动祭出：一对乌钩飞旋而出，贯穿沿途敌人后折返，往返各造成 18 点伤害。', apply: () => {} },
+    qingjiao: { name: '青蛟旗', kind: 'bao', sch: 'ice', glyph: '蛟', rar: 2, auto: 9, desc: '每 9 秒自动祭出：旗中青蛟冲出，贯穿一线，造成 45 点伤害并撞退敌人。', apply: () => {} },
+    hunyuan: { name: '混元钵', kind: 'bao', sch: 'body', glyph: '钵', rar: 2, desc: '铜钵绕身飞旋，收走碰到的敌方弹幕。每 10 秒至多收 12 枚。', apply: (p) => { p.flags.bowl = 1; p.bowlN = 12; p.bowlT = 0; } },
+    tianleizi: { name: '天雷子', kind: 'bao', sch: 'thunder', glyph: '子', rar: 2, auto: 8, desc: '每 8 秒自动掷出：一枚天雷子在目标处炸开，造成 70 点范围伤害并麻痹。', apply: () => {} },
+    sanyan: { name: '三焰扇', kind: 'bao', sch: 'fire', glyph: '扇', rar: 3, auto: 11, desc: '每 11 秒自动祭出：一扇之下，赤、金、蓝三色灵焰成扇面席卷而出，灼烧沿途一切敌人。', apply: () => {} },
+    baling: { name: '八灵尺', kind: 'bao', sch: 'misc', glyph: '尺', rar: 3, auto: 13, desc: '每 13 秒自动祭出：尺中八道兽灵向八方奔出，各造成 35 点贯穿伤害。', apply: () => {} },
+    guiluo: { name: '鬼罗幡', kind: 'bao', sch: 'ghost', glyph: '幡', rar: 2, auto: 9, desc: '每 9 秒自动祭出：幡中飞出五只鬼头，追噬敌人，各造成 20 点伤害。', apply: () => {} },
+    xuemojian: { name: '血魔剑', kind: 'bao', sch: 'blood', glyph: '魔', rar: 2, auto: 3.2, desc: '每 3 秒自动挥出：一道血色剑光横扫前方，造成 30 点贯穿伤害；每斩中一个敌人回复 1 点气血。', apply: () => {} },
+    yuancishan: { name: '元磁神山', kind: 'bao', sch: 'earth', glyph: '山', rar: 3, auto: 10, desc: '每 10 秒自动祭出：小山当空压下，先将周围敌人吸向落点，再造成 90 点范围伤害。', apply: () => {} },
+    ziluo: { name: '紫罗极火', kind: 'bao', sch: 'fire', glyph: '极', rar: 3, desc: '紫色寒焰环身不熄：身周敌人持续受到灼伤并迟滞。', apply: (p) => { p.flags.ziluo = 1; } },
+    xuejing: { name: '雪晶珠', kind: 'bao', sch: 'ice', glyph: '珠', rar: 2, auto: 9, desc: '每 9 秒自动催动：寒气四散，冻结身周敌人 1.2 秒并造成 30 点伤害。', apply: () => {} },
+    heifeng: { name: '黑风旗', kind: 'bao', sch: 'misc', glyph: '旗', rar: 3, auto: 12, desc: '每 12 秒自动祭出：撕开一道空间裂缝，贯穿目标所在的一线，造成 110 点伤害。', apply: () => {} },
+    xuantian: { name: '玄天斩灵剑', kind: 'bao', sch: 'sword', glyph: '玄', rar: 3, auto: 14, desc: '玄天之宝。每 14 秒自动斩出：一道横贯全场的巨大剑光，造成 150 点伤害。', apply: () => {} },
+    // —— 法宝：被动 ——
+    huanglin: { name: '皇鳞甲', kind: 'bao', sch: 'body', glyph: '鳞', rar: 2, desc: '受到的伤害 -10%；每 8 秒凝出一层可吸收 20 点伤害的鳞光。', apply: (p) => { p.armor += 0.1; p.flags.huanglin = 1; p.linT = 0; } },
+    xutianding: { name: '虚天鼎', kind: 'bao', sch: 'misc', glyph: '鼎', rar: 3, desc: '每间房一次：受到致命伤害时遁入鼎中，免去这一击，无敌 2.5 秒并回复 25% 气血。', apply: (p) => { p.flags.ding = 1; p.dingReady = true; } },
+    // —— 灵宠 / 灵虫 ——
+    shuangwu: { name: '六翼霜蚣', kind: 'pet', sch: 'ice', glyph: '蚣', rar: 2, desc: '灵虫。振翅随行，每隔数秒向敌人喷出一片冰锥，冻伤并迟滞。', apply: () => {} },
+    yinyue: { name: '银月', kind: 'pet', sch: 'misc', glyph: '月', rar: 3, desc: '器灵，化形为一只银狐。每 10 秒施展迷魂之术，令周围敌人失神 1.6 秒；法力回复 +25%。', apply: (p) => { p.mpRegen *= 1.25; } },
+    tujia: { name: '土甲龙', kind: 'pet', sch: 'earth', glyph: '甲', rar: 1, desc: '灵宠。善于钻地：不时从敌人脚下破土而出，将其掀翻；还会刨出灵石，灵石获取 +30%。', apply: (p) => { p.stoneMul += 0.3; } },
+    baolin: { name: '豹麟兽', kind: 'pet', sch: 'thunder', glyph: '麟', rar: 3, desc: '灵宠。迅疾如电，每隔数秒扑向目标，沿途撞伤并击退敌人；你的移动速度 +8%。', apply: (p) => { p.speed *= 1.08; } },
+    quhun: { name: '曲魂', kind: 'pet', sch: 'ghost', glyph: '曲', rar: 2, desc: '炼尸。铜皮铁骨、力大无穷，会主动上前与敌人近身缠斗，替你挡在前面。', apply: () => {} },
+    renxing: { name: '人形傀儡', kind: 'pet', sch: 'puppet', glyph: '偶', rar: 3, desc: '大衍神君所留的傀儡，随行左右，持弓连射破灵箭，箭可贯穿两个敌人。', apply: () => {} },
+    // —— 技艺（可修至三重） ——
+    liandan: { name: '炼丹术', kind: 'craft', sch: 'misc', glyph: '炼', rar: 1, stack: 3, desc: '丹药回复量 +15%；清空房间时有一成几率炼成一枚丹药。每重叠加。', apply: (p) => { p.potionMul += 0.15; p.craft.dan = (p.craft.dan || 0) + 1; } },
+    lianqi2: { name: '炼器术', kind: 'craft', sch: 'misc', glyph: '器', rar: 1, stack: 3, desc: '自动祭出的法宝伤害 +20%，间隔 -8%。每重叠加。', apply: (p) => { p.baoMul += 0.2; p.baoCd *= 0.92; } },
+    zhenfa: { name: '阵法', kind: 'craft', sch: 'earth', glyph: '阵', rar: 2, stack: 3, desc: '每进入一处险地，自动在脚下布下颠倒五行阵（6 秒，每重 +2 秒）。', apply: (p) => { p.craft.zhen = (p.craft.zhen || 0) + 1; } },
+    kuilei: { name: '傀儡术', kind: 'craft', sch: 'puppet', glyph: '傀', rar: 1, stack: 3, desc: '傀儡（神通与灵宠）伤害 +25%，机关傀儡的存在时间 +3 秒。每重叠加。', apply: (p) => { p.kuiMul += 0.25; p.craft.kui = (p.craft.kui || 0) + 1; } },
+    zhifu: { name: '制符术', kind: 'craft', sch: 'fire', glyph: '符', rar: 1, stack: 3, desc: '每 12 秒（每重 -2 秒）自动打出一张符箓：火弹符或冰锥符，不耗法力。', apply: (p) => { p.craft.fu = (p.craft.fu || 0) + 1; } },
+    quchong: { name: '驱虫术', kind: 'craft', sch: 'bug', glyph: '驱', rar: 1, stack: 3, desc: '灵宠灵虫伤害 +20%，噬金虫群 +2 只。修至第二重时，可多带一只灵宠。', apply: (p) => { p.petMul += 0.2; p.craft.chong = (p.craft.chong || 0) + 1; if (p.craft.chong === 2) p.petCap += 1; } },
+    // —— 丹药 / 奇物 ——
+    butian: { name: '补天丹', kind: 'dan', sch: 'misc', glyph: '补', rar: 3, desc: '洗髓伐骨，资质蜕变。修为获取 +30%，并立刻提升一层。', apply: (p) => { p.xpMul += 0.3; G.Game.gainXp(p.xpNeed - p.xp + 0.01, true); } },
+    jiuqu: { name: '九曲灵参', kind: 'dan', sch: 'misc', glyph: '参', rar: 2, desc: '气血上限 +45，并回满气血。', apply: (p) => { p.maxHp += 45; p.hp = p.maxHp; } },
+    yanghun: { name: '养魂木', kind: 'dan', sch: 'misc', glyph: '木', rar: 2, desc: '温养神魂。神通冷却 -10%，法力上限 +20。', apply: (p) => { p.cdr += 0.1; p.maxMp += 20; p.mp += 20; } },
+    huiyang: { name: '回阳水', kind: 'dan', sch: 'misc', glyph: '阳', rar: 2, desc: '气血归零时回复五成气血（仅一次）。', apply: (p) => { p.flags.huiyang = (p.flags.huiyang || 0) + 1; } },
+    qingsuo: { name: '青索飞剑', kind: 'bao', sch: 'sword', glyph: '索', rar: 1, desc: '攻击速度 +18%。', apply: (p) => { p.atkSpd *= 1.18; }, stack: 3 },
   });
   for (const k in R) R[k].id = k;
+  G.KIND = { gong: '功法', bao: '法宝', pet: '灵宠', craft: '技艺', dan: '丹药' };
 
   /* ---------------- 青元剑诀（功法）----------------
      筑基后习得第一层；此后升层时有机会参悟下一层。 */
@@ -307,7 +365,9 @@
         { label: '买下不知名的玉盒', hint: '80 灵石 → 一件至宝', can: (p) => p.stones >= 80,
           run: (g, p) => { p.stones -= 80; const r = g.randomRelic(3, true); g.giveRelic(r); return `玉盒开启，宝光一闪——竟是【${G.Relics[r].name}】！`; } },
         { label: '买下功法玉简', hint: '50 灵石 → 一门神通', can: (p) => p.stones >= 50,
-          run: (g, p) => { p.stones -= 50; const s = g.randomSkill(); g.giveSkill(s); return `玉简贴上眉心，一篇法诀涌入识海：【${G.Skills[s].name}】。`; } },
+          run: (g, p) => { p.stones -= 50; const s = g.randomSkill([], true);
+            if (!s) { const r = g.randomRelic(2); g.giveRelic(r); return `玉简里记的不是法诀，而是一处藏宝之地。你按图索骥，寻到了【${G.Relics[r].name}】。`; }
+            g.giveSkill(s); return `玉简贴上眉心，一篇法诀涌入识海：【${G.Skills[s].name}】。`; } },
         { label: '摇头离开', hint: '', run: () => '斗篷人耸耸肩，身影没入暗处。' },
       ],
     },
@@ -331,9 +391,9 @@
       title: '枯树虫卵', glyph: '虫',
       text: '枯树洞里有一窝奇异的虫卵，金银二色，连树心都被啃噬得千疮百孔。',
       options: [
-        { label: '小心收起', hint: '获得【噬金虫卵】', run: (g, p) => {
-          if (p.relics.chongluan) { g.addStones(60, true); return '你早已养着一窝同样的灵虫，便把这些虫卵转手卖给了路过的修士。'; }
-          g.giveRelic('chongluan'); return '你用玉盒将虫卵尽数收起。这些小东西日后或许会有大用。'; } },
+        { label: '小心收起', hint: '获得灵虫【噬金虫】', run: (g, p) => {
+          if (p.relics.chongluan || p.pets.length >= p.petCap) { g.addStones(60, true); return '你的灵兽袋里已经没有空位，便把这些虫卵转手卖给了路过的修士。'; }
+          g.giveRelic('chongluan'); return '你用玉盒将虫卵尽数收起。没过多久，一群金银相间的甲虫便破卵而出。'; } },
         { label: '不碰来历不明之物', hint: '修为小幅增长', run: (g, p) => { g.gainXp(p.xpNeed * 0.2, true); return '谨慎，是你活到今天最大的倚仗。'; } },
       ],
     },
@@ -361,5 +421,10 @@
     '陨落后会获得道心，可在洞府中永久强化根基。',
     '筑基之后方可修炼青元剑诀；结丹之后才能炼成本命法宝青竹蜂云剑。',
     '青竹蜂云剑的剑意靠飞剑命中积攒，满了按 V —— 七十二口飞剑齐出。',
+    '炼成青竹蜂云剑之后，留意首领遗物里的【大庚剑阵】阵图：七十二口飞剑布阵困敌。',
+    '标着"自动祭出"的法宝会自己出手，不占神通栏，也不耗法力。炼器术能让它们更快、更狠。',
+    '灵兽袋至多带三只灵宠。它们不会受伤，放心让曲魂顶在前面。',
+    '神通只能同修三门。栏满之后再得新神通，要舍弃一门来换。',
+    '啼魂兽专吞鬼物：气血不足两成半的鬼、尸、魔修会被它一口吞掉。',
   ];
 })();

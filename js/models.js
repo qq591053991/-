@@ -675,6 +675,40 @@
   };
 
   /* ============================ 小物 ============================ */
+  /* ============================ 灵宠灵虫 ============================ */
+  Mo.spider = function (L, o = {}) { // 血玉蜘蛛
+    const c = ctx(), { g, add, lam, glow, grp } = c;
+    const jade = lam(L.body, { emissive: col(L.body, -0.72) }), dark = lam(L.dark), eye = glow(L.eye);
+    const body = grp([0, 0.2, 0]);
+    add(sph(12), jade, [0, 0.02, -0.16], [0.36, 0.28, 0.42], null, body);
+    add(sph(10), jade, [0, 0, 0.1], [0.24, 0.2, 0.24], null, body);
+    add(sph(6), eye, [-0.06, 0.05, 0.2], 0.045, null, body); add(sph(6), eye, [0.06, 0.05, 0.2], 0.045, null, body);
+    const legs = [];
+    for (let i = 0; i < 4; i++) for (const sx of [-1, 1]) {
+      const lg = grp([sx * 0.1, 0.02, 0.14 - i * 0.09], body); lg.rotation.y = sx * (0.5 - i * 0.35);
+      add(cyl(0.5, 0.4, 5), dark, [sx * 0.14, 0.06, 0], [0.03, 0.3, 0.03], [0, 0, -sx * 1.0], lg);
+      add(cyl(0.4, 0.2, 5), dark, [sx * 0.31, -0.04, 0], [0.025, 0.3, 0.025], [0, 0, sx * 0.45], lg);
+      lg.userData.k = i + (sx > 0 ? 0.5 : 0); legs.push(lg);
+    }
+    if (o.scale) g.scale.setScalar(o.scale);
+    return finish(c, 0.4 * (o.scale || 1), function (e) {
+      const t = e.t || 0, sp = e.moving ? 16 : 2.5;
+      for (const lg of legs) lg.rotation.x = Math.sin(t * sp + lg.userData.k * 2.6) * (e.moving ? 0.35 : 0.06);
+      body.position.y = 0.2 + Math.sin(t * 3) * 0.012 + (e.atk || 0) * 0.06;
+    });
+  };
+  const PET_LOOK = {
+    zhizhu: () => Mo.spider({ body: '#d8344e', dark: '#5a1420', eye: '#ffe36a' }, { scale: 0.95 }),
+    tihun: () => Mo.wolf({ fur: '#2c2834', dark: '#17151c', eye: '#c9a0ff' }, { scale: 0.66 }),
+    shuangwu: () => Mo.centipede({ body: '#e6f4ff', dark: '#a8cfee', leg: '#f4fbff', eye: '#7dffea' }, { scale: 0.85 }),
+    yinyue: () => Mo.wolf({ fur: '#eaeef6', dark: '#b4bed2', eye: '#ffc0e8' }, { scale: 0.7 }),
+    tujia: () => Mo.centipede({ body: '#b08a52', dark: '#7a5a30', leg: '#4e3a1e', eye: '#ffe36a' }, { scale: 1.05 }),
+    baolin: () => Mo.wolf({ fur: '#e8c050', dark: '#8a6a20', eye: '#7dffea' }, { scale: 0.98 }),
+    quhun: () => (G.Assets.ready && G.Assets.make('ironslave', { show: ['Knight_Helmet'], atk: 'chop2', scale: 1.1, walk: 1 })) || Mo.brute({ body: '#5d6470', dark: '#343943', eye: '#7dffea', skin: '#8c8f96' }, { scale: 0.95 }),
+    renxing: () => Mo.puppet({ body: '#c9d4e8', dark: '#56658a', eye: '#ffd24a' }, { scale: 1.02 }),
+  };
+  Mo.pet = (id) => (PET_LOOK[id] || PET_LOOK.tihun)();
+
   /* ============================ 法器：飞剑 ============================
      剑身几何体：沿 +Z，菱形截面，前端收成剑尖。所有飞剑、巨剑、羽刃都用它。 */
   function bladeGeo() {
