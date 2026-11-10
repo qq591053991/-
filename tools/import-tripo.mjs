@@ -2,7 +2,8 @@
 //
 // 准备：npm i @gltf-transform/core @gltf-transform/functions @gltf-transform/extensions sharp fbx2gltf
 // 用法：node tools/import-tripo.mjs <名字> <模型文件 .fbx 或 .glb>
-//   例：node tools/import-tripo.mjs hanli ~/Downloads/tripo_convert_xxx.fbx
+//   例：node tools/import-tripo.mjs modaifu ~/Downloads/tripo_convert_xxx.fbx
+//   名字是角色键名（player 是玩家形象；敌人的键名见 js/data.js，如 modaifu、thug、wangchan）
 //
 // 做了什么：
 //   1. FBX 用 FBX2glTF 转成 GLB（贴图在同名 .fbm 目录里会被自动带上）；

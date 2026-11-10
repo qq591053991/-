@@ -28,13 +28,29 @@
     slash(x, y, ang, r, c, arc = 1.3) {
       this.parts.push({ kind: 'slash', x, y, z: 16, ang, r, arc, life: 0.18, max: 0.18, c, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
     },
+    // 闪电：主干 + 分叉。天雷（自上而下）落点带一圈金光与火花
     bolt(x1, y1, z1, x2, y2, z2, c, w = 3) {
-      const pts = [], n = 7;
+      const pts = [], n = 8, len = Math.hypot(x2 - x1, y2 - y1, z2 - z1), jit = Math.min(22, 6 + len * 0.05);
       for (let i = 0; i <= n; i++) {
-        const t = i / n, j = i === 0 || i === n ? 0 : 1;
-        pts.push([U.lerp(x1, x2, t) + U.rand(-14, 14) * j, U.lerp(y1, y2, t) + U.rand(-8, 8) * j, U.lerp(z1, z2, t) + U.rand(-10, 10) * j]);
+        const t = i / n, k = i === 0 || i === n ? 0 : 1;
+        pts.push([U.lerp(x1, x2, t) + U.rand(-jit, jit) * k, U.lerp(y1, y2, t) + U.rand(-jit, jit) * 0.6 * k, U.lerp(z1, z2, t) + U.rand(-jit, jit) * 0.7 * k]);
       }
-      this.parts.push({ kind: 'bolt', pts, life: 0.2, max: 0.2, c, w, add: true, x: x2, y: y2, z: z2, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
+      const br = [];
+      for (let b = 0; b < (len > 120 ? 2 : 1); b++) { // 分叉
+        const o = pts[U.randi(2, n - 2)], a = U.rand(TAU), l = U.rand(18, 46), seg = [o];
+        for (let q = 1; q <= 3; q++) seg.push([o[0] + Math.cos(a) * l * q * 0.4 + U.rand(-6, 6), o[1] + Math.sin(a) * l * q * 0.4 + U.rand(-6, 6), o[2] - q * U.rand(4, 14)]);
+        br.push(seg);
+      }
+      this.parts.push({ kind: 'bolt', pts, br, life: 0.22, max: 0.22, c, w, add: true, x: x2, y: y2, z: z2, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
+      if (z1 > 200) { this.ring(x2, y2, 4, 52, c, 0.28, 4); this.burst(x2, y2, 8, 9, { c, s0: 60, s1: 230, l0: 0.15, l1: 0.38, z0: 2, z1: 3.5 }); }
+    },
+    // 阵图：贴地旋转的法阵，r0 → r1
+    array(x, y, r0, r1, c, life = 0.6, spin = 1.5) {
+      this.parts.push({ kind: 'array', x, y, z: 0, r0, r1, c, spin, rot: U.rand(TAU), life, max: life, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
+    },
+    // 风雷翅的光翼，跟随玩家
+    wings(life = 0.5) {
+      this.parts.push({ kind: 'wings', x: 0, y: 0, z: 0, life, max: life, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
     },
     text(x, y, z, str, c = '#fff', size = 14) {
       if (this.texts.length > 60) this.texts.shift();
@@ -46,7 +62,7 @@
         const p = P[i];
         p.life -= dt;
         if (p.life <= 0) { P[i] = P[P.length - 1]; P.pop(); continue; }
-        if (p.kind === 'ring' || p.kind === 'bolt' || p.kind === 'slash') continue;
+        if (p.kind !== 'dot') continue;
         p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz -= p.g * dt;
         if (p.drag) { const k = Math.max(0, 1 - p.drag * dt); p.vx *= k; p.vy *= k; }
         if (p.z < 0) { p.z = 0; p.vz *= -0.4; p.vx *= 0.6; p.vy *= 0.6; }
@@ -266,12 +282,16 @@
     p.sp = 0;
     const dmg = swordDamage(p) * F.dmgMul;
     for (let i = 0; i < F.swords; i++) {
-      const a = (i / F.swords) * TAU + U.rand(-0.1, 0.1);
-      E.shootP(p.x + Math.cos(a) * 16, p.y + Math.sin(a) * 16, a, { kind: 'fy', swarm: true, fy: true, spd: U.rand(330, 460), life: F.life + U.rand(-0.6, 0.6), dmg, bites: F.bites,
-        cool: 0.15 + (i / F.swords) * 0.55, homing: 7.5, r: 7, z: U.rand(16, 40), c: '170,255,110', ghost: true });
+      const ring = i % 3, a = (i / F.swords) * TAU * 3 + ring * 0.7; // 三圈，逐圈错开
+      const spd = 300 + ring * 70 + U.rand(-20, 20);
+      const pr = E.shootP(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a + 1.05, { kind: 'fy', swarm: true, fy: true, spd, life: F.life + U.rand(-0.6, 0.6), dmg, bites: F.bites,
+        cool: 0.3 + ring * 0.12 + (i / F.swords) * 0.3, homing: 0, homeAt: 0.3 + ring * 0.12, homeK: 7.5, r: 7, z: 18 + ring * 10, c: '170,255,110', ghost: true });
+      pr.ang = a;
     }
-    FX.ring(p.x, p.y, 10, 240, '170,255,110', 0.5, 6); FX.ring(p.x, p.y, 10, 150, '255,235,130', 0.4, 4);
-    FX.burst(p.x, p.y, 24, 40, { c: '200,255,140', s1: 320, l1: 0.7 });
+    FX.array(p.x, p.y, 30, 250, '170,255,110', 1.1, 2.4); FX.array(p.x, p.y, 20, 130, '255,235,130', 0.8, -3.2);
+    FX.ring(p.x, p.y, 10, 250, '170,255,110', 0.5, 6);
+    FX.burst(p.x, p.y, 24, 46, { c: '200,255,140', s1: 340, l1: 0.7 }); FX.burst(p.x, p.y, 24, 16, { c: '255,235,130', s1: 260, l1: 0.5 });
+    for (let k = 0; k < 6; k++) { const a = (k / 6) * TAU; FX.bolt(p.x, p.y, 40, p.x + Math.cos(a) * 120, p.y + Math.sin(a) * 120, 14, '255,235,130', 2.5); }
     FX.text(p.x, p.y, 70, '蜂云剑阵', '#d8ffb0', 22);
     Gm.shake(8); Gm.flash = 0.14; Au.sfx('bigsword'); Au.sfx('thunder');
     Gm.stats.casts++; p.atkAnim = 1;
@@ -283,7 +303,7 @@
     FX.ring(x, y, 10, r, c, 0.3, 5);
     FX.burst(x, y, 10, 18, { c, s1: r * 3, l1: 0.5, z1: 6 });
     FX.burst(x, y, 10, 8, { c: '60,50,50', s1: r * 1.5, add: false, z1: 8, l1: 0.8, g: -40 });
-    Gm.shake(opts.shake || 4); Au.sfx('boom');
+    if (opts.shake) Gm.shake(opts.shake); Au.sfx('boom');
     for (const e of Gm.room.enemies) {
       if (e.dead || U.dist(x, y, e.x, e.y) > r + e.r) continue;
       const a = U.ang(x, y, e.x, e.y);
@@ -299,6 +319,7 @@
       pr.t += dt; pr.life -= dt;
       let dead = false;
       if (pr.cool > 0) pr.cool -= dt;
+      if (pr.homeAt !== undefined && pr.t >= pr.homeAt) { pr.homing = pr.homeK; pr.homeAt = undefined; }
       // 追踪
       if (pr.homing) {
         let tx, ty, ok = false;
@@ -430,16 +451,17 @@
             FX.ring(h.x, h.y, h.r * 0.3, h.r, h.c, 0.3, 5);
             FX.burst(h.x, h.y, 6, 14, { c: h.c, s1: h.r * 2.6, l1: 0.45 });
             if (h.sfx !== false) Au.sfx('boom');
-            Gm.shake(h.r > 70 ? 5 : 2.5);
+            if (h.r >= 90) Gm.shake(4);
           } else {
-            E.explode(h.x, h.y, h.r, h.dmg, h.c, { shake: 9 });
+            E.explode(h.x, h.y, h.r, h.dmg, h.c, { shake: h.shake || 0 });
+            if (h.kind === 'giant') FX.array(h.x, h.y, h.r * 0.4, h.r * 1.25, h.c, 0.5, 2);
           }
           if (h.onBoom) h.onBoom(h);
         }
       } else if (h.type === 'line') {
         if (h.visual) { if (h.t >= h.delay) done = true; }
         else if (h.t >= h.delay) {
-          if (!h.fired) { h.fired = true; if (h.sfx !== false) Au.sfx('fire'); Gm.shake(2); }
+          if (!h.fired) { h.fired = true; if (h.sfx !== false) Au.sfx('fire'); }
           if (h.from === 1 && U.segDist(p.x, p.y, h.x1, h.y1, h.x2, h.y2) < h.w / 2 + p.r * 0.4) E.hurtPlayer(h.dmg, p.x, p.y);
           if (Math.random() < 0.6) { const t = Math.random(); FX.p(U.lerp(h.x1, h.x2, t), U.lerp(h.y1, h.y2, t), 2, { c: h.c, vz: U.rand(60, 160), life: 0.4, size: U.rand(3, 6) }); }
           if (h.t >= h.delay + h.stay) done = true;
@@ -490,7 +512,7 @@
       }
       Au.sfx('ice');
     },
-    formation(p, ax, ay, lv) { p.formT = 6; p.formN = 4 + lv * 2; p.formLv = lv; p.formTick = 0; Au.sfx('bigsword'); FX.ring(p.x, p.y, 10, 90, '110,255,200', 0.3); },
+    formation(p, ax, ay, lv) { p.formT = 6; p.formN = 4 + lv * 2; p.formLv = lv; p.formTick = 0; Au.sfx('bigsword'); FX.ring(p.x, p.y, 10, 96, '110,255,200', 0.3); FX.array(p.x, p.y, 20, 110, '110,255,200', 0.5, 3); },
     thunder(p, ax, ay, lv) {
       const Gm = G.Game, list = [];
       for (const e of Gm.room.enemies) { if (e.dead || e.untarget || e.st === 'spawn') continue; const d = U.dist(ax, ay, e.x, e.y); if (d < 300) list.push([d, e]); }
@@ -505,10 +527,10 @@
         E.dmgEnemy(e, dmg, { c: '#ffe36a', evilMul: 1.6 });
         if (!e.dead && !e.boss) e.stunT = Math.max(e.stunT, 0.7);
       }
-      Gm.shake(5); Gm.flash = 0.12; Au.sfx('thunder');
+      Gm.shake(2); Au.sfx('thunder');
     },
     giant(p, ax, ay, lv) {
-      E.hazCircle(ax, ay, 92 + lv * 6, 0.55, 95 * (1 + 0.35 * (lv - 1)) * p.spellMul * p.dmgMul, { from: 0, kind: 'giant', c: '170,225,255' });
+      E.hazCircle(ax, ay, 92 + lv * 6, 0.55, 95 * (1 + 0.35 * (lv - 1)) * p.spellMul * p.dmgMul, { from: 0, kind: 'giant', c: '110,255,200', shake: 5 });
       Au.sfx('bigsword');
     },
     beetles(p, ax, ay, lv) { for (let i = 0; i < 5 + lv * 2; i++) E.spawnBeetle(p.x + U.rand(-10, 10), p.y + U.rand(-10, 10), lv); Au.sfx('bugs'); },
@@ -532,8 +554,9 @@
         if (e.dead || e.untarget || e.st === 'spawn') continue;
         if (U.segDist(e.x, e.y, sx, sy, tx, ty) < 44 + e.r) { E.dmgEnemy(e, dmg, { c: '#c9b0ff', evilMul: 1.6 }); if (!e.dead && !e.boss) e.stunT = Math.max(e.stunT, 0.4); }
       }
-      FX.bolt(sx, sy, 20, tx, ty, 20, '190,160,255', 5); FX.bolt(sx, sy, 24, tx, ty, 16, '255,255,255', 2);
-      FX.burst(sx, sy, 20, 10, { c: '190,160,255' }); FX.burst(tx, ty, 20, 14, { c: '190,160,255' });
+      FX.bolt(sx, sy, 20, tx, ty, 20, '255,235,130', 5); FX.bolt(sx, sy, 26, tx, ty, 14, '190,205,255', 3);
+      FX.wings(0.55); FX.ring(tx, ty, 8, 70, '190,205,255', 0.3, 4);
+      FX.burst(sx, sy, 20, 10, { c: '190,205,255' }); FX.burst(tx, ty, 20, 14, { c: '255,235,130' });
       p.x = tx; p.y = ty; p.inv = Math.max(p.inv, 0.35);
       Au.sfx('thunder');
     },
@@ -553,6 +576,10 @@
     if (s.id === 'blink' && !Gm.isManualNow()) { // 自动瞄准下，风雷翅朝移动方向闪（没在移动才闪向目标）
       const mv = G.Input.moveVec();
       if (mv.l > 0.2) aim = { x: p.x + mv.x * 280, y: p.y + mv.y * 280 };
+      else if (Gm.target) { // 站定时：穿过目标，落在它身后，而不是停在它脚下
+        const d = U.dist(p.x, p.y, aim.x, aim.y) || 1;
+        aim = { x: aim.x + ((aim.x - p.x) / d) * 90, y: aim.y + ((aim.y - p.y) / d) * 90 };
+      }
     }
     SK[s.id](p, aim.x, aim.y, s.lv);
     p.atkAnim = 1; Gm.stats.casts++;
@@ -654,7 +681,7 @@
         const e = E.nearestEnemy(a.x, a.y, 440, true);
         if (e) {
           a.face = U.ang(a.x, a.y, e.x, e.y); a.atkT = 0.42; a.atk = 1;
-          E.shootP(a.x, a.y, a.face, { kind: 'bolt', spd: 640, life: 0.8, dmg: 9 * (1 + 0.3 * (a.lv - 1)) * p.spellMul * p.dmgMul, r: 7, z: 24, c: '110,255,234', tc: '#8affea' });
+          E.shootP(a.x, a.y, a.face, { kind: 'bolt', spd: 640, life: 0.8, dmg: 9 * (1 + 0.3 * (a.lv - 1)) * p.spellMul * p.dmgMul, r: 7, z: 24, c: '255,190,90', tc: '#ffd28a' });
           Au.sfx('shoot');
         } else a.atkT = 0.2;
       }

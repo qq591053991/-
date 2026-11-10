@@ -75,7 +75,43 @@
     this.mat.uniforms.uScale.value = (H * renderer.getPixelRatio()) / (2 * HALF_TAN);
   };
 
-  let glows, dusts, orbs, shards, P = {};
+  let glows, dusts, orbs, shards, orbRims, shardRims, fySw, bugs, P = {};
+  let trailMesh, trPos, trCol, trQ = 0, arrayTex = null, bugSeq = 0;
+  const ZHU = '255,74,50';       // 朱砂：一切危险区域的预警色
+  const formTr = [], menuTr = [{}, {}, {}], hoverTr = [];
+
+  /* 拖尾：我方飞剑共用一个网格，每帧重建。每条拖尾记下最近若干个位置，连成一条渐隐的带子 */
+  const TR_PTS = 10, TR_MAXQ = 1400;
+  function initTrails() {
+    trPos = new Float32Array(TR_MAXQ * 12); trCol = new Float32Array(TR_MAXQ * 12);
+    const idx = new Uint16Array(TR_MAXQ * 6);
+    for (let q = 0; q < TR_MAXQ; q++) idx.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4 + 2, q * 4 + 1, q * 4 + 3], q * 6);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(trPos, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('color', new THREE.BufferAttribute(trCol, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    trailMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    trailMesh.frustumCulled = false; trailMesh.renderOrder = 25; scene.add(trailMesh);
+  }
+  function trail(o, x, y, z, c, width, gain) {
+    let h = o._tr; if (!h) h = o._tr = [];
+    const n0 = h.length;
+    if (!n0 || Math.abs(h[n0 - 3] - x) + Math.abs(h[n0 - 2] - y) + Math.abs(h[n0 - 1] - z) > 0.004) { h.push(x, y, z); if (h.length > TR_PTS * 3) h.splice(0, 3); }
+    const n = h.length / 3; if (n < 2) return;
+    const cr = c.col.r * gain, cg = c.col.g * gain, cb = c.col.b * gain;
+    for (let i = 0; i < n - 1 && trQ < TR_MAXQ; i++) {
+      const a = i * 3, ax = h[a], ay = h[a + 1], az = h[a + 2], bx = h[a + 3], by = h[a + 4], bz = h[a + 5];
+      let dx = bx - ax, dz = bz - az; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+      const k0 = i / (n - 1), k1 = (i + 1) / (n - 1), w0 = width * k0, w1 = width * k1, f0 = k0 * k0, f1 = k1 * k1, o = trQ * 12;
+      trPos[o] = ax - dz * w0; trPos[o + 1] = ay; trPos[o + 2] = az + dx * w0;
+      trPos[o + 3] = ax + dz * w0; trPos[o + 4] = ay; trPos[o + 5] = az - dx * w0;
+      trPos[o + 6] = bx - dz * w1; trPos[o + 7] = by; trPos[o + 8] = bz + dx * w1;
+      trPos[o + 9] = bx + dz * w1; trPos[o + 10] = by; trPos[o + 11] = bz - dx * w1;
+      trCol[o] = trCol[o + 3] = cr * f0; trCol[o + 1] = trCol[o + 4] = cg * f0; trCol[o + 2] = trCol[o + 5] = cb * f0;
+      trCol[o + 6] = trCol[o + 9] = cr * f1; trCol[o + 7] = trCol[o + 10] = cg * f1; trCol[o + 8] = trCol[o + 11] = cb * f1;
+      trQ++;
+    }
+  }
 
   /* ============================ 初始化 ============================ */
   R.init = function (cv) {
@@ -118,12 +154,18 @@
     glows = new Cloud(2600, true); dusts = new Cloud(700, false);
     scene.add(glows.obj); scene.add(dusts.obj);
 
-    const mkInst = (geo, n) => {
-      const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff }), n);
+    const mkInst = (geo, n, o) => {
+      const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial(Object.assign({ color: 0xffffff }, o)), n);
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.setColorAt(0, tmpC.set(0xffffff)); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
       m.frustumCulled = false; m.count = 0; scene.add(m); return m;
     };
-    orbs = mkInst(Mo.geo.sph(10), 900); shards = mkInst(Mo.geo.oct(), 500);
+    // 弹幕 = 芯 + 外壳（外壳只画背面，于是在芯的外围露出一圈色边）。我方白芯，敌方暗芯
+    orbs = mkInst(Mo.geo.sph(10), 900); orbRims = mkInst(Mo.geo.sph(10), 900, { side: THREE.BackSide });
+    shards = mkInst(Mo.geo.oct(), 500); shardRims = mkInst(Mo.geo.oct(), 500, { side: THREE.BackSide });
+    fySw = mkInst(Mo.bladeGeo(), 240, { side: THREE.DoubleSide }); // 蜂云剑阵的小剑
+    bugs = mkInst(Mo.geo.sph(10), 160);                             // 噬金虫
+    initTrails();
+    arrayTex = ctex(Tx.array());
 
     // 贴地图形的池
     const flatMat = (o) => new THREE.MeshBasicMaterial(Object.assign({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }, o));
@@ -133,9 +175,9 @@
     P.fxring = new Pool(flat(thinG, { blending: THREE.AdditiveBlending }));
     P.web = new Pool(flat(circG, { map: webTex }));
     P.beam = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
-    P.sword = new Pool(() => Mo.sword(0x96ffdc)); P.mini = new Pool(() => Mo.sword(0xffdc82, true)); P.fsword = new Pool(() => Mo.sword(0x6effc8));
-    P.swQ = new Pool(() => Mo.sword(0x5cff9a, false, 0xe6fff0)); // 青元剑诀：青色剑光
-    P.swF = new Pool(() => Mo.sword(0x9aff4a, false, 0xd8ffa8, 0xffe36a)); // 青竹蜂云剑：竹青剑身 + 金色雷弧
+    P.sw0 = new Pool(() => Mo.sword(0)); P.sw1 = new Pool(() => Mo.sword(1)); P.sw2 = new Pool(() => Mo.sword(2)); P.mini = new Pool(() => Mo.sword('mini'));
+    P.arr = new Pool(flat(circG, { map: arrayTex, blending: THREE.AdditiveBlending }));
+    P.wing = new Pool(() => Mo.wings()); P.plate = new Pool(() => Mo.shieldPlate());
     P.gem = new Pool(() => { const m = new THREE.Mesh(Mo.geo.oct(), new THREE.MeshBasicMaterial({ color: 0x8affd8 })); m.scale.set(0.15, 0.24, 0.15); return m; });
     P.potion = new Pool(() => { const g = new THREE.Group(); const a = new THREE.Mesh(Mo.geo.sph(10), new THREE.MeshLambertMaterial({ color: 0xe0484a, emissive: 0x5a1012 })); a.scale.setScalar(0.24); const b = new THREE.Mesh(Mo.geo.cyl(0.5, 0.5, 8), new THREE.MeshLambertMaterial({ color: 0xd9b45a })); b.scale.set(0.09, 0.14, 0.09); b.position.y = 0.16; g.add(a, b); return g; });
     P.ball = new Pool(() => new THREE.Mesh(Mo.geo.sph(10), new THREE.MeshBasicMaterial({ color: 0xffffff })));
@@ -406,26 +448,32 @@
 
   function syncHazards(Gm, t) {
     for (const h of Gm.haz) {
-      const c = rgb(h.c);
+      // c 是招式本身的颜色（流派色）；wc 是预警色：敌方一律朱砂
+      const c = rgb(h.c), foe = h.from === 1, wc = foe ? rgb(ZHU) : c;
       if (h.type === 'circle' || h.type === 'lob') {
         const k = Math.min(1, h.t / (h.type === 'lob' ? h.dur : h.delay));
-        flatAt(P.circ, h.x, h.y, h.r, c, 0.12 + k * 0.14, 0.02, 2);
-        flatAt(P.circ, h.x, h.y, Math.max(1, h.r * k), c, 0.3, 0.025, 3);
-        flatAt(P.ring, h.x, h.y, h.r, c, 0.75 + Math.sin(t * 20) * 0.25, 0.03, 4);
+        if (h.kind === 'giant') { // 巨剑术：阵图 + 光柱 + 自天而降的巨剑
+          const m = P.arr.get(); m.position.set(h.x * S, 0.045, h.y * S); m.scale.set(h.r * S, h.r * S, 1); m.rotation.z = t * 2.2; m.material.color.copy(c.col); m.material.opacity = 0.35 + k * 0.6; m.renderOrder = 5;
+          flatAt(P.circ, h.x, h.y, Math.max(1, h.r * k), c, 0.16, 0.025, 3);
+          const b = P.beam.get(); b.position.set(h.x * S, 4, h.y * S); b.rotation.set(0, t * 3, 0); b.scale.set(0.2 + k * 0.5, 8, 0.2 + k * 0.5); b.material.color.copy(c.col); b.material.opacity = 0.1 + k * 0.22;
+          const gsw = P.giant.get(); place(gsw, h.x, h.y, 520 * (1 - k * k)); gsw.rotation.y = t * 1.5;
+          for (const mt of gsw.userData.mats) mt.opacity = mt.userData.o0 * (0.3 + k * 0.7);
+          glows.push(gsw.position.x, gsw.position.y + 1.4, gsw.position.z, c, 0.5, 4);
+          continue;
+        }
+        flatAt(P.circ, h.x, h.y, h.r, wc, 0.12 + k * 0.14, 0.02, 2);
+        flatAt(P.circ, h.x, h.y, Math.max(1, h.r * k), wc, 0.3, 0.025, 3);
+        flatAt(P.ring, h.x, h.y, h.r, wc, 0.75 + Math.sin(t * 20) * 0.25, 0.03, 4);
         if (h.type === 'lob') {
           const b = P.ball.get(); place(b, U.lerp(h.sx, h.x, k), U.lerp(h.sy, h.y, k), 14 + Math.sin(k * PI) * 130);
-          b.scale.setScalar(0.34); b.material.color.copy(c.col);
-          glows.push(b.position.x, b.position.y, b.position.z, c, 0.7, 1.1);
-        } else if (h.kind === 'giant') {
-          const gsw = P.giant.get(); place(gsw, h.x, h.y, 440 * (1 - k * k));
-          for (const m of gsw.userData.mats) m.opacity = 0.45 + k * 0.55;
-          glows.push(gsw.position.x, gsw.position.y + 1.4, gsw.position.z, c, 0.5, 4);
+          b.scale.setScalar(0.34); b.material.color.copy(c.col).multiplyScalar(0.3);
+          glows.push(b.position.x, b.position.y, b.position.z, c, 0.6, 1.1);
         }
       } else if (h.type === 'line') {
         const k = Math.min(1, h.t / h.delay);
         if (h.visual || h.t < h.delay) {
-          bandAt(h.x1, h.y1, h.x2, h.y2, h.w, c, 0.1 + k * 0.18, 0.02, 2);
-          if (!h.visual) bandAt(h.x1, h.y1, h.x2, h.y2, h.w * k, c, 0.28, 0.025, 3);
+          bandAt(h.x1, h.y1, h.x2, h.y2, h.w, wc, 0.1 + k * 0.18, 0.02, 2);
+          if (!h.visual) bandAt(h.x1, h.y1, h.x2, h.y2, h.w * k, wc, 0.28, 0.025, 3);
         } else {
           const f = 1 - (h.t - h.delay) / h.stay;
           bandAt(h.x1, h.y1, h.x2, h.y2, h.w, c, 0.55 + f * 0.3, 0.02, 2);
@@ -436,63 +484,83 @@
       } else if (h.type === 'puddle') {
         const f = Math.min(1, h.life / 0.5) * Math.min(1, h.t / 0.25);
         if (h.kind === 'web') flatAt(P.web, h.x, h.y, h.r, rgb('235,235,245'), 0.6 * f, 0.025, 2);
-        else { flatAt(P.circ, h.x, h.y, h.r, c, 0.3 * f, 0.02, 2); flatAt(P.ring, h.x, h.y, h.r, c, 0.6 * f, 0.03, 3); }
+        else { flatAt(P.circ, h.x, h.y, h.r, c, 0.3 * f, 0.02, 2); flatAt(P.ring, h.x, h.y, h.r, wc, 0.7 * f, 0.03, 3); }
       } else if (h.type === 'beam' && h.owner) {
         const o = h.owner, x2 = o.x + Math.cos(h.ang) * h.len, y2 = o.y + Math.sin(h.ang) * h.len;
-        if (h.t < h.delay) { const k = h.t / h.delay; bandAt(o.x, o.y, x2, y2, h.w, c, 0.08 + k * 0.2, 0.02, 2); bandAt(o.x, o.y, x2, y2, 4, c, 0.5 + k * 0.4, 0.03, 3); }
+        if (h.t < h.delay) { const k = h.t / h.delay; bandAt(o.x, o.y, x2, y2, h.w, wc, 0.08 + k * 0.2, 0.02, 2); bandAt(o.x, o.y, x2, y2, 4, wc, 0.5 + k * 0.4, 0.03, 3); }
         else {
           const f = Math.min(1, (h.delay + h.life - h.t) / 0.3);
           for (let i = 0; i < 2; i++) {
             const b = P.beam.get(); b.position.set(((o.x + x2) / 2) * S, 0.34, ((o.y + y2) / 2) * S); b.rotation.set(0, -h.ang, 0);
             b.scale.set(h.len * S, i ? 0.14 : 0.36, h.w * S * (i ? 0.4 : 1) * (0.9 + Math.sin(t * 40) * 0.1));
-            if (i) b.material.color.setRGB(1, 0.92, 0.92); else b.material.color.copy(c.col);
+            if (i) b.material.color.setRGB(0.1, 0.02, 0.03); else b.material.color.copy(c.col);
             b.material.opacity = (i ? 0.9 : 0.7) * f;
           }
-          bandAt(o.x, o.y, x2, y2, h.w * 1.6, c, 0.25 * f, 0.02, 2);
+          bandAt(o.x, o.y, x2, y2, h.w * 1.6, wc, 0.25 * f, 0.02, 2);
         }
       }
     }
   }
 
+  /* 色相定流派，芯定敌我：我方的芯是亮的（近白），敌方的芯是暗的；外圈一律是流派色 */
+  function putOrb(i, x, y, z, sx, sy, sz, ry, c, foe, rim) {
+    dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.set(sx, sy, sz); dummy.updateMatrix();
+    orbs.setMatrixAt(i, dummy.matrix);
+    orbs.setColorAt(i, foe ? tmpC.copy(c.col).multiplyScalar(0.1) : tmpC.copy(c.col).lerp(WHITE, 0.85));
+    dummy.scale.set(sx * rim, sy * rim, sz * rim); dummy.updateMatrix();
+    orbRims.setMatrixAt(i, dummy.matrix); orbRims.setColorAt(i, tmpC.copy(c.col));
+  }
+  function putShard(i, x, y, z, sx, sy, sz, ry, c, foe) {
+    dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.set(sx, sy, sz); dummy.updateMatrix();
+    shards.setMatrixAt(i, dummy.matrix);
+    shards.setColorAt(i, foe ? tmpC.copy(c.col).multiplyScalar(0.1) : tmpC.copy(c.col).lerp(WHITE, 0.85));
+    dummy.scale.set(sx * 1.9, sy * 1.9, sz * 1.22); dummy.updateMatrix();
+    shardRims.setMatrixAt(i, dummy.matrix); shardRims.setColorAt(i, tmpC.copy(c.col));
+  }
+
   function syncProjs(Gm, t) {
-    let no = 0, ns = 0;
+    let no = 0, ns = 0, nf = 0, nb = 0;
     for (const pr of Gm.projs) {
-      const c = rgb(pr.c || '255,255,255'), x = pr.x * S, y = pr.z * S, z = pr.y * S, a = Math.atan2(pr.vy, pr.vx), r = pr.r * S;
-      if (pr.kind === 'sword') {
-        const s = (pr.mini ? P.mini : pr.style === 2 ? P.swF : pr.style === 1 ? P.swQ : P.sword).get(); s.position.set(x, y, z); s.rotation.y = PI / 2 - a;
-        glows.push(x, y, z, c, 0.55, pr.mini ? 0.7 : 1.1);
-        if (pr.style === 2 && !pr.mini) glows.push(x + U.rand(-0.15, 0.15), y + U.rand(-0.1, 0.1), z + U.rand(-0.15, 0.15), GOLD, 0.9, 0.35);
-      } else if (pr.kind === 'fy') { // 蜂云剑阵的小剑
-        if (ns < 500) {
-          dummy.position.set(x, y, z); dummy.rotation.set(0, PI / 2 - a, 0); dummy.scale.set(0.12, 0.05, 0.62); dummy.updateMatrix();
-          shards.setMatrixAt(ns, dummy.matrix); shards.setColorAt(ns, tmpC.set(0xdcffb0)); ns++;
+      const c = rgb(pr.c || '255,255,255'), x = pr.x * S, y = pr.z * S, z = pr.y * S, a = Math.atan2(pr.vy, pr.vx), r = pr.r * S, foe = pr.from === 1, ry = PI / 2 - a;
+      if (pr.kind === 'sword') { // 飞剑：按功法进境换形，带拖尾
+        const s = (pr.mini ? P.mini : pr.style === 2 ? P.sw2 : pr.style === 1 ? P.sw1 : P.sw0).get(); s.position.set(x, y, z); s.rotation.set(0, ry, 0);
+        glows.push(x, y, z, c, pr.style ? 0.5 : 0.32, pr.mini ? 0.7 : 1.0);
+        trail(pr, x, y, z, c, pr.mini ? 0.05 : pr.style ? 0.1 : 0.07, pr.style ? 0.95 : 0.55);
+        if (pr.style === 2 && !pr.mini && ((pr.t * 40) | 0) % 2 === 0) glows.push(x + U.rand(-0.2, 0.2), y + U.rand(-0.1, 0.1), z + U.rand(-0.2, 0.2), GOLD, 0.95, 0.32); // 剑身游走的金色电弧
+      } else if (pr.kind === 'fy') { // 蜂云剑阵：七十二口竹青小剑
+        if (nf < 240) {
+          dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.set(0.075, 0.032, 0.5); dummy.updateMatrix();
+          fySw.setMatrixAt(nf, dummy.matrix); fySw.setColorAt(nf, tmpC.set(nf % 3 ? 0xc4f296 : 0xf4ffe2)); nf++;
         }
-        glows.push(x, y, z, c, 0.5, 0.8);
-        if (((pr.t * 30) | 0) % 5 === 0) glows.push(x, y, z, GOLD, 0.9, 0.45);
+        glows.push(x, y, z, c, 0.4, 0.62);
+        trail(pr, x, y, z, c, 0.045, 0.8);
+        if (((pr.t * 30 + nf) | 0) % 7 === 0) glows.push(x, y, z, GOLD, 0.9, 0.42);
+      } else if (pr.kind === 'beetle') { // 噬金虫：金银相间的甲虫，振翅
+        if (pr._i === undefined) pr._i = bugSeq++;
+        if (nb < 160) {
+          dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.set(0.2, 0.13, 0.3); dummy.updateMatrix();
+          bugs.setMatrixAt(nb, dummy.matrix); bugs.setColorAt(nb, tmpC.set(pr._i % 2 ? 0xffd24a : 0xe6ecf2)); nb++;
+        }
+        const f = Math.sin(t * 70 + pr._i) * 0.07 + 0.11, sx = Math.sin(a), sz = -Math.cos(a);
+        glows.push(x + sx * f, y + 0.05, z + sz * f, WHITE3, 0.75, 0.22); glows.push(x - sx * f, y + 0.05, z - sz * f, WHITE3, 0.75, 0.22);
+        glows.push(x, y, z, c, 0.35, 0.6);
       } else if (pr.kind === 'ice' || pr.kind === 'blade' || pr.kind === 'needle' || pr.kind === 'bolt' || pr.kind === 'arrow') {
-        if (ns < 500) {
-          const thin = pr.kind === 'needle' || pr.kind === 'bolt' || pr.kind === 'arrow';
-          dummy.position.set(x, y, z); dummy.rotation.set(0, PI / 2 - a, 0);
-          dummy.scale.set(thin ? 0.09 : r * 1.5, thin ? 0.09 : r * 1.0, thin ? 0.7 : r * 4.2); dummy.updateMatrix();
-          shards.setMatrixAt(ns, dummy.matrix);
-          shards.setColorAt(ns, pr.kind === 'arrow' ? tmpC.set(0xe8dcc0) : tmpC.copy(c.col).lerp(WHITE, 0.55)); ns++;
-        }
-        glows.push(x, y, z, c, 0.6, r * 4.4);
+        const thin = pr.kind === 'needle' || pr.kind === 'bolt' || pr.kind === 'arrow';
+        if (ns < 500) { putShard(ns, x, y, z, thin ? 0.08 : r * 1.4, thin ? 0.08 : r * 0.95, thin ? 0.66 : r * 4.0, ry, c, foe); ns++; }
+        if (pr.kind !== 'arrow') glows.push(x, y, z, c, foe ? 0.36 : 0.6, r * 4.2); // 凡人的箭不发光
+        if (!foe) trail(pr, x, y, z, c, r * 0.9, 0.6);
       } else {
-        if (no < 900) {
-          dummy.position.set(x, y, z); dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(r * 2); dummy.updateMatrix();
-          orbs.setMatrixAt(no, dummy.matrix);
-          orbs.setColorAt(no, pr.kind === 'ink' ? tmpC.set(0x12141f) : pr.kind === 'beetle' ? tmpC.set(0xffd24a) : tmpC.copy(c.col).lerp(WHITE, pr.kind === 'blood' ? 0.1 : 0.4)); no++;
-        }
-        glows.push(x, y, z, c, pr.from === 0 ? 0.75 : 0.62, r * (pr.kind === 'fire' ? 6.5 : 5));
-        if (pr.kind === 'fire' || pr.kind === 'ghostfire' || pr.kind === 'skullp') glows.push(x - Math.cos(a) * r * 2.4, y, z - Math.sin(a) * r * 2.4, c, 0.4, r * 3.6);
+        const big = pr.kind === 'fire' && !foe;
+        if (no < 900) { putOrb(no, x, y, z, r * 1.5, r * 1.5, r * 1.5, 0, c, foe, foe ? 1.42 : 1.3); no++; }
+        glows.push(x, y, z, c, foe ? 0.36 : 0.75, r * (big ? 6.5 : 4.6));
+        if (big) trail(pr, x, y, z, c, r * 1.3, 0.8);
+        else if (pr.kind === 'ghostfire' || pr.kind === 'skullp') glows.push(x - Math.cos(a) * r * 2.4, y, z - Math.sin(a) * r * 2.4, c, 0.3, r * 3.4);
       }
     }
-    orbs.count = no; shards.count = ns;
-    orbs.instanceMatrix.needsUpdate = shards.instanceMatrix.needsUpdate = true;
-    orbs.instanceColor.needsUpdate = shards.instanceColor.needsUpdate = true;
+    orbs.count = orbRims.count = no; shards.count = shardRims.count = ns; fySw.count = nf; bugs.count = nb;
+    for (const m of [orbs, orbRims, shards, shardRims, fySw, bugs]) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
   }
-  const WHITE = new THREE.Color(0xffffff), GOLD = [1, 0.92, 0.5];
+  const WHITE = new THREE.Color(0xffffff), GOLD = [1, 0.92, 0.5], WHITE3 = [1, 1, 1];
 
   function syncFx(t) {
     for (const p of G.FX.parts) {
@@ -504,6 +572,17 @@
         const r = U.lerp(p.r1, p.r0, k), m = P.fxring.get(), c = rgb(p.c);
         m.position.set(p.x * S, 0.06, p.y * S); m.scale.set(Math.max(0.02, r * S), Math.max(0.02, r * S), 1);
         m.material.color.copy(c.col); m.material.opacity = k * 0.9; m.renderOrder = 6;
+      } else if (p.kind === 'array') {
+        const r = U.lerp(p.r1, p.r0, k * k), m = P.arr.get(), c = rgb(p.c);
+        m.position.set(p.x * S, 0.05, p.y * S); m.scale.set(r * S, r * S, 1); m.rotation.z = p.rot + t * p.spin;
+        m.material.color.copy(c.col); m.material.opacity = Math.min(1, k * 2.2); m.renderOrder = 6;
+      } else if (p.kind === 'wings') {
+        const pl = G.Game.player, w = P.wing.get(), q = 1 - k;
+        place(w, pl.x, pl.y, 0); w.rotation.y = PI / 2 - pl.face; w.scale.setScalar(ACTOR * (0.55 + Math.min(1, q * 5) * 0.6));
+        for (const mt of w.userData.mats) mt.opacity = mt.userData.o0 * Math.min(1, k * 2.4);
+        glows.push(pl.x * S, 1.1, pl.y * S, rgb('190,205,255'), 0.3 * k, 4);
+      } else if (p.kind === 'bolt') {
+        glows.push(p.x * S, p.z * S + 0.15, p.y * S, rgb(p.c), 0.9 * k, 2.4);
       }
     }
   }
@@ -512,7 +591,7 @@
     frame++;
     // 敌人
     for (const e of room.enemies) {
-      const c = rgb('255,90,90');
+      const c = rgb(ZHU);
       if (e.st === 'spawn') {
         const k = 1 - Math.min(1, e.stT / 0.8);
         flatAt(P.ring, e.x, e.y, 10 + e.r * 1.4 * (1 - k * 0.3), c, 0.5 + k * 0.5, 0.03, 4);
@@ -559,13 +638,33 @@
       pLight.position.set(p.x * S, 1.9, p.y * S + 0.7);
       if (!p.dead) flatAt(P.ring, p.x, p.y, 17, rgb('127,224,192'), 0.4, 0.03, 4);
       if (p.fy && p.sp >= 100 && !p.dead) { flatAt(P.ring, p.x, p.y, 24 + Math.sin(t * 6) * 3, rgb('200,255,120'), 0.7, 0.035, 5); glows.push(p.x * S, 0.5, p.y * S, rgb('200,255,120'), 0.22, 2.4); }
-      if (p.shield > 0) { const s = P.shield.get(); place(s, p.x, p.y, 30); s.scale.set(1.4, 1.8, 1.4); s.material.opacity = 0.14 + (p.shield / p.shieldMax) * 0.2; }
-      if (p.flags.autoShield && p.autoShieldT <= 0) { const a = t * 2.4; glows.push(p.x * S + Math.cos(a) * 0.5, 0.6, p.y * S + Math.sin(a) * 0.5, rgb('200,215,240'), 0.9, 0.5); }
-      if (p.formT > 0) for (let i = 0; i < p.formN; i++) {
-        const a = t * 4.5 + (i / p.formN) * TAU, s = P.fsword.get();
-        s.position.set((p.x + Math.cos(a) * 66) * S, 0.5, (p.y + Math.sin(a) * 66) * S); s.rotation.y = -a;
-        glows.push(s.position.x, 0.5, s.position.z, rgb('110,255,200'), 0.5, 0.9);
+      const tier = p.fy ? 2 : p.qy ? 1 : 0, swPool = P['sw' + tier], swC = rgb(tier === 2 ? '170,255,110' : tier === 1 ? '110,255,170' : '150,255,220');
+      // 本命飞剑悬在身后，出剑时前指（身静器动）
+      if (!p.dead) for (let i = 0, nh = Math.min(3, p.swords); i < nh; i++) {
+        const off = (i - (nh - 1) / 2) * 30, fa = p.face, s = swPool.get();
+        const hx = p.x - Math.cos(fa) * 20 - Math.sin(fa) * off, hy = p.y - Math.sin(fa) * 20 + Math.cos(fa) * off;
+        s.position.set(hx * S, 1.12 + Math.sin(t * 2.4 + i * 1.7) * 0.06, hy * S);
+        s.rotation.set(U.lerp(-1.18, -0.25, Math.min(1, p.atkAnim)), PI / 2 - fa, 0);
+        glows.push(s.position.x, s.position.y + 0.1, s.position.z, swC, tier ? 0.34 : 0.2, 0.9);
       }
+      // 玄铁盾：绕身飞旋的盾牌 + 一层薄薄的护体灵光
+      if (p.shield > 0) {
+        const s = P.shield.get(); place(s, p.x, p.y, 30); s.scale.set(1.4, 1.8, 1.4); s.material.opacity = 0.06 + (p.shield / p.shieldMax) * 0.12;
+        for (let i = 0; i < 2; i++) { const a = t * 3.2 + i * PI, pl = P.plate.get(); pl.position.set(p.x * S + Math.cos(a) * 0.78, 0.78, p.y * S + Math.sin(a) * 0.78); pl.rotation.set(0, PI / 2 - a, 0); pl.scale.setScalar(0.95); }
+      }
+      if (p.flags.autoShield && p.autoShieldT <= 0) { const a = t * 2.4, pl = P.plate.get(); pl.position.set(p.x * S + Math.cos(a) * 0.62, 0.95, p.y * S + Math.sin(a) * 0.62); pl.rotation.set(0, PI / 2 - a, 0); pl.scale.setScalar(0.5); }
+      // 青元剑阵：脚下阵图 + 环身飞剑
+      if (p.formT > 0) {
+        const fc = rgb('110,255,200'), fade = Math.min(1, p.formT * 2), ar = P.arr.get();
+        ar.position.set(p.x * S, 0.045, p.y * S); ar.scale.set(96 * S, 96 * S, 1); ar.rotation.z = -t * 1.6; ar.material.color.copy(fc.col); ar.material.opacity = 0.75 * fade; ar.renderOrder = 5;
+        const fp = P['sw' + Math.max(1, tier)];
+        for (let i = 0; i < p.formN; i++) {
+          const a = t * 4.5 + (i / p.formN) * TAU, s = fp.get(), o = formTr[i] || (formTr[i] = {});
+          s.position.set((p.x + Math.cos(a) * 66) * S, 0.5, (p.y + Math.sin(a) * 66) * S); s.rotation.set(0, -a, 0);
+          glows.push(s.position.x, 0.5, s.position.z, fc, 0.45, 0.9);
+          trail(o, s.position.x, 0.5, s.position.z, fc, 0.09, 0.9);
+        }
+      } else if (formTr.length) formTr.length = 0;
     } else if (heroM) heroM.g.visible = false;
 
     // 傀儡
@@ -615,10 +714,12 @@
         const k = q.life / q.max;
         if (q.kind === 'bolt') {
           c.globalCompositeOperation = 'lighter';
-          c.beginPath();
-          for (let j = 0; j < q.pts.length; j++) { const s = proj(q.pts[j][0], q.pts[j][1], q.pts[j][2]); if (j) c.lineTo(s.x, s.y); else c.moveTo(s.x, s.y); }
-          c.strokeStyle = `rgba(${q.c},${k})`; c.lineWidth = q.w * 2.4; c.stroke();
+          const path = (pts) => { c.beginPath(); for (let j = 0; j < pts.length; j++) { const s = proj(pts[j][0], pts[j][1], pts[j][2]); if (j) c.lineTo(s.x, s.y); else c.moveTo(s.x, s.y); } };
+          path(q.pts);
+          c.strokeStyle = `rgba(${q.c},${k * 0.3})`; c.lineWidth = q.w * 5.5; c.stroke();
+          c.strokeStyle = `rgba(${q.c},${k})`; c.lineWidth = q.w * 2.2; c.stroke();
           c.strokeStyle = `rgba(255,255,255,${k})`; c.lineWidth = q.w * 0.8; c.stroke();
+          for (const br of q.br || []) { path(br); c.strokeStyle = `rgba(${q.c},${k * 0.85})`; c.lineWidth = q.w * 0.9; c.stroke(); }
           c.globalCompositeOperation = 'source-over';
         } else if (q.kind === 'slash') {
           c.globalCompositeOperation = 'lighter';
@@ -627,6 +728,18 @@
           c.strokeStyle = `rgba(${q.c},${k})`; c.lineWidth = 8 * k + 1.5; c.stroke();
           c.globalCompositeOperation = 'source-over';
         }
+      }
+      // 蜂云剑阵：飞剑之间游走的辟邪神雷
+      const fy = Gm.projs.filter((x) => x.fy);
+      if (fy.length > 1) {
+        c.globalCompositeOperation = 'lighter'; c.lineWidth = 1.4;
+        for (let n = 0, tries = 0; n < 5 && tries < 24; tries++) {
+          const a = U.pick(fy), b = U.pick(fy);
+          if (a === b || U.dist2(a.x, a.y, b.x, b.y) > 110 * 110) continue;
+          const s1 = proj(a.x, a.y, a.z), s2 = proj(b.x, b.y, b.z), mx = (s1.x + s2.x) / 2 + U.rand(-9, 9), my = (s1.y + s2.y) / 2 + U.rand(-9, 9);
+          c.strokeStyle = 'rgba(255,235,130,0.85)'; c.beginPath(); c.moveTo(s1.x, s1.y); c.lineTo(mx, my); c.lineTo(s2.x, s2.y); c.stroke(); n++;
+        }
+        c.globalCompositeOperation = 'source-over';
       }
       // 血条 / 预警 / 状态
       c.textAlign = 'center'; c.textBaseline = 'alphabetic';
@@ -679,8 +792,11 @@
     }
   }
 
-  function beginPools() { for (const k in P) P[k].begin(); glows.n = 0; dusts.n = 0; }
-  function endPools() { for (const k in P) P[k].end(); glows.end(); dusts.end(); }
+  function beginPools() { for (const k in P) P[k].begin(); glows.n = 0; dusts.n = 0; trQ = 0; }
+  function endPools() {
+    for (const k in P) P[k].end(); glows.end(); dusts.end();
+    const g = trailMesh.geometry; g.setDrawRange(0, trQ * 6); g.attributes.position.needsUpdate = g.attributes.color.needsUpdate = true;
+  }
 
   /* ============================ 游戏画面 ============================ */
   R.drawWorld = function (dt) {
@@ -719,11 +835,12 @@
     beginPools();
     animateRoom(menuRoom, t);
     for (let i = 0; i < 3; i++) { // 环身飞剑
-      const a = t * 1.3 + (i / 3) * TAU, s = P.fsword.get();
-      s.position.set(cx + Math.cos(a) * 1.2, 0.9 + Math.sin(t * 2 + i) * 0.12, cz + Math.sin(a) * 1.2); s.rotation.y = -a;
-      glows.push(s.position.x, s.position.y, s.position.z, rgb('110,255,200'), 0.55, 1.0);
+      const a = t * 1.3 + (i / 3) * TAU, s = P.sw2.get(), fc = rgb('170,255,110');
+      s.position.set(cx + Math.cos(a) * 1.2, 0.9 + Math.sin(t * 2 + i) * 0.12, cz + Math.sin(a) * 1.2); s.rotation.set(0, -a, 0);
+      glows.push(s.position.x, s.position.y, s.position.z, fc, 0.5, 1.0);
+      trail(menuTr[i], s.position.x, s.position.y, s.position.z, fc, 0.09, 0.9);
     }
-    orbs.count = shards.count = 0;
+    for (const m of [orbs, orbRims, shards, shardRims, fySw, bugs]) m.count = 0;
     endPools();
     const a = Math.sin(t * 0.13) * 0.55 + 0.25, wide = W / H < 1 ? 1.7 : 1, d = 12.5 * wide;
     camera.position.set(cx + Math.sin(a) * d, 5.6 * wide, cz + Math.cos(a) * d);

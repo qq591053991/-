@@ -78,7 +78,7 @@
             <p>飞剑自动锁定最近的敌人</p>
             <p>右下按钮：遁术、神通、丹药</p>
             <h3>要诀</h3>
-            <p>清空房间可得一滴<b>绿液</b>，在<b>药园</b>催熟灵药。</p>
+            <p>清空房间可得一滴<b>灵露</b>，在<b>药园</b>催熟灵药。</p>
             <p>红圈红线是招式预警；遁术可穿越一切。</p>
             <p>陨落后获得<b>道心</b>，在洞府永久强化。</p>
           </div>
@@ -125,7 +125,7 @@
       let i = 0;
       const show = () => {
         const [who, text] = lines[i];
-        this.open(`<div class="dialog"><b class="${who === '韩立' ? 'me' : who === '旁白' ? 'nar' : 'foe'}">${who === '旁白' ? '' : esc(who)}</b><p>${esc(text)}</p><span class="hint">▼</span></div>`, 'clear');
+        this.open(`<div class="dialog"><b class="${who === '你' ? 'me' : who === '旁白' ? 'nar' : 'foe'}">${who === '旁白' ? '' : esc(who)}</b><p>${esc(text)}</p><span class="hint">▼</span></div>`, 'clear');
         const next = () => { Au.sfx('ui'); i++; if (i < lines.length) show(); else { this.close(); done && done(); } };
         let ready = false; setTimeout(() => (ready = true), 200);
         this.ov.onclick = () => { if (ready) { this.ov.onclick = null; next(); } };
@@ -152,7 +152,7 @@
     choice(o) {
       const cards = o.cards.map((c, i) => `<button class="card ${c.cls || ''}" data-i="${i}">
         <span class="glyph" ${c.color ? `style="color:${c.color};border-color:${c.color}"` : ''}>${c.glyph}</span>
-        <b>${esc(c.name)}</b><em>${esc(c.tag || '')}</em><p>${esc(c.desc)}</p><span class="num">${i + 1}</span></button>`).join('');
+        <b>${esc(c.name)}</b><em>${esc(c.tag || '')}</em><p>${esc(c.desc)}</p><span class="num">${i + 1}</span>${c.sch && c.sch !== 'misc' ? `<span class="sch" style="color:${G.Schools[c.sch].color};border-color:${G.Schools[c.sch].color}">${G.Schools[c.sch].name}</span>` : ''}</button>`).join('');
       this.open(`<div class="choice"><h2>${esc(o.title)}</h2><p class="sub">${esc(o.sub || '')}</p><div class="cards">${cards}</div></div>`, 'dim');
       let ready = false; setTimeout(() => (ready = true), 350);
       const pick = (i) => {
@@ -189,16 +189,17 @@
 
     garden(it) {
       const Gm = G.Game, p = Gm.player;
+      const cost = (x) => Math.max(1, x.h.cost - (p.flags.vial ? 1 : 0)); // 掌天瓶：少费一滴
       const draw = () => {
         const rows = it.herbs.map((x, i) => `<div class="row ${x.sold ? 'sold' : ''}"><span class="glyph r2 herb">${x.h.glyph}</span>
           <div class="info"><b>${esc(x.h.name)}</b><em>${esc(x.h.desc)}</em></div>
-          <button class="btn sm green" data-i="${i}" ${x.sold || p.drops < x.h.cost ? 'disabled' : ''}>${x.sold ? '已采' : '绿液 ' + x.h.cost}</button></div>`).join('');
-        this.open(`<div class="panel shop"><h2>药园</h2><p class="sub">取出掌天瓶，滴下绿液——灵药转瞬便是百年药龄。</p><div class="dao green">绿液 <b>${p.drops}</b> 滴</div>
+          <button class="btn sm green" data-i="${i}" ${x.sold || p.drops < cost(x) ? 'disabled' : ''}>${x.sold ? '已采' : '灵露 ' + cost(x)}</button></div>`).join('');
+        this.open(`<div class="panel shop"><h2>药园</h2><p class="sub">取出玉瓶，滴下灵露——灵药转瞬便是百年药龄。</p><div class="dao green">灵露 <b>${p.drops}</b> 滴</div>
           <div class="list">${rows}</div><button class="btn" id="x-close">离开</button></div>`, 'dim');
         this.ov.querySelectorAll('button[data-i]').forEach((b) => (b.onclick = () => {
           const x = it.herbs[+b.dataset.i];
-          if (x.sold || p.drops < x.h.cost) { Au.sfx('deny'); return; }
-          p.drops -= x.h.cost; x.sold = true; x.h.run(p); p.hp = Math.min(p.hp, p.maxHp);
+          if (x.sold || p.drops < cost(x)) { Au.sfx('deny'); return; }
+          p.drops -= cost(x); x.sold = true; x.h.run(p); p.hp = Math.min(p.hp, p.maxHp);
           Au.sfx('heal'); Gm.toast(`催熟并服用了【${x.h.name}】`);
           if (it.herbs.every((h) => h.sold)) it.used = true;
           draw();

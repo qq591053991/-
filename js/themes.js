@@ -48,10 +48,10 @@
     },
     { // 3 虚天殿 —— 冰火古殿
       void: '#040913', mist: '120,190,255',
-      floor: '#93a9b8', floor2: '#869cac', line: 'rgba(214,180,90,0.55)', moss: '#d8f0ff', grass: '#e8f8ff',
-      face: '#2b4162', faceDark: '#1c2c47', base: '#131f38', top: '#a9c0cf', topHi: '#dcecf3',
+      floor: '#62788a', floor2: '#586e80', line: 'rgba(214,180,90,0.6)', moss: '#d8f0ff', grass: '#e8f8ff',
+      face: '#2b4162', faceDark: '#1c2c47', base: '#131f38', top: '#8ea4b4', topHi: '#b6cad6',
       water: '#b83a0c', waterHi: '#ffd27a',
-      bg: 0x040913, fog: [0x0a1a34, 28, 76], hemi: [0xc8dcff, 0x2c3c5e, 0.52], sun: [0xf0f6ff, 0.5], glowK: 0.55,
+      bg: 0x040913, fog: [0x0a1a34, 28, 76], hemi: [0xc8dcff, 0x2c3c5e, 0.66], sun: [0xf0f6ff, 0.62], glowK: 0.85,
       lamp: '150,220,255', lampHex: 0x96dcff,
       props: ['icecrystal', 'pillar', 'brazier2', 'statue', 'icecrystal', 'pillar'], mote: 'snow',
     },
@@ -266,6 +266,23 @@
     if (bg) { x.fillStyle = bg; x.fillRect(0, 0, 128, 128); }
     x.fillStyle = color; x.font = 'bold 92px "STKaiti","KaiTi","Kaiti SC","楷体","Noto Serif CJK SC","Songti SC","SimSun","WenQuanYi Zen Hei",serif';
     x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(ch, 64, 70);
+    return c;
+  };
+  /* 剑阵阵图：同心环 + 八方剑纹 + 内八角，白色线稿，使用时按流派着色 */
+  Tx.array = function () {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d'); x.translate(128, 128); x.strokeStyle = '#fff'; x.fillStyle = '#fff'; x.lineCap = 'round';
+    for (const [r, w] of [[122, 3], [112, 1.2], [78, 2], [44, 1.5]]) { x.lineWidth = w; x.beginPath(); x.arc(0, 0, r, 0, TAU); x.stroke(); }
+    x.lineWidth = 1.5; x.beginPath(); for (let i = 0; i <= 8; i++) { const a = (i / 8) * TAU + TAU / 16; x[i ? 'lineTo' : 'moveTo'](Math.cos(a) * 78, Math.sin(a) * 78); } x.stroke();
+    for (let i = 0; i < 8; i++) { // 八柄小剑，剑尖朝外
+      x.save(); x.rotate((i / 8) * TAU);
+      x.beginPath(); x.moveTo(110, 0); x.lineTo(96, -4); x.lineTo(84, 0); x.lineTo(96, 4); x.closePath(); x.fill();
+      x.lineWidth = 1.5; x.beginPath(); x.moveTo(84, 0); x.lineTo(50, 0); x.moveTo(80, -6); x.lineTo(80, 6); x.stroke();
+      x.restore();
+    }
+    x.lineWidth = 1; for (let i = 0; i < 24; i++) { const a = (i / 24) * TAU; x.beginPath(); x.moveTo(Math.cos(a) * 113, Math.sin(a) * 113); x.lineTo(Math.cos(a) * 121, Math.sin(a) * 121); x.stroke(); }
+    const g = x.createRadialGradient(0, 0, 0, 0, 0, 44); g.addColorStop(0, 'rgba(255,255,255,0.5)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.beginPath(); x.arc(0, 0, 44, 0, TAU); x.fill();
     return c;
   };
   Tx.web = function () {

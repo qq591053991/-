@@ -210,11 +210,11 @@
 
     relicCard(id) {
       const r = G.Relics[id], have = this.player.relics[id] || 0;
-      return { name: r.name, glyph: r.glyph, tag: ['', '法宝 · 凡品', '法宝 · 珍品', '法宝 · 至宝'][r.rar] + (have ? ` · 已有 ${have}` : ''), desc: r.desc, cls: 'r' + r.rar, pick: () => this.giveRelic(id) };
+      return { name: r.name, glyph: r.glyph, sch: r.sch, tag: ['', '法宝 · 凡品', '法宝 · 珍品', '法宝 · 至宝'][r.rar] + (have ? ` · 已有 ${have}` : ''), desc: r.desc, cls: 'r' + r.rar, pick: () => this.giveRelic(id) };
     },
     skillCard(id) {
       const d = G.Skills[id], s = this.player.skills.find((x) => x.id === id), lv = s ? s.lv + 1 : 1;
-      return { name: d.name, glyph: d.glyph, tag: s ? `神通 · 升至第 ${lv} 重` : '神通 · 新习得', desc: d.desc(lv) + `　耗法力 ${d.mp}，冷却 ${d.cd} 秒。`, cls: 'r2 skill', color: d.color, pick: () => this.giveSkill(id) };
+      return { name: d.name, glyph: d.glyph, sch: d.sch, tag: s ? `神通 · 升至第 ${lv} 重` : '神通 · 新习得', desc: d.desc(lv) + `　耗法力 ${d.mp}，冷却 ${d.cd} 秒。`, cls: 'r2 skill', color: d.color, pick: () => this.giveSkill(id) };
     },
 
     openLootChoice(title, sub, minRar, done) {
@@ -237,7 +237,7 @@
       // 已修炼青元剑诀且未大成：有机会参悟下一层
       if (p.qy >= 1 && p.qy < G.Qingyuan.length && U.chance(0.6)) {
         const L = G.Qingyuan[p.qy];
-        cards[U.randi(0, 2)] = { name: '青元剑诀', glyph: '元', tag: `功法 · 第${G.CN_NUM[p.qy + 1]}层【${L.name}】`, desc: L.desc, cls: 'r3', pick: () => this.gainQingyuan() };
+        cards[U.randi(0, 2)] = { name: '青元剑诀', glyph: '元', sch: 'sword', tag: `功法 · 第${G.CN_NUM[p.qy + 1]}层【${L.name}】`, desc: L.desc, cls: 'r3', pick: () => this.gainQingyuan() };
       }
       G.UI.choice({ title: '修为精进', sub: E.realmName(p) + ' —— 择一感悟', cards, done: () => { p.pendingLv--; } });
     },
@@ -248,7 +248,7 @@
       room.cleared = true; room.locked = false;
       this.stats.rooms++;
       this.clearHostile = true;
-      if (p.drops < 9) { p.drops++; this.toast('掌天瓶凝出一滴绿液'); }
+      if (p.drops < 9) { const n = Math.min(9 - p.drops, p.flags.vial ? 2 : 1); p.drops += n; this.toast(n > 1 ? '掌天瓶吞吐月华，凝出两滴灵露' : '玉瓶里凝出一滴灵露'); }
       const n = U.randi(2, 3) + (room.type === 'elite' ? 3 : 0);
       for (let i = 0; i < n; i++) E.dropPickup('stone', p.x + U.rand(-60, 60), p.y + U.rand(-60, 60), Math.round(U.randi(2, 4) * (1 + room.chapter * 0.25)));
       if (room.type === 'elite') {

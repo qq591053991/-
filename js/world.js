@@ -205,7 +205,7 @@
     const mid = { x: (cx + 0.5) * T, y: (cy + 0.5) * T };
     if (room.type === 'treasure') room.interact.push({ kind: 'chest', x: mid.x, y: mid.y, r: 46, label: '开启机缘宝匣' });
     if (room.type === 'shop') room.interact.push({ kind: 'shop', x: mid.x, y: mid.y - T, r: 56, label: '坊市 · 交易' });
-    if (room.type === 'garden') room.interact.push({ kind: 'garden', x: mid.x, y: mid.y, r: 56, label: '药园 · 以绿液催熟灵药' });
+    if (room.type === 'garden') room.interact.push({ kind: 'garden', x: mid.x, y: mid.y, r: 56, label: '药园 · 以灵露催熟灵药' });
     if (room.type === 'event') room.interact.push({ kind: 'event', x: mid.x, y: mid.y, r: 50, label: '探查' });
     if (room.type === 'start' || room.type === 'treasure' || room.type === 'shop' || room.type === 'garden' || room.type === 'event') room.cleared = true;
 

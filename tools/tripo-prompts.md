@@ -1,14 +1,14 @@
 # Tripo 角色提示词
 
-给 [Tripo Studio](https://studio.tripo3d.ai/) 用的提示词，风格与已有的韩立模型统一。
+给 [Tripo Studio](https://studio.tripo3d.ai/) 用的提示词，风格与已有的玩家形象统一，并遵守 [`docs/art-philosophy.md`](../docs/art-philosophy.md) 里的造型规范。
 
 ## 生成与导出设置
 
 - 每个角色单独生成，提示词 = **通用前缀 + 角色描述**。
 - 姿势用 A-pose（双臂略张开），不要底座。
 - 生成后做**绑骨（Rig）**，骨骼规范选 **Mixamo**。不需要加动画。
-- 导出 **FBX**（和韩立那次一样）或 GLB。贴图多大都行，导入工具会缩到 1K。
-- 面数尽量低（韩立是约 6000 面，这个量级正合适）。
+- 导出 **FBX**（和玩家形象那次一样）或 GLB。贴图多大都行，导入工具会缩到 1K。
+- 面数尽量低（玩家形象是约 6000 面，这个量级正合适）。
 - 武器直接写进提示词，让它握在**右手**（游戏里挥砍、施法都是右臂动作）。
 
 导入：`node tools/import-tripo.mjs <键名> <导出的文件>`，键名见下表第一列。
@@ -23,7 +23,7 @@ stylized chibi game character, low-poly, hand-painted flat colors, Chinese xianx
 
 | 键名 | 角色 | 角色描述（接在通用前缀后面） |
 | --- | --- | --- |
-| `hanli` | 韩立（已完成） | young cultivator man, black hair tied in a topknot with a teal ribbon, teal-green hanfu robe with white inner collar and dark sash, cloth boots, calm face, no weapon |
+| `player` | 玩家默认形象（已完成） | young cultivator man, black hair tied in a topknot with a teal ribbon, teal-green hanfu robe with white inner collar and dark sash, cloth boots, calm face, no weapon |
 | `modaifu` | 墨大夫 · 第一章首领 | thin elderly physician villain, bald head, long white beard, dark grey scholar robe, his right hand is a shiny silver metal claw, sinister smile, no weapon |
 | `wangchan` | 王蝉 · 第三章首领 | arrogant young demonic sect master, long black hair with a small golden hair crown, crimson and black embroidered robe with high collar, pale skin, no weapon |
 | `jiyin` | 极阴祖师 · 第四章首领 | gaunt ancient evil patriarch, pale green skin, long white hair and long white eyebrows, tattered black and dark green robe with glowing green trim, long fingernails, holding a gnarled staff in right hand |

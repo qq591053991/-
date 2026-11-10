@@ -11,7 +11,7 @@
      dark: 明度                                                  —— 把近黑色（头发）提亮成灰白
      tint: 材质乘色 */
   const V = {
-    hanli:      { m: 'Mage', hue: [[200, 345, 168, 0.8, 1.0]] },
+    player:     { m: 'Mage', hue: [[200, 345, 168, 0.8, 1.0]] },
     disciple:   { m: 'Mage', hue: [[200, 345, 286, 0.75, 1.2]] },
     flamecult:  { m: 'Mage', hue: [[200, 345, 6, 1.0, 0.62]], tint: [0.92, 0.85, 0.9] },
     jiyin:      { m: 'Mage', hue: [[200, 345, 140, 0.7, 0.5]], dark: 0.74, tint: [0.86, 0.96, 0.88] },
@@ -60,7 +60,7 @@
         }, (e) => { fail(e && e.message); fin(); });
       } catch (e) { fail(e.message); fin(); }
     }
-    // Tripo 生成的角色（名字即角色键名：hanli、modaifu、thug……有就用，没有就退回 KayKit / 几何体模型）
+    // Tripo 生成的角色（名字即角色键名：player、modaifu、thug……有就用，没有就退回 KayKit / 几何体模型）
     for (const k of tkeys) {
       try { loader.parse(b64(tdata[k]), '', (g) => { this.tripo[k] = g.scene; fin(); }, (e) => { console.warn('[凡人问道] Tripo 模型加载失败：', k, e && e.message); fin(); }); }
       catch (e) { console.warn('[凡人问道] Tripo 模型加载失败：', k, e.message); fin(); }

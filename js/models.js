@@ -455,9 +455,9 @@
     return m;
   };
 
-  // 主角：优先用 Tripo 生成的韩立，其次 KayKit，最后几何体
+  // 玩家形象：优先用 Tripo 生成的模型，其次 KayKit，最后几何体
   Mo.hero = function (look) {
-    return G.Assets.makeRig('hanli', { atk: 'cast' }) || (G.Assets.ready && G.Assets.make('hanli', { atk: 'cast' })) || Mo.human(look);
+    return G.Assets.makeRig('player', { atk: 'cast' }) || (G.Assets.ready && G.Assets.make('player', { atk: 'cast' })) || Mo.human(look);
   };
 
   Mo.forEnemy = function (e) {
@@ -675,26 +675,86 @@
   };
 
   /* ============================ 小物 ============================ */
-  Mo.sword = function (hex, mini, bladeHex, trailHex) {
-    const g = new THREE.Group();
-    const L = mini ? 0.34 : 0.56;
-    const blade = new THREE.Mesh(oct(), new THREE.MeshBasicMaterial({ color: bladeHex || 0xf2fffb })); blade.scale.set(0.075, 0.03, L); g.add(blade);
-    const edge = new THREE.Mesh(oct(), new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })); edge.scale.set(0.16, 0.05, L * 1.25); g.add(edge);
-    const trail = new THREE.Mesh(cone(6), new THREE.MeshBasicMaterial({ color: trailHex || hex, transparent: true, opacity: trailHex ? 0.5 : 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
-    trail.scale.set(0.09, L * 1.9, 0.03); trail.rotation.x = PI / 2; trail.position.z = -L * 1.2; g.add(trail);
-    if (!mini) { const hilt = new THREE.Mesh(box(), new THREE.MeshBasicMaterial({ color: 0xd9b45a })); hilt.scale.set(0.16, 0.03, 0.03); hilt.position.z = -L * 0.5; g.add(hilt); }
+  /* ============================ 法器：飞剑 ============================
+     剑身几何体：沿 +Z，菱形截面，前端收成剑尖。所有飞剑、巨剑、羽刃都用它。 */
+  function bladeGeo() {
+    return gg('blade', () => {
+      const T = [0, 0, 0.5], zb = 0.18, A = [[0.5, 0, zb], [0, 0.5, zb], [-0.5, 0, zb], [0, -0.5, zb]], B = A.map((v) => [v[0], v[1], -0.5]);
+      const tri = [];
+      for (let i = 0; i < 4; i++) { const k = (i + 1) % 4; tri.push(T, A[i], A[k], A[i], B[i], B[k], A[i], B[k], A[k]); }
+      tri.push(B[0], B[2], B[1], B[0], B[3], B[2]);
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(tri.flat(), 3)); g.computeVertexNormals(); return g;
+    });
+  }
+  Mo.bladeGeo = bladeGeo;
+  const basic = (c, o) => new THREE.MeshBasicMaterial(Object.assign({ color: c, side: THREE.DoubleSide }, o));
+  const aura = (c, op) => basic(c, { transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
+
+  /* 三档飞剑，随功法进境换形：
+     0 凡铁飞剑 —— 铁色剑身，只有一线微光
+     1 青元剑光 —— 青元剑诀：月白剑身，青色剑芒
+     2 青竹蜂云剑 —— 竹节剑身、亮剑尖、金色剑格
+     mini 金蚨子刃 */
+  const SWORD = {
+    0: { blade: 0xd6dfe6, aura: 0x8fd8d0, glow: 0.26, guard: 0x7a5a34 },
+    1: { blade: 0xeafff6, aura: 0x5cffb0, glow: 0.42, guard: 0xd9b45a },
+    2: { blade: 0xb2ea80, aura: 0x9aff4a, glow: 0.42, guard: 0xf0cc5a, joint: 0x4a8e38, tip: 0xf4ffe2 },
+    mini: { blade: 0xfff0c0, aura: 0xffdc82, glow: 0.4, L: 0.36 },
+  };
+  Mo.sword = function (style) {
+    const st = SWORD[style] || SWORD[0], L = st.L || 0.62, g = new THREE.Group();
+    g.rotation.order = 'YXZ';
+    const add = (geo, m, p, sc) => { const x = new THREE.Mesh(geo, m); x.position.set(p[0], p[1], p[2]); x.scale.set(sc[0], sc[1], sc[2]); g.add(x); return x; };
+    add(bladeGeo(), aura(st.aura, st.glow), [0, 0, L * 0.08], [0.2, 0.07, L * 1.3]);
+    add(bladeGeo(), basic(st.blade), [0, 0, L * 0.1], [0.085, 0.03, L]);
+    if (st.joint) { // 竹节与亮剑尖
+      const jm = basic(st.joint);
+      for (let i = 0; i < 3; i++) add(box(), jm, [0, 0, -L * 0.4 + (i + 0.6) * L * 0.207], [0.1 - i * 0.012, 0.042, 0.022]);
+      add(bladeGeo(), basic(st.tip), [0, 0, L * 0.42], [0.05, 0.033, L * 0.34]);
+    }
+    if (st.guard) { add(box(), basic(st.guard), [0, 0, -L * 0.42], [0.19, 0.045, 0.035]); add(box(), basic(0x2a2422), [0, 0, -L * 0.55], [0.035, 0.035, L * 0.24]); }
     return g;
   };
 
+  /* 巨剑术：青元剑光聚成的巨剑，剑尖朝下，原点在剑尖 */
   Mo.giantSword = function () {
+    const g = new THREE.Group(), mats = [];
+    const mk = (c, o) => { const m = basic(c, Object.assign({ transparent: true }, o)); m.userData.o0 = (o && o.opacity) || 1; mats.push(m); return m; };
+    const add = (geo, m, p, sc, down) => { const x = new THREE.Mesh(geo, m); x.position.set(p[0], p[1], p[2]); x.scale.set(sc[0], sc[1], sc[2]); if (down) x.rotation.x = PI / 2; g.add(x); return x; };
+    add(bladeGeo(), mk(0x5cffb0, { opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }), [0, 1.6, 0], [1.25, 0.34, 3.5], true);
+    add(bladeGeo(), mk(0xeafff6), [0, 1.5, 0], [0.62, 0.12, 3.0], true);
+    add(bladeGeo(), mk(0x9ff0cc), [0, 1.5, 0], [0.16, 0.14, 2.9], true);
+    add(box(), mk(0xd9b45a), [0, 3.08, 0], [1.2, 0.16, 0.16]);
+    add(box(), mk(0x2a2422), [0, 3.5, 0], [0.15, 0.7, 0.13]);
+    g.userData.mats = mats;
+    return g;
+  };
+
+  /* 风雷翅：一对由羽刃排成的光翼，原点在脚下，朝 +Z */
+  Mo.wings = function () {
+    const g = new THREE.Group(), m1 = aura(0x8fa8ff, 0.34), m2 = aura(0xdfe8ff, 0.6), m3 = aura(0xffe36a, 0.7);
+    const z1 = new THREE.Vector3(0, 0, 1), d = new THREE.Vector3();
+    for (const sx of [-1, 1]) for (let i = 0; i < 6; i++) {
+      const k = i / 5, len = 0.95 - k * 0.42, up = 1.05 - k * 1.25; // 自上而下六根羽刃
+      d.set(sx * Math.cos(up), Math.sin(up), -0.35 - k * 0.15).normalize();
+      for (const [m, w] of [[m1, 0.13], [i % 2 ? m3 : m2, 0.045]]) {
+        const f = new THREE.Mesh(bladeGeo(), m); f.scale.set(w, 0.02, len);
+        f.quaternion.setFromUnitVectors(z1, d); f.position.set(sx * 0.14, 1.02, -0.14).addScaledVector(d, len * 0.5); g.add(f);
+      }
+    }
+    g.userData.mats = [m1, m2, m3]; for (const m of g.userData.mats) m.userData.o0 = m.opacity;
+    return g;
+  };
+
+  /* 玄铁飞天盾：六角玄铁盾牌，原点在盾心，盾面朝 +Z */
+  Mo.shieldPlate = function () {
     const g = new THREE.Group();
-    const m1 = new THREE.MeshBasicMaterial({ color: 0xeaf8ff, transparent: true }), m2 = new THREE.MeshBasicMaterial({ color: 0x8fd0ff, transparent: true }), m3 = new THREE.MeshBasicMaterial({ color: 0xd9b45a, transparent: true });
-    const add = (geo, m, p, s, r) => { const x = new THREE.Mesh(geo, m); x.position.set(...p); x.scale.set(...s); if (r) x.rotation.set(...r); g.add(x); return x; };
-    add(box(), m1, [0, 1.5, 0], [0.56, 2.4, 0.07]);
-    add(cone(4), m1, [0, 0.16, 0], [0.56, 0.36, 0.07], [PI, 0, 0]);
-    add(box(), m2, [0, 1.5, 0], [0.1, 2.3, 0.09]);
-    add(box(), m3, [0, 2.76, 0], [1.1, 0.16, 0.14]); add(box(), m3, [0, 3.2, 0], [0.16, 0.74, 0.12]);
-    g.userData.mats = [m1, m2, m3];
+    const hex = gg('hex', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 6));
+    const add = (m, sc, z) => { const x = new THREE.Mesh(hex, m); x.rotation.x = PI / 2; x.scale.set(sc, 0.07, sc); x.position.z = z; g.add(x); return x; };
+    add(basic(0xbcd8ff), 0.62, -0.012);                                   // 灵光镶边
+    add(new THREE.MeshLambertMaterial({ color: 0x39414f, emissive: 0x10141c }), 0.54, 0);
+    add(new THREE.MeshLambertMaterial({ color: 0x5a6578, emissive: 0x161b26 }), 0.3, 0.03);
+    add(basic(0xdcecff), 0.1, 0.06);
     return g;
   };
 })();

@@ -6,7 +6,7 @@
 
   const FLY_Z = { bat: 26, skull: 18, wraith: 6, yinhun: 6, firespirit: 8 };
   const HPM = [1.6, 2.3, 3.4, 5.6], DMGM = [1, 1.25, 1.5, 1.8];
-  const SHOT_C = { arrow: '235,225,195', fire: '255,140,60', bolt: '110,255,234', orb: '255,90,90', ice: '150,220,255' };
+  const SHOT_C = { arrow: '235,225,195', fire: '255,140,60', bolt: '255,190,90', orb: '255,90,90', ice: '90,140,255' };
 
   /* ============================ 生成 ============================ */
   E.spawnEnemy = function (key, x, y, o = {}) {
@@ -155,7 +155,7 @@
         const hit = W.move(room, e, Math.cos(e.dir) * 540 * sm * dt, Math.sin(e.dir) * 540 * sm * dt, 1);
         if (Math.random() < 0.6) FX.p(e.x, e.y, 2, { c: '200,190,170', add: false, life: 0.35, size: 4, vz: 30 });
         if (!e.hitOnce && dTo(e, p) < e.r + p.r && E.hurtPlayer(e.dmg, e.x, e.y)) e.hitOnce = true;
-        if (hit || e.stT <= 0) { e.st = 'rec'; e.stT = hit ? 0.9 : 0.5; e.charge = false; e.cd = U.rand(1.2, 2); if (hit) { G.Game.shake(3); FX.burst(e.x, e.y, 8, 8, { c: '200,190,170', add: false }); } }
+        if (hit || e.stT <= 0) { e.st = 'rec'; e.stT = hit ? 0.9 : 0.5; e.charge = false; e.cd = U.rand(1.2, 2); if (hit) { FX.burst(e.x, e.y, 8, 8, { c: '200,190,170', add: false }); } }
       } else { e.stT -= dt; e.moving = false; if (e.stT <= 0) e.st = 'idle'; }
     },
 
@@ -233,7 +233,7 @@
         e.stT -= dt; e.wind = 1 - e.stT / 0.6;
         if (e.stT <= 0) {
           if (e.def.pattern === 'ring') { e.rot = (e.rot || 0) + 0.4; ring(e.x, e.y, e.def.pn, 165, e.rot, { dmg: e.dmg, c: '255,90,140' }); }
-          else for (let i = -1; i <= 1; i++) E.shootE(e.x, e.y, e.face + i * 0.2, 340, { kind: 'ice', dmg: e.dmg, c: '150,220,255' });
+          else for (let i = -1; i <= 1; i++) E.shootE(e.x, e.y, e.face + i * 0.2, 340, { kind: 'ice', dmg: e.dmg, c: '90,140,255' });
           e.st = 'idle'; e.cd = e.def.pcd * U.rand(0.9, 1.15); e.wind = 0; Au.sfx('shoot');
         }
       }
@@ -252,7 +252,7 @@
         e.stT -= dt; e.wind = 1 - e.stT / 0.75; e.moving = false;
         if (e.stT <= 0) {
           e.st = 'rec'; e.stT = 0.7; e.cd = U.rand(1.3, 2); e.wind = 0;
-          if (e.def.look.stone) ring(e.x, e.y, 10, 190, U.rand(TAU), { dmg: e.dmg * 0.6, c: '110,210,255' });
+          if (e.def.look.stone) ring(e.x, e.y, 10, 190, U.rand(TAU), { dmg: e.dmg * 0.6, c: '90,140,255' });
         }
       } else { e.stT -= dt; e.moving = false; if (e.stT <= 0) e.st = 'idle'; }
     },
@@ -273,7 +273,7 @@
             if (!W.blocked(room, x, y, e.r, 2)) { e.x = x; e.y = y; break; }
           }
           e.face = angTo(e, p); e.st = 'appear'; e.stT = 0.5;
-          E.hazCircle(e.x, e.y, 64, 0.5, e.dmg, { follow: e, c: '160,255,210', sfx: false });
+          E.hazCircle(e.x, e.y, 64, 0.5, e.dmg, { follow: e, c: '154,120,255', sfx: false });
         }
       } else if (e.st === 'appear') {
         e.stT -= dt; e.alpha = 1 - e.stT / 0.5; e.wind = e.alpha;
@@ -305,7 +305,7 @@
         if (e.stT <= 0) {
           const minions = room.enemies.filter((m) => !m.dead && m.def.minion).length;
           if (minions < 6) for (let i = 0; i < 2; i++) E.spawnEnemy('skull', e.x + U.rand(-30, 30), e.y + U.rand(-30, 30), { delay: 0.35 });
-          else for (let i = -1; i <= 1; i++) E.shootE(e.x, e.y, e.face + i * 0.25, 260, { dmg: e.dmg, c: '125,255,176' });
+          else for (let i = -1; i <= 1; i++) E.shootE(e.x, e.y, e.face + i * 0.25, 260, { dmg: e.dmg, c: '154,120,255' });
           e.st = 'idle'; e.cd = U.rand(3.8, 5); e.wind = 0; e.atk = 1; Au.sfx('spawn');
         }
       }
@@ -377,7 +377,7 @@
           const n = e.phase === 2 ? 4 : 3, cnt = e.phase === 2 ? 9 : 7;
           e.face = angTo(e, p); e.wind = Math.min(1, e.pt / 0.4); e.moving = false;
           for (let k = 0; k < n; k++) if (at(e, dt, 0.4 + k * 0.36)) {
-            for (let i = 0; i < cnt; i++) E.shootE(e.x, e.y, e.face + (i - (cnt - 1) / 2) * 0.14 + (k % 2 ? 0.07 : 0), 390, { kind: 'needle', dmg: e.dmg, c: '200,255,190', r: 5 });
+            for (let i = 0; i < cnt; i++) E.shootE(e.x, e.y, e.face + (i - (cnt - 1) / 2) * 0.14 + (k % 2 ? 0.07 : 0), 390, { kind: 'needle', dmg: e.dmg, c: '170,205,60', r: 5 });
             e.atk = 1; Au.sfx('shoot');
           }
           return e.pt > 0.4 + n * 0.36 + 0.35;
@@ -394,14 +394,14 @@
         ghosts(e, dt, p) {
           e.wind = 1; e.moving = false; e.face = angTo(e, p);
           if (every(e, dt, 0.22, 0.5, 0.5 + 7 * 0.22)) {
-            E.shootE(e.x, e.y, U.rand(TAU), 230, { kind: 'skullp', dmg: e.dmg, c: '170,255,210', homing: 2.4, life: 4.2, r: 9, trail: 0.4 });
+            E.shootE(e.x, e.y, U.rand(TAU), 230, { kind: 'skullp', dmg: e.dmg, c: '154,120,255', homing: 2.4, life: 4.2, r: 9, trail: 0.4 });
             Au.sfx('shoot');
           }
           return e.pt > 2.7;
         },
         ringneedle(e, dt, p) {
           e.wind = 1; e.moving = false;
-          for (let k = 0; k < 3; k++) if (at(e, dt, 0.5 + k * 0.45)) { ring(e.x, e.y, 18, 230, k * 0.17, { kind: 'needle', dmg: e.dmg, c: '200,255,190', r: 5 }); Au.sfx('shoot'); e.atk = 1; }
+          for (let k = 0; k < 3; k++) if (at(e, dt, 0.5 + k * 0.45)) { ring(e.x, e.y, 18, 230, k * 0.17, { kind: 'needle', dmg: e.dmg, c: '170,205,60', r: 5 }); Au.sfx('shoot'); e.atk = 1; }
           return e.pt > 2;
         },
       },
@@ -577,8 +577,8 @@
           e.wind = 1; e.moving = false; e.face = angTo(e, p);
           for (let k = 0; k < sets; k++) if (at(e, dt, 0.2 + k * 1.35)) {
             const horiz = (v.o + k) % 2 === 0, sp = 150, RW = room.w * T, RH = room.h * T, off = U.rand(0, sp);
-            if (horiz) for (let y = T + off; y < RH - T; y += sp) E.hazLine(T, y, RW - T, y, 64, 0.95, e.dmg, { stay: 0.5, c: '110,255,150' });
-            else for (let x = T + off; x < RW - T; x += sp) E.hazLine(x, T, x, RH - T, 64, 0.95, e.dmg, { stay: 0.5, c: '110,255,150' });
+            if (horiz) for (let y = T + off; y < RH - T; y += sp) E.hazLine(T, y, RW - T, y, 64, 0.95, e.dmg, { stay: 0.5, c: '154,200,50' });
+            else for (let x = T + off; x < RW - T; x += sp) E.hazLine(x, T, x, RH - T, 64, 0.95, e.dmg, { stay: 0.5, c: '154,200,50' });
             Au.sfx('warn');
           }
           return e.pt > 0.2 + sets * 1.35 + 0.5;
@@ -596,8 +596,8 @@
           const n = e.phase === 2 ? 5 : 4;
           e.wind = 1; e.moving = false; e.face = angTo(e, p);
           for (let k = 0; k < n; k++) {
-            if (at(e, dt, 0.4 + k * 0.55)) { ring(e.x, e.y, 20, 185, k % 2 ? TAU / 40 : 0, { kind: 'ghostfire', dmg: e.dmg, c: '110,255,150', r: 8 }); Au.sfx('fire'); e.atk = 1; }
-            if (e.phase === 2 && at(e, dt, 0.68 + k * 0.55)) for (let i = -2; i <= 2; i++) E.shootE(e.x, e.y, e.face + i * 0.16, 360, { kind: 'ghostfire', dmg: e.dmg, c: '190,255,120', r: 7 });
+            if (at(e, dt, 0.4 + k * 0.55)) { ring(e.x, e.y, 20, 185, k % 2 ? TAU / 40 : 0, { kind: 'ghostfire', dmg: e.dmg, c: '154,200,50', r: 8 }); Au.sfx('fire'); e.atk = 1; }
+            if (e.phase === 2 && at(e, dt, 0.68 + k * 0.55)) for (let i = -2; i <= 2; i++) E.shootE(e.x, e.y, e.face + i * 0.16, 360, { kind: 'ghostfire', dmg: e.dmg, c: '190,215,70', r: 7 });
           }
           return e.pt > 0.4 + n * 0.55 + 0.4;
         },
@@ -612,8 +612,8 @@
         orbs(e, dt, p) {
           e.wind = 1; e.moving = false; e.face = angTo(e, p);
           if (every(e, dt, 0.3, 0.4, 0.4 + 5 * 0.3)) {
-            E.shootE(e.x, e.y, e.face + U.rand(-1.4, 1.4), 175, { kind: 'ghostfire', dmg: e.dmg, c: '110,255,150', r: 13, homing: 1.7, life: 5.2, trail: 0.6,
-              onEnd: (pr) => E.hazPuddle(pr.x, pr.y, 48, 3.2, e.dmg * 0.6, { c: '110,255,150' }) });
+            E.shootE(e.x, e.y, e.face + U.rand(-1.4, 1.4), 175, { kind: 'ghostfire', dmg: e.dmg, c: '154,200,50', r: 13, homing: 1.7, life: 5.2, trail: 0.6,
+              onEnd: (pr) => E.hazPuddle(pr.x, pr.y, 48, 3.2, e.dmg * 0.6, { c: '154,200,50' }) });
             Au.sfx('fire');
           }
           return e.pt > 2.4;
