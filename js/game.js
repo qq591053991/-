@@ -379,20 +379,25 @@
 
     /* 引路：没有小地图，靠场景里的一只灵蝶带路。
        它总是停在"从你这里往目标走五格"的地方 —— 你跟上去，它就再往前飞。
-       目标依次是：还没惊动的埋伏（大图）、没开的宝匣 / 传送阵、通往没去过的地方的出口。到了跟前就不再带路 */
+       目标依次是：躲在看不见处的残敌、还没惊动的埋伏（大图）、没开的宝匣 / 传送阵、通往没去过的地方的出口。到了跟前就不再带路 */
     updateGuide(raw) {
       const room = this.room, p = this.player, g = this.guide || (this.guide = { x: p.x, y: p.y, on: false });
       let tx = null, ty = null, key = null, bd = 1e9;
       const pick = (x, y, k) => { const d = U.dist(p.x, p.y, x, y); if (d < bd) { bd = d; tx = x; ty = y; key = k; } };
       if (this.transit || p.dead) key = null;
       else if (room.locked) {
-        if (room.zones && room.waves && room.waveI < room.waves.length && !room.enemies.some((e) => !e.dead)) for (const z of room.zones) if (!z.done) pick(z.x * T, z.y * T, 'z' + z.x);
+        const alive = room.enemies.filter((e) => !e.dead && e.st !== 'spawn' && !e.boss);
+        if (alive.length) { // 还有敌人，但两秒多都没有一个在视线里（躲在树后、隔着林子）：带过去
+          if (alive.some((e) => U.dist(p.x, p.y, e.x, e.y) < 470 && W.los(room, p.x, p.y, e.x, e.y, 1))) g.lostT = 0;
+          else if ((g.lostT = (g.lostT || 0) + raw) > 2.2) for (const e of alive) pick(e.x, e.y, 'e');
+        } else if (room.zones && room.waves && room.waveI < room.waves.length) for (const z of room.zones) if (!z.done) pick(z.x * T, z.y * T, 'z' + z.x);
       } else {
         for (const it of room.interact) if (!it.used && (it.kind === 'chest' || it.kind === 'portal' || it.kind === 'event')) pick(it.x, it.y + 30, 'i' + it.kind);
         if (key === null) for (const d in room.doors) if (!room.doors[d].to.visited) { const c = room.doors[d].cells[1]; pick((c[0] + 0.5) * T, (c[1] + 0.5) * T, 'd' + d); }
       }
-      if (key === null || bd < (key[0] === 'z' ? 1.6 : 3) * T) { g.on = false; g.key = null; return; } // 埋伏要带进空地里面才会惊动；出口和宝匣带到跟前就够了
-      if (g.key !== key || g.room !== room) { g.key = key; g.room = room; g.D = W.distField(room, tx, ty); }
+      if (key === null || bd < (key[0] === 'z' ? 1.6 : key === 'e' ? 0.8 : 3) * T) { g.on = false; g.key = null; return; } // 埋伏要带进空地里面才会惊动；出口和宝匣带到跟前就够了
+      g.dT = (g.dT || 0) - raw;
+      if (g.key !== key || g.room !== room || (key === 'e' && g.dT <= 0)) { g.key = key; g.room = room; g.D = W.distField(room, tx, ty); g.dT = 0.8; } // 敌人会动，追它时每隔一会儿重算一次路
       const D = g.D, w = room.w, h = room.h;
       let cx = U.clamp(Math.floor(p.x / T), 0, w - 1), cy = U.clamp(Math.floor(p.y / T), 0, h - 1);
       for (let s = 0; s < 5; s++) { // 顺着步数场往目标走五格
