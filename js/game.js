@@ -579,7 +579,17 @@
         if (room.enemies.length === 0) {
           if (room.waveI < room.waves.length) {
             if (room.zones) { // 大图：敌人按空地埋伏，走进一片还没惊动过的空地，才引出下一波
-              let z = room.zones.find((q) => !q.done && Math.abs(p.x / T - q.x) < q.rx + 0.6 && Math.abs(p.y / T - q.y) < q.ry + 0.6);
+              // 走近一片还没惊动过的空地、望得见它了，埋伏就杀出来——不必等走到空地中间才触发
+              let z = room.zones.find((q) => {
+                if (q.done) return false;
+                const dx = Math.abs(p.x / T - q.x), dy = Math.abs(p.y / T - q.y);
+                if (dx < q.rx + 0.6 && dy < q.ry + 0.6) return true;                                              // 已经踏进去了
+                return dx < q.rx + 6 && dy < q.ry + 4.5 && W.los(room, p.x, p.y, q.x * T, q.y * T, 2);           // 走到一屏之内，中间没有林子挡着
+              }) || room.zones.find((q) => { // 或者：顺着路再走九格之内就到它中心了（路拐了弯、望不见也算）
+                if (q.done) return false;
+                const D = q.D || (q.D = W.distField(room, q.x * T, q.y * T)), d = D[Math.floor(p.y / T) * room.w + Math.floor(p.x / T)];
+                return d >= 0 && d <= 9;
+              });
               if (!z && room.zones.every((q) => q.done)) z = room.zones[0];
               if (z) { room.waveT -= dt; if (room.waveT <= 0) { z.done = true; E.spawnWave(room, z); room.waveT = 0.7; } }
             } else { room.waveT -= dt; if (room.waveT <= 0) { E.spawnWave(room); room.waveT = 0.7; } }
