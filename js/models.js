@@ -44,6 +44,7 @@
     return { g, mats, lam, flat, glow, add, grp };
   }
 
+  Mo._ctx = ctx; // 给 beasts.js 用
   function finish(c, h, update, extra) {
     const m = Object.assign({ g: c.g, mats: c.mats, h, update, _f: 0, _a: 1 }, extra);
     m.setFlash = function (f) {
@@ -57,6 +58,8 @@
     m.dispose = function () { for (const mt of this.mats) mt.dispose(); };
     return m;
   }
+
+  Mo._finish = finish;
 
   /* ============================ 人形 ============================ */
   Mo.human = function (L, o = {}) {
