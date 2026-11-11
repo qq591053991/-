@@ -15,7 +15,7 @@
   const PAL = (Mo.PAL = [
     // capK：顶面有几成覆着"盖"。苔与枯苔只是零星几片，雪盖得满
     { rock: '#99a2ad', dark: '#353c48', cap: '#4c7650', cap2: '#648f5c', capK: 0.38, trunk: '#4b392e', leaf: '#629c62', leafD: '#214a36', bloom: '#f2ccd8', bloomD: '#b9708f' }, // 青石、苔、松、桃
-    { rock: '#93766a', dark: '#2e1e1c', cap: '#5c5a38', cap2: '#77703f', capK: 0.3, trunk: '#231818', leaf: '#8c3038', leafD: '#38101a', bloom: '#c87060', bloomD: '#7c2832' },  // 赭石、枯苔、血枫
+    { rock: '#93766a', dark: '#2e1e1c', cap: '#5c5a38', cap2: '#77703f', capK: 0.3, trunk: '#231818', leaf: '#6c3038', leafD: '#2a1016', bloom: '#a86458', bloomD: '#6a2830' },  // 赭石、枯苔、血枫
     { rock: '#6c6a84', dark: '#222030', cap: '#3a3848', cap2: '#48465a', capK: 0.5, trunk: '#1e1c24', leaf: '#4c485a', leafD: '#22202a', bloom: '#9affc0', bloomD: '#2a7a50' },  // 玄石、灰
     { rock: '#9ab2c8', dark: '#3f5678', cap: '#e6f1fa', cap2: '#ffffff', capK: 0.85, trunk: '#3c4a60', leaf: '#d4ecfa', leafD: '#6490b6', bloom: '#eef8ff', bloomD: '#9ccaea' }, // 寒石、雪
   ]);
@@ -75,17 +75,17 @@
 
   /* 树：主干是几截渐细的枝干连成的一条歪线，侧枝末端各托一团叶。
      kind：pine 松（扁云片）/ round 阔叶 / bloom 花树 */
-  Mo.tree = function (v, ti, kind = 'pine', scale = 1) {
+  Mo.tree = function (v, ti, kind = 'pine', scale = 1, o = {}) { // o.lite：林子深处的树，省掉根与一半的枝；o.bark / o.leaf：整片林子共用的材质
     const pal = PAL[ti], g = new THREE.Group(), h = (i) => U.hash(v * 13 + i, i * 7 + 3, ti + 5), pine = kind === 'pine';
-    const bark = lam(pal.trunk), leaf = vcol();
-    const H = (pine ? 1.85 : 1.55) * (0.85 + h(1) * 0.35), segs = 4, pts = [new V3(0, 0, 0)], lean = (pine ? 0.36 : 0.2) * (H / segs);
+    const bark = o.bark || lam(pal.trunk), leaf = o.leaf || vcol();
+    const H = (pine ? 1.85 : 1.55) * (0.85 + h(1) * 0.35), segs = o.lite ? 3 : 4, pts = [new V3(0, 0, 0)], lean = (pine ? 0.36 : 0.2) * (H / segs);
     let a = h(2) * TAU, x = 0, z = 0;
     for (let i = 1; i <= segs; i++) { a += (h(3 + i) - 0.5) * 2.4; x += Math.cos(a) * lean; z += Math.sin(a) * lean; pts.push(new V3(x, (i / segs) * H, z)); }
     for (let i = 0; i < segs; i++) stick(g, pts[i], pts[i + 1], 0.135 * (1 - i * 0.17), bark);
-    for (let i = 0; i < 3; i++) { const ra = h(20 + i) * TAU; stick(g, new V3(Math.cos(ra) * 0.3, -0.03, Math.sin(ra) * 0.3), new V3(0, 0.22, 0), 0.06, bark); } // 露出地面的根
+    if (!o.lite) for (let i = 0; i < 3; i++) { const ra = h(20 + i) * TAU; stick(g, new V3(Math.cos(ra) * 0.3, -0.03, Math.sin(ra) * 0.3), new V3(0, 0.22, 0), 0.06, bark); } // 露出地面的根
     const pad = (c, s, vr) => { const m = new THREE.Mesh(padGeo(vr, ti, kind), leaf); m.position.copy(c); m.scale.set(s, s * 0.95, s * (0.8 + h(vr + 30) * 0.3)); m.rotation.y = h(vr + 40) * TAU; m.castShadow = true; g.add(m); };
     const top = pts[segs]; pad(new V3(top.x, top.y - 0.02, top.z), pine ? 0.64 : 0.5, 0);
-    const nB = pine ? 4 : 5;
+    const nB = o.lite ? 2 : pine ? 4 : 5;
     for (let j = 0; j < nB; j++) {
       const t = 0.42 + (j / nB) * 0.52, k = Math.min(segs - 1, Math.floor(t * segs)), base = pts[k].clone().lerp(pts[k + 1], t * segs - k);
       const ba = h(50 + j) * TAU + j * 2.4, bl = (pine ? 0.66 : 0.42) * (1.12 - t * 0.5) * (0.8 + h(60 + j) * 0.5);
@@ -94,7 +94,7 @@
       pad(new V3(end.x, end.y + 0.02, end.z), (pine ? 0.52 : 0.36) * (1.12 - t * 0.38), j + 1);
     }
     g.scale.setScalar(scale);
-    return { g, mats: [bark, leaf], anim: null };
+    return { g, mats: o.bark ? [] : [bark, leaf], anim: null };
   };
 
   /* 石灯笼：六角座、收腰的柱、灯室、四角起翘的顶、宝珠 */
@@ -183,7 +183,7 @@
   });
   const KIT = [
     { tile: '#353c4a', ridge: '#566174', wood: '#5a3d2c', stone: '#8f959d', dark: '#5b616b', gold: '#b99a58' },  // 黛瓦、朱木、青石
-    { tile: '#3a2a26', ridge: '#54403a', wood: '#2a1c1a', stone: '#8a7468', dark: '#4a3832', gold: '#b08a60' },
+    { tile: '#3a2a26', ridge: '#54403a', wood: '#6a4c3a', stone: '#8a7468', dark: '#3a2a24', gold: '#b08a60' },
     { tile: '#2b2934', ridge: '#474456', wood: '#262230', stone: '#5c5a6a', dark: '#3a3846', gold: '#6f9a84' },  // 玄瓦、黑铁、城砖
     { tile: '#8ea4b4', ridge: '#d9b45a', wood: '#d2e0ec', stone: '#b4c6d6', dark: '#7e96ae', gold: '#d9b45a' },  // 寒玉、鎏金
   ];
@@ -244,6 +244,27 @@
         put(box, M('stone'), x, hgt * 0.36, z + 0.12, 0.5, hgt * 0.72, 0.34);
         put(box, M('dark'), x, hgt * 0.16, z + 0.3, 0.6, hgt * 0.32, 0.3);
         put(box, M('dark'), x, hgt * 0.74, z + 0.1, 0.56, 0.06, 0.4);
+      },
+      /* 栈桥：从 (x, z) 沿 (dx, dz) 伸出去的一道索桥 —— 木板、立柱、两道绳，中间微微下垂 */
+      bridge(x, z, dx, dz, len) {
+        const sag = (t) => -0.24 * Math.sin((PI * t) / len), lx = dz, lz = dx; // 横向
+        for (let t = 0.18; t < len; t += 0.42) put(box, M(((t * 10) | 0) % 3 ? 'wood' : 'dark'), x + dx * t, sag(t) - 0.02, z + dz * t, dx ? 0.34 : 2.5, 0.07, dx ? 2.5 : 0.34);
+        for (const s of [-1, 1]) {
+          let prev = null;
+          for (let t = 0; t <= len + 0.01; t += len / 4) {
+            const px = x + dx * t + lx * s * 1.32, pz = z + dz * t + lz * s * 1.32, top = sag(t) + 0.62;
+            put(box, M('dark'), px, top - 0.3, pz, 0.12, 0.66, 0.12);
+            if (prev) for (const yy of [0, -0.26]) put(box, M('wood'), (px + prev[0]) / 2, (top + prev[1]) / 2 + yy, (pz + prev[2]) / 2, dx ? len / 4 : 0.05, 0.05, dx ? 0.05 : len / 4);
+            prev = [px, top, pz];
+          }
+        }
+      },
+      /* 火盆：三足架上的一只铁盆。返回火苗的位置 */
+      firebowl(x, z) {
+        for (let i = 0; i < 3; i++) { const a = (i / 3) * TAU + 0.5, l = put(box, M('dark'), x + Math.cos(a) * 0.12, 0.26, z + Math.sin(a) * 0.12, 0.05, 0.56, 0.05); l.rotation.set(Math.sin(a) * 0.32, 0, -Math.cos(a) * 0.32); }
+        put(gg('bowl', () => new THREE.CylinderGeometry(0.5, 0.3, 1, 8)), M('dark'), x, 0.58, z, 0.52, 0.2, 0.52);
+        put(hex, M('gold'), x, 0.69, z, 0.56, 0.04, 0.56);
+        return [x, 0.84, z, 0.34];
       },
       /* 垛口：城墙顶上的一排齿 */
       crenel(x, y, z, sx, sz) { put(box, M('stone'), x, y + 0.17, z, sx, 0.34, sz); },

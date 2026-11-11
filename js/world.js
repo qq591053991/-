@@ -100,8 +100,16 @@
       for (const [x, y] of cells) tiles[y * w + x] = 4;
       room.doors[d] = { cells, to: room.links[d] };
     }
-    room.props = []; room.lights = []; room.interact = [];
+    room.props = []; room.lights = []; room.interact = []; room.deco = [];
     room.enemies = []; room.pickups = []; room.puddles = [];
+    /* 地形：不是每张图都是"四面墙 + 四扇门"。
+       court 院落 —— 有墙有门，七玄门的屋舍、燕翎堡、虚天殿；
+       wild  山野 —— 林木与山石围出的一片不规则空地，出口是土路接栈桥；
+       cave  洞窟 —— 四壁都是岩石，没有天。
+       血色禁地整章是山野，墨蛟的巢穴是洞窟；七玄门是院落与山谷相间 */
+    const ch = room.chapter || 0, fight = room.type === 'combat' || room.type === 'elite';
+    room.terrain = ch === 1 ? (room.type === 'boss' ? 'cave' : 'wild') : ch === 0 && (room.type === 'garden' || (fight && U.chance(0.6))) ? 'wild' : 'court';
+    for (const d in room.doors) room.doors[d].cave = room.terrain === 'cave' || (ch === 1 && room.links[d].type === 'boss'); // 通往洞窟的出口是洞口
 
     const reserve = new Set(); // 禁止放障碍的格
     const res = (x, y) => reserve.add(y * w + x);
@@ -112,6 +120,31 @@
       }
     }
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) res(cx + i, cy + j);
+
+    if (room.terrain !== 'court') {
+      // 空地的边界：一圈起伏的曲线（超椭圆 × 随方向变化的半径），线外都是林木 / 岩壁
+      const ph = [U.rand(G.TAU), U.rand(G.TAU), U.rand(G.TAU)], amp = room.type === 'boss' ? 0.06 : 0.11;
+      const edge = (a) => 0.97 - amp + amp * (Math.sin(a * 2 + ph[0]) * 0.5 + Math.sin(a * 3 + ph[1]) * 0.3 + Math.sin(a * 5 + ph[2]) * 0.2);
+      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        const nx = (x + 0.5 - w / 2) / (w / 2 - 1), ny = (y + 0.5 - h / 2) / (h / 2 - 1);
+        if (Math.pow(Math.pow(Math.abs(nx), 2.6) + Math.pow(Math.abs(ny), 2.6), 1 / 2.6) > edge(Math.atan2(ny, nx))) tiles[y * w + x] = 1;
+      }
+      // 每个出口向内清出一条路，直通空地；路口两侧各立一只火盆
+      for (const d in room.doors) {
+        const [dx, dy] = DIRS[OPP[d]], cells = room.doors[d].cells;
+        for (const [x0, y0] of cells) for (let k = 1; k < Math.max(w, h); k++) {
+          const x = x0 + dx * k, y = y0 + dy * k;
+          if (x < 1 || y < 1 || x > w - 2 || y > h - 2 || (tiles[y * w + x] === 0 && k > 3)) break;
+          tiles[y * w + x] = 0; res(x, y);
+        }
+        const [mx, my] = cells[1];
+        for (const s of [-1, 1]) {
+          const fx = mx + 0.5 + dx * 1.6 + (dx ? 0 : s * 2.15), fy = my + 0.5 + dy * 1.6 + (dy ? 0 : s * 2.15);
+          room.deco.push({ kind: 'firebowl', x: fx, y: fy });
+          room.lights.push({ x: fx * T, y: fy * T, z: 30, r: 300, c: 0xffb060 });
+        }
+      }
+    }
 
     const th = G.Themes[room.theme];
     const put = (x, y, t) => {
@@ -195,8 +228,8 @@
       const L = G.PROP_LIGHT[p.kind];
       if (L) room.lights.push({ x: (p.tx + 0.5) * T, y: (p.ty + 0.5) * T, z: L.z, r: L.r, c: L.c });
     }
-    // 北墙壁灯
-    for (let x = 3; x < w - 2; x += 5) {
+    // 北墙壁灯（只有院落才有墙）
+    for (let x = 3; x < w - 2 && room.terrain === 'court'; x += 5) {
       if (tiles[x] !== 1) continue;
       room.lights.push({ x: (x + 0.5) * T, y: T * 1.0, z: 40, r: 280, c: th.lampHex, sconce: true });
     }

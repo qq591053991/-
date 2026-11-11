@@ -285,6 +285,35 @@
       return m;
     };
     const runs = (len, isWall, cb) => { let s = -1; for (let i = 0; i <= len; i++) { const on = i < len && isWall(i); if (on && s < 0) s = i; if (!on && s >= 0) { cb(s, i - s); s = -1; } } };
+    const open = room.terrain && room.terrain !== 'court', cave = room.terrain === 'cave';
+    if (open) {
+      // 山野 / 洞窟：墙格上不立墙。山野是树与山石围出的空地（南面的树矮而暗，是前景）；洞窟四壁都是岩石，越往外越高
+      const bark = lm({ color: new THREE.Color(Mo.PAL[ti].trunk) }), leaf = new THREE.MeshLambertMaterial({ vertexColors: true }), barkD = bark.clone(), leafD = new THREE.MeshLambertMaterial({ vertexColors: true, color: new THREE.Color(0.6, 0.62, 0.68) });
+      barkD.color.multiplyScalar(0.6); rs.mats.push(leaf, barkD, leafD);
+      const taken = new Set(room.deco.map((dd) => Math.floor(dd.y) * w + Math.floor(dd.x)));
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        if (at(x, y) !== 1 || taken.has(y * w + x)) continue;
+        let edgeT = false;
+        for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const xx = x + i, yy = y + j; if (xx >= 0 && yy >= 0 && xx < w && yy < h && tiles[yy * w + xx] !== 1) edgeT = true; }
+        const r1 = U.hash(x, y, sd + 60), r2 = U.hash(x, y, sd + 61), px = x + 0.5 + (U.hash(x, y, sd + 62) - 0.5) * 0.5, pz = y + 0.5 + (U.hash(x, y, sd + 63) - 0.5) * 0.5, north = y < h * 0.42, south = y > h * 0.66;
+        if (cave) {
+          const top = Math.max(0.35, (edgeT ? 0.85 : 1.7) + r1 * (north ? 1.4 : south ? 0.3 : 0.8) - (south ? 0.45 : 0)); crag(px, pz, top);
+          if (edgeT && !south && r2 < 0.2) rk(px + 0.3, top + 0.5 + r2 * 4, pz + 0.2, 0.2, 3.6, x * 37 + y); // 石笋
+          continue;
+        }
+        // 空地南沿：镜头从南面看过来，这里的东西会挡住场内。紧贴空地的一排只放矮石，往外两排的树又小又疏
+        let below = 0; for (let k = 1; k <= 3; k++) if (y - k >= 0 && tiles[(y - k) * w + x] !== 1) { below = k; break; }
+        if (below === 1) { if (r1 < 0.55) crag(px, pz, 0.2 + r2 * 0.22); continue; }
+        if (below && r1 > 0.42) { if (r1 < 0.7) crag(px, pz, 0.25 + r2 * 0.3); continue; }
+        if (r1 < (edgeT ? 0.24 : 0.1)) { crag(px, pz, (south ? 0.3 : 0.5) + r2 * (south ? 0.3 : 0.8)); continue; }
+        if (r1 > (edgeT ? 0.95 : 0.64)) continue; // 林间留一点缝
+        const fg = south || below > 0;
+        const tr = Mo.tree(x * 31 + y * 17 + sd, ti, ti === 1 ? 'round' : r2 < 0.12 ? 'bloom' : 'pine', (below ? 0.6 : south ? 0.8 : north ? 1.25 : 1.05) + r2 * (below ? 0.2 : 0.35), { lite: !edgeT || fg, bark: fg ? barkD : bark, leaf: fg ? leafD : leaf });
+        tr.g.position.set(px, -0.04, pz); tr.g.rotation.y = r2 * TAU; scn.add(tr.g);
+      }
+      // 路口的火盆
+      for (const dd of room.deco) if (dd.kind === 'firebowl') (rs.bowls || (rs.bowls = [])).push(kit.firebowl(dd.x, dd.y));
+    } else {
     // 北墙。七玄门：粉墙 + 黛瓦坡顶 + 檐柱；血色禁地：一道山岩；燕翎堡：城墙 + 垛口 + 扶壁；虚天殿：玉墙 + 金脊 + 玉柱
     runs(w, (x) => at(x, 0) === 1, (x0, len) => {
       if (ti === 1) { for (let i = 0; i < len; i++) { const top = 1.25 + U.hash(x0 + i, 1, sd) * 0.75; crag(x0 + i + 0.5, 0.5, top); if (U.hash(x0 + i, 2, sd) < 0.2) treeOn(x0 + i + 0.5, top, 0.4, 'round', 1.15); } return; }
@@ -330,13 +359,31 @@
       const top = 0.72 + U.hash(x, y, sd + 2) * 0.45; crag(x + 0.5, y + 0.5, top);
       if (ti === 0 && U.hash(x, y, sd + 3) < 0.22) treeOn(x + 0.5, top, y + 0.5, 'pine', 0.55);
     }
+    } // 院落的墙到此为止
 
     // 门：门楼 / 门柱 / 禁制 / 通路微光
     const postM = lm({ color: new THREE.Color(ti === 3 ? '#d9b45a' : ti === 1 ? '#3a2622' : ti === 2 ? '#3c3a47' : '#5a3d2c') });
     const roofM = lm({ color: new THREE.Color(th.top) }), roofHi = lm({ color: new THREE.Color(th.topHi) });
     for (const d in room.doors) {
       const cells = room.doors[d].cells, cx = cells[1][0] + 0.5, cz = cells[1][1] + 0.5, ns = d === 'n' || d === 's';
-      if (d === 'n') {
+      const out = G.World.DIRS[d], dkey = 900 + cells[1][0] * 7 + cells[1][1] * 3;
+      if (room.doors[d].cave) { // 洞口：两侧立石、上压洞楣，里面一片漆黑
+        const la = ns ? [1, 0] : [0, 1], hm = new THREE.MeshBasicMaterial({ color: 0x030203, side: THREE.DoubleSide }); rs.mats.push(hm);
+        if (d === 'n') { // 北面：一座完整的洞门，立在岩壁上
+          for (const sgn of [-1, 1]) rk(cx + sgn * 2.1, 2.3 + U.hash(dkey, sgn + 2, sd) * 0.6, cz, 0.98, 2.7, dkey + sgn);
+          rk(cx, 3.2, cz, 2.4, 0.42, dkey + 5);
+          const hole = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 2.5), hm); rs.geos.push(hole.geometry); hole.position.set(cx, 1.15, cz - 0.3); g.add(hole);
+        } else { // 其余三面：镜头会被高石挡住，所以做成一个向下的洞 —— 地上一口黑洞，洞沿围一圈矮石
+          const hole = new THREE.Mesh(new THREE.CircleGeometry(1.5, 20), hm); rs.geos.push(hole.geometry);
+          hole.rotation.x = -PI / 2; hole.scale.set(ns ? 1 : 0.72, ns ? 0.72 : 1, 1); hole.position.set(cx + out[0] * 0.25, 0.02, cz + out[1] * 0.25); hole.renderOrder = 1; g.add(hole);
+          for (let i = 0; i < 7; i++) { const a = (i / 7) * TAU + 0.3, ex = Math.cos(a) * (ns ? 1.75 : 1.3), ez = Math.sin(a) * (ns ? 1.3 : 1.75); if (ex * -out[0] + ez * -out[1] > 0.7) continue; rk(cx + out[0] * 0.25 + ex, 0.3 + U.hash(dkey, i, sd) * 0.35, cz + out[1] * 0.25 + ez, 0.5, 1.4, dkey + i); } // 朝场内的一侧留出口子
+        }
+      } else if (open) { // 栈桥：从出口伸向对面的山头
+        const L = 5.4, bx = cx + out[0] * 0.5, bz = cz + out[1] * 0.5;
+        kit.bridge(bx, bz, out[0], out[1], L);
+        rk(bx + out[0] * (L + 1.6), 0.04, bz + out[1] * (L + 1.6), 2.3, 2.0, dkey); rk(bx + out[0] * (L + 2.6) + out[1] * 1.8, 0.7, bz + out[1] * (L + 2.6) + out[0] * 1.8, 1.5, 2.2, dkey + 9);
+        if (ti < 2) { const tr = Mo.tree(dkey + sd, ti, ti === 1 ? 'round' : 'pine', 1.3); tr.g.position.set(bx + out[0] * (L + 2.2) - out[1] * 1.2, -0.06, bz + out[1] * (L + 2.2) - out[0] * 1.2); scn.add(tr.g); rs.mats.push(...tr.mats); }
+      } else if (d === 'n') {
         const ag = Mo.archGate(ti); ag.g.position.set(cx, 0, 0.9); g.add(ag.g); rs.mats.push(...ag.mats); rs.tex.push(...ag.tex); // 青铜环门
       } else {
         const ph = d === 's' ? 0.8 : 1.3;
@@ -375,6 +422,7 @@
     candle(1.32, 1.36, 1); candle(w - 1.32, 1.36, 2); candle(1.32, h - 1.36, 3); candle(w - 1.32, h - 1.36, 4);
     if (room.doors.n) { const dc = room.doors.n.cells[1][0] + 0.5; candle(dc - 2.35, 1.3, 5); candle(dc + 2.35, 1.3, 6); }
     if (['treasure', 'event', 'shop', 'garden', 'start'].includes(room.type)) for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU + 0.52; candle(w / 2 + Math.cos(a) * 3.35, h / 2 + Math.sin(a) * 3.35, 7 + i); }
+    for (const f of rs.bowls || []) { rs.flames.push(f); rs.candles.push([f[0], f[2]]); }
     const merged = mergeStatic(propRoot);
     if (merged) { g.add(merged); rs.geos.push(merged.geometry); rs.mats.push(merged.material); inkOutline(merged, 0.028, g, rs, th.ink); }
     // 灯光与光晕
@@ -403,7 +451,7 @@
     for (let x = -0.3; x < w + 0.5; x += 1.45) { kk++; if (nearDoor('s', x, 0)) continue; rk(x + rv(1) * 0.5, -0.5 + rv(2) * 0.3, h + 0.55 + rv(3) * 0.35, 0.9 + rv(4) * 0.45, 1.6 + rv(5) * 0.7, kk, true); }
     // 东西两缘
     for (let z = 0.4; z < h; z += 1.55) for (const e of [0, 1]) { kk++; if (nearDoor(e ? 'e' : 'w', z, 1)) continue; rk(e ? w + 0.55 + rv(1) * 0.3 : -0.55 - rv(1) * 0.3, 0.2 + rv(2) * 0.55, z + rv(3) * 0.5, 1.0 + rv(4) * 0.6, 1.7 + rv(5) * 0.7, kk); }
-    const plant = (x, top, z, kind, sc, seed, dark) => { const tr = Mo.tree(seed + sd, ti, kind, sc); if (dark) for (const m of tr.mats) m.color.multiplyScalar(dark); tr.g.position.set(x, top - 0.1, z); tr.g.rotation.y = U.hash(seed, 17, sd) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); };
+    const plant = (x, top, z, kind, sc, seed, dark) => { if (cave) return; const tr = Mo.tree(seed + sd, ti, kind, sc); if (dark) for (const m of tr.mats) m.color.multiplyScalar(dark); tr.g.position.set(x, top - 0.1, z); tr.g.rotation.y = U.hash(seed, 17, sd) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); };
     // 山台：比岛缘更低、更远的一圈石台，一级一级降进云里，台上偶尔有树
     for (let i = 0; i < 11; i++) {
       kk++; const side = i % 3, u = rv(1); // 0 南 / 1 西 / 2 东
@@ -440,10 +488,10 @@
       kk++; if (nearDoor('n', x, 0)) continue;
       const top = 1.15 + rv(2) * 1.25, rx = x + rv(1) * 0.6, rz = -0.8 - rv(3) * 0.9;
       rk(rx, top, rz, 1.3 + rv(4) * 0.9, 1.8 + rv(5) * 0.8, kk);
-      if (ti < 2 && rv(6) < 0.42) { const tr = Mo.tree(kk + sd, ti, ti === 1 ? 'round' : rv(7) < 0.3 ? 'bloom' : 'pine', 1.3); tr.g.position.set(rx, top - 0.12, rz); tr.g.rotation.y = rv(8) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); }
+      if (ti < 2 && !cave && rv(6) < 0.42) { const tr = Mo.tree(kk + sd, ti, ti === 1 ? 'round' : rv(7) < 0.3 ? 'bloom' : 'pine', 1.3); tr.g.position.set(rx, top - 0.12, rz); tr.g.rotation.y = rv(8) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); }
     }
     // 立轴：庭院与古殿的北墙上各挂两幅山水
-    if (ti === 0 || ti === 3) {
+    if ((ti === 0 || ti === 3) && !open) {
       const dn = dz('n'), dcx = dn ? dn[0] + 0.5 : w / 2;
       for (const off of [-3.5, 3.5]) {
         const sx = dcx + off; if (sx < 1.7 || sx > w - 1.7 || at(Math.floor(sx), 0) !== 1 || room.lights.some((L) => L.sconce && Math.abs(L.x * S - sx) < 0.75)) continue;
@@ -566,11 +614,14 @@
     const mc = rgb(th.mist).col;
     for (const s of mists) s.material.color.copy(mc);
     for (const s of wisps) s.material.color.copy(mc);
+    const inCave = room.terrain === 'cave';
+    for (const m of seas) m.visible = !inCave; for (const s of mists) s.visible = !inCave; cshadow.visible = !inCave;
+    if (inCave) { scene.background = new THREE.Color(0x050304); scene.fog.color.set(0x140a0b); hemi.intensity *= 0.72; }
     seas[0].material.color.setHex(th.sea[2]); seas[0].material.opacity = th.sea[3]; seas[0].position.set(w / 2, -11, h / 2);
     seas[1].material.color.setHex(th.sea[0]); seas[1].material.opacity = th.sea[1]; seas[1].position.set(w / 2, -6.5, h / 2);
     cshadow.position.set(w / 2, 0.012, h / 2); cshadow.scale.set(w - 1.2, h - 1.2, 1); cshadow.material.opacity = th.cloudShadow[0]; cshadow.material.map.repeat.set(w / th.cloudShadow[1], h / th.cloudShadow[1]);
     shafts.forEach((m, i) => {
-      m.visible = !!th.shaft; if (!th.shaft) return;
+      m.visible = !!th.shaft && !inCave; if (!m.visible) return;
       m.material.color.setHex(th.shaft[0]); m.userData.o = th.shaft[1];
       m.position.set(w * [0.2, 0.47, 0.72, 0.93][i], 4, h * [0.45, 0.28, 0.58, 0.3][i]); m.scale.set(2.2 + (i % 2) * 1.2, 16, 1);
     });
@@ -615,7 +666,7 @@
     // 云海
     for (const s of mists) { const u = s.userData; u.a += u.sp * 0.016; s.position.set(room.w / 2 + Math.cos(u.a) * (u.r + room.w * 0.35), u.y, room.h / 2 + Math.sin(u.a) * (u.r * 0.6 + room.h * 0.35)); }
     { const lc = rgb(th.lamp); // 烛火：每支一个跳动的光点，每簇一团暖晕
-      for (let i = 0; i < cur.flames.length; i++) { const f = cur.flames[i], fl = Math.sin(t * 17 + i * 2.3) * 0.5 + Math.sin(t * 29 + i) * 0.5; glows.push(f[0], f[1] + fl * 0.008, f[2], FLAME, 0.75, 0.085 + fl * 0.015); }
+      for (let i = 0; i < cur.flames.length; i++) { const f = cur.flames[i], fl = Math.sin(t * 17 + i * 2.3) * 0.5 + Math.sin(t * 29 + i) * 0.5; glows.push(f[0], f[1] + fl * 0.008, f[2], FLAME, 0.8, (f[3] || 0.085) * (1 + fl * 0.16)); if (f[3]) glows.push(f[0], f[1] + 0.16 + fl * 0.03, f[2], FLAME, 0.5, f[3] * 0.6); }
       for (let i = 0; i < cur.candles.length; i++) { const cd = cur.candles[i]; glows.push(cd[0], 0.3, cd[1], lc, 0.13 + Math.sin(t * 9 + i * 1.7) * 0.025, 1.9); } }
     seas[0].material.map.offset.set(t * 0.0016, t * 0.0007); seas[1].material.map.offset.set(-t * 0.004, t * 0.0022);
     cshadow.material.map.offset.set(t * 0.006, t * 0.0035);
@@ -1130,7 +1181,7 @@
       c.globalAlpha = 1;
     }
     if (world && p && room.theme !== undefined) { // 黑暗里的一圈光：离主角越远越暗
-      const dk = G.Themes[room.theme].dark, s = proj(p.x, p.y, 24), g = c.createRadialGradient(s.x, s.y, H * 0.3, s.x, s.y, Math.max(W, H) * 0.8);
+      const dk = Math.min(0.86, G.Themes[room.theme].dark * (room.terrain === 'cave' ? 1.35 : 1)), s = proj(p.x, p.y, 24), g = c.createRadialGradient(s.x, s.y, H * 0.3, s.x, s.y, Math.max(W, H) * 0.8);
       g.addColorStop(0, 'rgba(2,4,10,0)'); g.addColorStop(0.5, `rgba(2,4,10,${dk * 0.5})`); g.addColorStop(1, `rgba(2,4,10,${dk})`);
       c.fillStyle = g; c.fillRect(0, 0, W, H);
       c.globalAlpha = 0.55; c.drawImage(vignette, 0, 0, W, H); c.globalAlpha = 1;

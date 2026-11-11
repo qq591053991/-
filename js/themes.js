@@ -72,9 +72,16 @@
   const T = 48; // 绘制坐标沿用 48 像素一格，整体再按 FS 放大
   Tx.FS = 1.5;
 
-  function drawFloorTile(c, th, ti, x, y, px, py) {
+  function drawFloorTile(c, th, ti, x, y, px, py, wild) {
     const hh = (i) => U.hash(x, y, i), TH = T;
-    if (ti === 0) { // 庭院：手铺的不规则石板 —— 每个格点各自错开一点，石板之间是生苔的缝
+    if (ti === 0 && wild) { // 山谷：草地，深浅不一，零星野花
+      c.fillStyle = hh(1) < 0.5 ? '#45604c' : '#4b6751'; c.fillRect(px, py, T + 0.5, TH + 0.5);
+      for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#587a5c' : '#35493c'; c.globalAlpha = 0.45; ell(c, px + hh(i * 3 + 2) * T, py + hh(i * 3 + 3) * TH, 9 + hh(i * 3 + 4) * 15, 6 + hh(i + 30) * 9); }
+      c.globalAlpha = 0.5; c.strokeStyle = '#86b07e'; c.lineWidth = 1; c.lineCap = 'round';
+      for (let i = 0; i < 5; i++) { const gx = px + hh(40 + i) * T, gy = py + hh(50 + i) * TH; c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx + (hh(60 + i) - 0.5) * 4, gy - 4 - hh(70 + i) * 4); c.stroke(); }
+      c.globalAlpha = 1;
+      if (hh(80) < 0.16) { c.fillStyle = hh(81) < 0.5 ? '#f2e6c8' : '#e8b8cc'; for (let i = 0; i < 3; i++) circ(c, px + 8 + hh(82 + i) * 32, py + 8 + hh(86 + i) * 32, 1.5); }
+    } else if (ti === 0) { // 庭院：手铺的不规则石板 —— 每个格点各自错开一点，石板之间是生苔的缝
       const J = (ix, iy, k) => (U.hash(ix, iy, 40 + k) - 0.5) * 13;
       const p = [[px + J(x, y, 0), py + J(x, y, 1)], [px + T + J(x + 1, y, 0), py + J(x + 1, y, 1)], [px + T + J(x + 1, y + 1, 0), py + TH + J(x + 1, y + 1, 1)], [px + J(x, y + 1, 0), py + TH + J(x, y + 1, 1)]];
       const mx = (p[0][0] + p[1][0] + p[2][0] + p[3][0]) / 4, my = (p[0][1] + p[1][1] + p[2][1] + p[3][1]) / 4;
@@ -207,10 +214,26 @@
     const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 1 : tiles[y * w + x]);
     const cv = document.createElement('canvas'); cv.width = Math.round(w * T * FS); cv.height = Math.round(h * T * FS);
     const c = cv.getContext('2d'); c.scale(FS, FS);
+    const open = room.terrain && room.terrain !== 'court'; // 山野 / 洞窟：没有墙，地面一直铺到林子、岩壁底下
     c.fillStyle = ti === 0 ? '#26382f' : shade(th.base, -0.4); c.fillRect(0, 0, w * T, h * T); // 第一章的石缝里是苔
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const t = at(x, y); if (t === 1) continue;
-      drawFloorTile(c, th, ti, x, y, x * T, y * T);
+      const t = at(x, y); if (t === 1 && !open) continue;
+      drawFloorTile(c, th, ti, x, y, x * T, y * T, open);
+    }
+    if (open) {
+      // 土路：从每个出口踩向空地中央的一条小径 —— 地图之间靠路连着，而不是靠门
+      const trail = ti === 0 ? '112,104,84' : ti === 1 ? '64,46,38' : '70,70,80', mx = (w / 2) * T, my = (h / 2) * T;
+      c.lineCap = 'round';
+      for (const d in room.doors || {}) {
+        const [dx0, dy0] = room.doors[d].cells[1], sx = (dx0 + 0.5) * T, sy = (dy0 + 0.5) * T, bx = (sx + mx) / 2 + (U.hash(dx0, dy0, 5) - 0.5) * 90, by = (sy + my) / 2 + (U.hash(dx0, dy0, 6) - 0.5) * 70;
+        for (const [lw, a] of [[T * 2.3, 0.2], [T * 1.6, 0.3], [T * 0.9, 0.3]]) { c.strokeStyle = `rgba(${trail},${a})`; c.lineWidth = lw; c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(bx, by, mx, my); c.stroke(); }
+      }
+      // 林下 / 岩壁下的暗：一团一团的，边缘是软的
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        if (at(x, y) !== 1) continue;
+        const sx = (x + 0.5) * T, sy = (y + 0.5) * T, g = c.createRadialGradient(sx, sy, T * 0.2, sx, sy, T * 1.05);
+        g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(sx - T * 1.1, sy - T * 1.1, T * 2.2, T * 2.2);
+      }
     }
     // 青铜地台
     const seed = (room.gx || 0) * 7 + (room.gy || 0) * 13 + ti * 31;
@@ -272,6 +295,7 @@
       const t = at(x, y); if (t === 1) continue;
       const px = x * T, py = y * T;
       if (t === 4) { c.fillStyle = 'rgba(255,235,190,0.10)'; c.fillRect(px, py, T, T); }
+      if (open) continue; // 山野没有墙根
       if (ti < 2 && at(x, y - 1) === 1 && U.hash(x, y, 91) < 0.55) { c.fillStyle = th.moss; c.globalAlpha = 0.5; ell(c, px + U.hash(x, y, 92) * T, py + 5, 14 + U.hash(x, y, 93) * 12, 6 + U.hash(x, y, 94) * 5); c.globalAlpha = 1; } // 墙根的苔
       if (at(x, y - 1) === 1) { const g = c.createLinearGradient(0, py, 0, py + 22); g.addColorStop(0, 'rgba(0,0,0,0.45)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(px, py, T, 22); }
       if (at(x - 1, y) === 1) { const g = c.createLinearGradient(px, 0, px + 14, 0); g.addColorStop(0, 'rgba(0,0,0,0.3)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(px, py, 14, T); }
