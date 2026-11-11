@@ -237,7 +237,7 @@
       for (let tryN = 0; tryN < 8; tryN++) {
         tiles.set(snapshot); room.props.length = 0; flat();
         const pat = U.pick(['pillars', 'pond', 'scatter', 'scatter', 'blocks', 'twin', 'ring', 'mix', 'terrace', 'terrace', 'terrace']);
-        if (big && room.zones && U.chance(0.8)) { const z = U.pick(room.zones); dais(Math.floor(z.x), Math.floor(z.y), 2, 1); } // 大图：挑一片空地垒一座土台
+        if (big && room.zones && U.chance(0.8)) { const z = U.pick(room.zones.slice(1)); dais(Math.floor(z.x), Math.floor(z.y), 2, 1); } // 不选正中那片：场心的地台纹样不该铺到坡上 // 大图：挑一片空地垒一座土台
         if (pat === 'terrace') { // 场中一座台地，四面有台阶：占住台子居高临下，或者绕着它周旋
           dais(cx + U.randi(-2, 2), cy + U.randi(-1, 1), U.randi(2, 3), U.randi(1, 2));
           for (let i = 0; i < 5; i++) prop(U.randi(2, w - 3), U.randi(2, h - 3), pk());

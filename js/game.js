@@ -24,6 +24,7 @@
       R.init(cv);
       this.loadMeta();
       G.UI.init();
+      R.setQuality(this.meta.quality || 'auto');
       document.body.classList.toggle('autoaim', this.isAuto());
       G.UI.showMenu();
       G.Assets.load(() => G.UI.assetsReady());
@@ -36,6 +37,7 @@
     frame(ts) {
       const raw = Math.min(0.05, Math.max(0.001, (ts - this.last) / 1000)); this.last = ts;
       if (this.fade > 0) this.fade = Math.max(0, this.fade - raw * 2.8);
+      R.adapt(raw);
       if (this.state === 'menu') R.drawMenu(raw);
       else {
         this.update(raw);

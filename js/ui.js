@@ -251,9 +251,10 @@
       this.open(`<div class="panel pause"><h2>${G.Chapters[Gm.chapter].title}</h2>
         <div class="cols"><div><h3>修为</h3><div class="stats">${this.statLine(p)}</div><h3>行囊 <small>${p.relicList.length} 件</small></h3><div class="list scroll bag">${relics}</div></div>
         <div><h3>主修 · 本命法宝</h3><div class="list">${arts}</div><h3>神通</h3><div class="list">${skills}</div></div></div>
-        <div class="btns"><button class="btn" id="x-close">继续修行</button><button class="btn ghost" id="x-aim">瞄准：${Gm.meta.autoAim !== false ? '自动' : '手动'}</button><button class="btn ghost" id="x-mute">${Au.muted ? '开启声音' : '静音'}</button><button class="btn ghost" id="x-quit">放弃此世</button></div></div>`, 'dim');
+        <div class="btns"><button class="btn" id="x-close">继续修行</button><button class="btn ghost" id="x-aim">瞄准：${Gm.meta.autoAim !== false ? '自动' : '手动'}</button><button class="btn ghost" id="x-mute">${Au.muted ? '开启声音' : '静音'}</button><button class="btn ghost" id="x-q" title="自动：帧率不够时自动降低渲染分辨率；高：不降；省电：固定用六成分辨率">画质：${{ auto: '自动', high: '高', low: '省电' }[G.Render.quality] || '自动'}</button><button class="btn ghost" id="x-quit">放弃此世</button></div></div>`, 'dim');
       $('x-close').onclick = () => { Au.sfx('ui'); this.close(); };
       $('x-mute').onclick = () => { Au.toggleMute(); this.pause(); };
+      $('x-q').onclick = () => { Au.sfx('ui'); const q = { auto: 'high', high: 'low', low: 'auto' }[G.Render.quality] || 'auto'; G.Render.setQuality(q); Gm.meta.quality = q; Gm.saveMeta(); this.pause(); };
       $('x-aim').onclick = () => { Au.sfx('ui'); Gm.setAutoAim(Gm.meta.autoAim === false); this.pause(); };
       $('x-quit').onclick = () => { this.close(); Gm.player.hp = 0; Gm.player.dead = true; Gm.onPlayerDead(); };
       this.onKey = (k) => { if (k === 'Escape' || k === 'KeyP') this.close(); };

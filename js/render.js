@@ -187,10 +187,25 @@
     arrayTex = ctex(Tx.array());
 
     // 贴地图形的池
-    const flatMat = (o) => new THREE.MeshBasicMaterial(Object.assign({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }, o));
-    const circG = new THREE.CircleGeometry(1, 48), ringG = new THREE.RingGeometry(0.93, 1, 64), thinG = new THREE.RingGeometry(0.86, 1, 64), planeG = new THREE.PlaneGeometry(1, 1);
-    const flat = (geo, o) => () => { const m = new THREE.Mesh(geo, flatMat(o)); m.rotation.x = -PI / 2; return m; };
-    P.circ = new Pool(flat(circG)); P.ring = new Pool(flat(ringG)); P.band = new Pool(() => { const m = new THREE.Mesh(planeG, flatMat({ side: THREE.DoubleSide })); m.rotation.order = 'YXZ'; return m; });
+    /* 贴地的图形（预警圈、阵纹、脚下的环、墨渍）要"披"在地形上：台地上高、平地上低，跨过台沿时顺着坡走。
+       做法是在顶点着色器里按世界坐标去查一张高度图（每间房一张，格点高度），把每个顶点抬到地面上。
+       所以这些图形的网格要有足够的细分，并且不参加 liftDyn 的整体抬升 */
+    const flatMat = (o) => {
+      const m = new THREE.MeshBasicMaterial(Object.assign({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }, o));
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.hMap = HU.map; sh.uniforms.hSize = HU.size;
+        sh.vertexShader = 'uniform sampler2D hMap;\nuniform vec2 hSize;\n' + sh.vertexShader.replace('#include <project_vertex>', `
+          vec4 dWorld = modelMatrix * vec4( transformed, 1.0 );
+          dWorld.y += texture2D( hMap, ( dWorld.xz + 0.5 ) / hSize ).r;
+          vec4 mvPosition = viewMatrix * dWorld;
+          gl_Position = projectionMatrix * mvPosition;`);
+      };
+      m.customProgramCacheKey = () => 'drape';
+      return m;
+    };
+    const circG = new THREE.RingGeometry(0.0001, 1, 48, 8), ringG = new THREE.RingGeometry(0.93, 1, 64), thinG = new THREE.RingGeometry(0.86, 1, 64), planeG = new THREE.PlaneGeometry(1, 1, 12, 4);
+    const flat = (geo, o) => () => { const m = new THREE.Mesh(geo, flatMat(o)); m.rotation.x = -PI / 2; m.userData.drape = true; return m; };
+    P.circ = new Pool(flat(circG)); P.ring = new Pool(flat(ringG)); P.band = new Pool(() => { const m = new THREE.Mesh(planeG, flatMat({ side: THREE.DoubleSide })); m.rotation.order = 'YXZ'; m.userData.drape = true; return m; });
     P.fxring = new Pool(flat(thinG, { blending: THREE.AdditiveBlending }));
     P.web = new Pool(flat(circG, { map: webTex }));
     for (let i = 0; i < 3; i++) P['stain' + i] = new Pool(flat(planeG, { map: ctex(Tx.splat(i * 7 + 1)) })); // 战斗留在地上的墨渍
@@ -217,11 +232,28 @@
     if (!this.ok) return;
     W = Math.max(320, window.innerWidth); H = Math.max(240, window.innerHeight);
     dpr = Math.min(window.devicePixelRatio || 1, 2);
-    renderer.setPixelRatio(R.lite ? Math.min(dpr, 1.5) : dpr); renderer.setSize(W, H, false);
+    renderer.setPixelRatio((R.lite ? Math.min(dpr, 1.5) : dpr) * qScale); renderer.setSize(W, H, false);
     this.cv.style.width = W + 'px'; this.cv.style.height = H + 'px';
     ov.width = Math.round(W * dpr); ov.height = Math.round(H * dpr); ov.style.width = W + 'px'; ov.style.height = H + 'px';
     camera.aspect = W / H; camera.updateProjectionMatrix();
   };
+
+  /* 画质自适应：帧率撑不住就降渲染分辨率（一档一成，最低六成），稳住之后再慢慢升回去。
+     暂停菜单里可以改成"高"（不降）或"省电"（固定六成） */
+  let qScale = 1, qAcc = 0, qN = 0, qCool = 0, qGood = 0;
+  R.quality = 'auto';
+  R.setQuality = function (q) { this.quality = q; qScale = q === 'low' ? 0.6 : 1; qGood = 0; qAcc = 0; qN = 0; this.resize(); };
+  R.adapt = function (raw) {
+    if (this.quality !== 'auto' || !this.ok || navigator.webdriver) return; // 自动化测试里不降
+    qAcc += raw; qN++;
+    if (qAcc < 1.5) return;
+    const fps = qN / qAcc; qAcc = 0; qN = 0;
+    if (qCool > 0) { qCool--; return; }
+    if (fps < 45 && qScale > 0.6) { qScale = Math.max(0.6, qScale - 0.1); qGood = 0; qCool = 1; this.resize(); }
+    else if (fps > 57 && qScale < 1) { if (++qGood >= 4) { qScale = Math.min(1, qScale + 0.1); qGood = 0; qCool = 1; this.resize(); } }
+    else qGood = 0;
+  };
+  R.info = () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, scale: qScale, quality: R.quality });
 
   /* 屏幕坐标 → 地面上的游戏坐标 */
   R.toWorld = function (cx, cy) {
@@ -736,6 +768,8 @@
     curRoom = room;
     if (!room._rs) { room._rs = buildRoom(room); built.add(room); }
     cur = room._rs; scene.add(cur.g);
+    if (room.hc) { if (!cur.hTex) { cur.hTex = heightTex(room); cur.tex.push(cur.hTex); } HU.map.value = cur.hTex; HU.size.value.set(room.w + 1, room.h + 1); }
+    else { HU.map.value = zeroTex; HU.size.value.set(1, 1); }
     const th = G.Themes[room.theme], w = room.w, h = room.h;
     scene.background = new THREE.Color(th.bg);
     scene.fog.color.set(th.fog[0]); scene.fog.near = th.fog[1]; scene.fog.far = th.fog[2];
@@ -861,12 +895,20 @@
     return a || b || c || d ? (a + (b - a) * fx) * (1 - fz) + (c + (d - c) * fx) * fz : 0;
   }
   const hW = (x, z) => (curRoom && curRoom.hc ? hRoom(curRoom, x, z) : 0);
+  // 高度图：给贴地图形的着色器用。没有台地的房间用一张 1×1 的零图
+  const zeroTex = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1); zeroTex.needsUpdate = true;
+  const HU = { map: { value: zeroTex }, size: { value: new THREE.Vector2(1, 1) } };
+  function heightTex(room) {
+    const w1 = room.w + 1, h1 = room.h + 1, d = new Uint8Array(w1 * h1 * 4);
+    for (let i = 0; i < w1 * h1; i++) { d[i * 4] = Math.round(Math.min(1, room.hc[i]) * 255); d[i * 4 + 3] = 255; }
+    const t = new THREE.DataTexture(d, w1, h1); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; return t;
+  }
   function liftDyn() {
     const on = !!(curRoom && curRoom.hc);
     for (const o of dyn.children) {
       const u = o.userData;
       if (u.ly !== undefined) { if (o.position.y === u.ly) o.position.y -= u.lh; u.ly = undefined; } // 上一帧抬过、之后没人重设位置：先还原
-      if (!on || !o.visible) continue;
+      if (!on || !o.visible || u.drape) continue; // 贴地图形自己在着色器里按地形起伏
       const k = hRoom(curRoom, o.position.x, o.position.z);
       if (k) { o.position.y += k; u.ly = o.position.y; u.lh = k; }
     }
