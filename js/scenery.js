@@ -57,7 +57,7 @@
 
   Mo.padGeo = padGeo;
   function stick(parent, a, b, r, mat) { // 一截上细下粗的枝干，从 a 到 b
-    const m = new THREE.Mesh(gg('stk', () => new THREE.CylinderGeometry(0.38, 0.5, 1, 6)), mat);
+    const m = new THREE.Mesh(gg('stk', () => new THREE.CylinderGeometry(0.38, 0.5, 1, 6, 1, true)), mat); // 两端不封口：接缝被下一截或叶团盖住，省一半的面
     D.subVectors(b, a); const len = D.length();
     m.position.copy(a).addScaledVector(D, 0.5); m.quaternion.setFromUnitVectors(UP, D.normalize()); m.scale.set(r * 2, len * 1.06, r * 2); m.castShadow = true;
     parent.add(m); return m;

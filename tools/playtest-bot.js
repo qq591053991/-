@@ -8,6 +8,7 @@
      环境变量：
        MAIN=qy|du|dy   筑基时选哪门主修功法（默认选第一张卡：青元剑诀）
        BASE=http://…   游戏的地址（默认 http://127.0.0.1:8765）
+       PREFER=main     升层时优先参悟主修功法（默认总是点第一张卡）
 
    输出：每间房一行（章节、房型、+T 有台地、+B 大图、用时、气血变化……），每局结束一行汇总，
    以 @@ 开头的一行是便于脚本统计的 JSON。打不完的局会打印 STUCK / DIAG 供排查。
@@ -31,6 +32,7 @@ const { chromium } = require('playwright');
     const startCh = +(process.argv[4] || 0);
     if (startCh) { await pg.evaluate((c) => { const p = G.Game.player; p.dmgMul += 0.3 * c; p.maxHp += 50 * c; p.hp = p.maxHp; G.Game.enterChapter(c); }, startCh); await pg.waitForTimeout(300); await pg.keyboard.press('Space'); await pg.waitForTimeout(300); }
     await pg.evaluate((du) => { window.MAIN_DU = du; }, process.env.MAIN === 'du' ? 1 : process.env.MAIN === 'dy' ? 2 : 0);
+    await pg.evaluate((v) => { window.PREFER_MAIN = v; }, process.env.PREFER === 'main');
     await pg.evaluate((turbo) => {
       const Gm = G.Game, I = G.Input, R = G.Render, U = G.U;
       window.LOG = []; window.roomT0 = 0;
@@ -75,7 +77,8 @@ const { chromium } = require('playwright');
         if (Gm.state !== 'play') return;
         if (G.UI.blocking) {
           const h2 = document.querySelector('.choice h2'), pickDu = window.MAIN_DU && h2 && h2.textContent.includes('主修功法'); /* 可指定主修：du 毒经 / dy 大衍诀 */
-          const el = (pickDu && document.querySelectorAll('.card')[window.MAIN_DU]) || document.querySelector('.card, .opt:not([disabled]), .list button[data-i]:not([disabled])') || document.getElementById('x-close');
+          const mainCard = window.PREFER_MAIN && [...document.querySelectorAll('.card')].find((c) => /^功法 · 第/.test((c.querySelector('em') || {}).textContent || '')); /* 可让它优先参悟主修功法 */
+          const el = mainCard || (pickDu && document.querySelectorAll('.card')[window.MAIN_DU]) || document.querySelector('.card, .opt:not([disabled]), .list button[data-i]:not([disabled])') || document.getElementById('x-close');
           if (el) el.click(); else document.getElementById('overlay').click();
           return;
         }

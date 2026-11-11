@@ -294,6 +294,7 @@
 
     // 山石：岛缘、假山、山岩墙与远山全用它堆出来，最后合并成一个网格
     const scn = new THREE.Group(); g.add(scn);
+    const scnFar = new THREE.Group(); g.add(scnFar); // 林子深处与前景的树：只当背景，不描边、不投影（大图的面数大半花在这上面）
     const rockM = new THREE.MeshLambertMaterial({ vertexColors: true }); rs.mats.push(rockM);
     const sd = (room.gx || 0) * 31 + (room.gy || 0) * 17 + ti * 7;
     // rk：放一块山石，top 是它顶面的高度
@@ -342,7 +343,7 @@
         if (!cave && far[y * w + x] > 3) { // 林子深处：隔一格放一团压暗的树冠
           if ((x + y) % 2) continue;
           const fgc = northFloor(x, y, 8), cm = new THREE.Mesh(Mo.padGeo(x + y, ti, padKind), fgc ? leafFg : leafD), cs = (fgc ? 1.05 : 1.25) + U.hash(x, y, sd + 64) * 0.6;
-          cm.position.set(x + 0.5, (fgc ? 0.7 : 1.0) + U.hash(x, y, sd + 65) * 0.7, y + 0.5); cm.scale.set(cs, cs * 0.8, cs); cm.rotation.y = x * 1.3 + y; scn.add(cm); continue;
+          cm.position.set(x + 0.5, (fgc ? 0.7 : 1.0) + U.hash(x, y, sd + 65) * 0.7, y + 0.5); cm.scale.set(cs, cs * 0.8, cs); cm.rotation.y = x * 1.3 + y; scnFar.add(cm); continue;
         }
         let edgeT = false;
         for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const xx = x + i, yy = y + j; if (xx >= 0 && yy >= 0 && xx < w && yy < h && tiles[yy * w + xx] !== 1) edgeT = true; }
@@ -367,7 +368,7 @@
         const big = w > 28; // 大图里"南北"是相对空地而言的：只有紧挨空地南沿的才算前景
         if (ti === 2 && r1 > 0.5) continue; // 焦林稀疏
         const tr = Mo.tree(x * 31 + y * 17 + sd, ti, treeKind(r2 * 1.6), (below ? 0.6 : fg && !big ? 0.8 : north || big ? 1.2 : 1.05) + r2 * (below ? 0.2 : 0.35), { lite: !edgeT || fg, bark: fg ? barkFg : bark, leaf: fg ? leafFg : leaf });
-        tr.g.position.set(px, -0.04, pz); tr.g.rotation.y = r2 * TAU; scn.add(tr.g);
+        tr.g.position.set(px, -0.04, pz); tr.g.rotation.y = r2 * TAU; (edgeT && !fg ? scn : scnFar).add(tr.g); // 只有紧贴空地、又不是前景的那一圈树才描边投影
       }
       // 路口的火盆
       for (const dd of room.deco) if (dd.kind === 'firebowl') { const f = kit.firebowl(dd.x, dd.y); f.push(dd.d); (rs.bowls || (rs.bowls = [])).push(f); } // 记下这只火盆守着哪个出口
@@ -653,6 +654,8 @@
     });
     const mergedScn = mergeStatic(scn);
     if (mergedScn) { g.add(mergedScn); rs.geos.push(mergedScn.geometry); rs.mats.push(mergedScn.material); inkOutline(mergedScn, 0.042, g, rs, th.ink); }
+    const mergedFar = mergeStatic(scnFar);
+    if (mergedFar) { mergedFar.castShadow = false; g.add(mergedFar); rs.geos.push(mergedFar.geometry); rs.mats.push(mergedFar.material); }
     const mergedTuft = mergeStatic(tuft); // 草丛太细，不描线
     if (mergedTuft) { mergedTuft.castShadow = false; g.add(mergedTuft); rs.geos.push(mergedTuft.geometry); rs.mats.push(mergedTuft.material); }
     rs.mats.push(...kit.mats());
@@ -666,7 +669,7 @@
   /* 把一组静态网格烘焙成单个带顶点色的网格 */
   function mergeStatic(root) {
     root.updateMatrixWorld(true);
-    const pos = [], nor = [], colr = [], v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
+    const pos = [], nor = [], colr = [], dead = [], v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
     root.traverse((o) => {
       if (!o.isMesh) return;
       const m = o.material;
@@ -680,8 +683,12 @@
         n.fromBufferAttribute(N2, i).applyMatrix3(nm).normalize(); nor.push(n.x, n.y, n.z);
         if (C2) colr.push(m.color.r * C2.getX(i), m.color.g * C2.getY(i), m.color.b * C2.getZ(i)); else colr.push(m.color.r, m.color.g, m.color.b);
       }
-      q.dispose(); o.visible = false;
+      q.dispose(); o.visible = false; dead.push(o);
     });
+    // 合并进去的原件从场景树上摘掉（连同摘空了的组）：一张大图有两千多个，留着的话每帧都要遍历、更新矩阵
+    for (const o of dead) if (!o.children.length && o.parent) o.parent.remove(o);
+    const prune = (o) => { for (let i = o.children.length - 1; i >= 0; i--) { const c = o.children[i]; if (c.type !== 'Group' && c.type !== 'Object3D') continue; prune(c); if (!c.children.length) o.remove(c); } };
+    prune(root);
     if (!pos.length) return null;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
