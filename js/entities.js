@@ -226,6 +226,7 @@
     FX.burst(e.x, e.y, e.r, e.boss ? 80 : 14, { c: rgb, s1: e.boss ? 380 : 190, add: false, z1: 6 });
     FX.burst(e.x, e.y, e.r, e.boss ? 50 : 8, { c: '255,240,200', s1: 220 });
     FX.ring(e.x, e.y, 6, e.boss ? 260 : 50, '255,240,200', 0.35);
+    Gm.stain(e.x, e.y, e.boss ? 70 : e.elite ? 40 : 22 + e.r * 0.5, e.def.fly || e.def.draw === 'ghost' || e.def.draw === 'skull' || e.def.draw === 'flame' ? 1 : e.def.draw === 'puppet' || e.def.draw === 'crystal' ? 2 : 0);
     Au.sfx('kill');
     if (!e.def.minion || e.boss) {
       const ch = room.chapter;

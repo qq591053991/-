@@ -251,6 +251,20 @@
     return kit;
   };
 
+  /* 一簇蜡烛：高矮不一的几支，底下一摊蜡泪。烛身会被合并进静态网格，火苗的位置记在 flames 里，由渲染层画成光点 */
+  const WAX = ['#e6dcc4', '#8c2a2e', '#3a3648', '#cfe0ee'];
+  Mo.candles = function (v, ti) {
+    const g = new THREE.Group(), wax = lam(WAX[ti]), flames = [], cyl = gg('hex6', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 6)), h = (i) => U.hash(v * 9 + i, i * 3 + 1, ti + 21);
+    const n = 3 + Math.floor(h(0) * 3);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU + h(i + 1) * 2, r = i ? 0.1 + h(i + 6) * 0.1 : 0, hgt = 0.12 + h(i + 11) * 0.22, x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const c = new THREE.Mesh(cyl, wax); c.position.set(x, hgt / 2, z); c.scale.set(0.07, hgt, 0.07); g.add(c);
+      flames.push([x, hgt + 0.06, z]);
+    }
+    const pool = new THREE.Mesh(cyl, wax); pool.position.y = 0.012; pool.scale.set(0.42, 0.024, 0.36); g.add(pool);
+    return { g, mats: [wax], flames };
+  };
+
   /* 接管几样场景物件：山石、松（偶尔是一树桃花）、血枫、石灯 */
   const prop0 = Mo.prop;
   Mo.prop = function (kind, v, ti) {

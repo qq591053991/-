@@ -113,6 +113,13 @@
     shake(a) { this.shakeAmt = Math.min(16, Math.max(this.shakeAmt, a)); },
     toast(m) { G.UI.toast(m); },
     say(e, text) { this.barks.push({ e, text, life: 2.2 }); },
+    /* 战斗留痕：敌人倒下的地方留一摊墨渍，离开房间之前不会消失。kind：0 血（暗绛）/ 1 鬼物的墨 / 2 傀儡与晶石的碎屑 */
+    stain(x, y, r, kind) {
+      const room = this.room, L = room.stains || (room.stains = []);
+      if (W.solid(room, Math.floor(x / T), Math.floor(y / T), 2)) return;
+      L.push({ x, y, r, kind, rot: U.rand(Math.PI * 2), t: this.stats.time, v: L.length % 3 });
+      if (L.length > 70) L.shift();
+    },
     /* ---------------- 瞄准 ----------------
        自动瞄准（默认）：锁定最近且有射击视线的敌人；按住鼠标左键可临时改为手动瞄准。
        手动瞄准：始终指向鼠标位置。触屏下始终自动。 */

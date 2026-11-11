@@ -134,7 +134,7 @@
     const sm = R.lite ? 1024 : 2048;
     sun.shadow.mapSize.set(sm, sm); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.035;
     scene.add(sun); scene.add(sun.target);
-    pLight = new THREE.PointLight(0xfff0d8, 0.85, 9, 1.2); scene.add(pLight);
+    pLight = new THREE.PointLight(0xfff0d8, 1.25, 10.5, 1.2); scene.add(pLight);
     for (let i = 0; i < MAX_LIGHTS; i++) { const l = new THREE.PointLight(0xffffff, 0, 6, 1.4); scene.add(l); roomLights.push(l); }
     dyn = new THREE.Group(); scene.add(dyn);
 
@@ -191,6 +191,7 @@
     P.circ = new Pool(flat(circG)); P.ring = new Pool(flat(ringG)); P.band = new Pool(() => { const m = new THREE.Mesh(planeG, flatMat({ side: THREE.DoubleSide })); m.rotation.order = 'YXZ'; return m; });
     P.fxring = new Pool(flat(thinG, { blending: THREE.AdditiveBlending }));
     P.web = new Pool(flat(circG, { map: webTex }));
+    for (let i = 0; i < 3; i++) P['stain' + i] = new Pool(flat(planeG, { map: ctex(Tx.splat(i * 7 + 1)) })); // 战斗留在地上的墨渍
     P.beam = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
     P.sw0 = new Pool(() => Mo.sword(0)); P.sw1 = new Pool(() => Mo.sword(1)); P.sw2 = new Pool(() => Mo.sword(2)); P.mini = new Pool(() => Mo.sword('mini'));
     P.arr = new Pool(flat(circG, { map: arrayTex, blending: THREE.AdditiveBlending }));
@@ -364,8 +365,18 @@
       if (!['lantern', 'banner', 'pillar', 'statue', 'brazier', 'brazier2'].includes(pp.kind)) m.g.rotation.y = U.hash(pp.tx, pp.ty, 9) * TAU;
       propRoot.add(m.g); rs.mats.push(...m.mats); if (m.anim) rs.anims.push(m.anim);
     }
+    // 烛火：屋内四角、北门两侧各一簇；不打架的房间里，地台四周再围一圈
+    rs.flames = []; rs.candles = [];
+    const candle = (x, z, v) => {
+      if (at(Math.floor(x), Math.floor(z)) !== 0) return;
+      const cd = Mo.candles(v, ti); cd.g.position.set(x, 0, z); propRoot.add(cd.g); rs.mats.push(...cd.mats);
+      rs.candles.push([x, z]); for (const f of cd.flames) rs.flames.push([x + f[0], f[1], z + f[2]]);
+    };
+    candle(1.32, 1.36, 1); candle(w - 1.32, 1.36, 2); candle(1.32, h - 1.36, 3); candle(w - 1.32, h - 1.36, 4);
+    if (room.doors.n) { const dc = room.doors.n.cells[1][0] + 0.5; candle(dc - 2.35, 1.3, 5); candle(dc + 2.35, 1.3, 6); }
+    if (['treasure', 'event', 'shop', 'garden', 'start'].includes(room.type)) for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU + 0.52; candle(w / 2 + Math.cos(a) * 3.35, h / 2 + Math.sin(a) * 3.35, 7 + i); }
     const merged = mergeStatic(propRoot);
-    if (merged) { g.add(merged); rs.geos.push(merged.geometry); rs.mats.push(merged.material); }
+    if (merged) { g.add(merged); rs.geos.push(merged.geometry); rs.mats.push(merged.material); inkOutline(merged, 0.028, g, rs, th.ink); }
     // 灯光与光晕
     const glowSprite = (x, y, z, hex, s, op) => {
       const sm = new THREE.SpriteMaterial({ map: glowTex, color: hex, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -409,6 +420,7 @@
       else rk(fx, top + 1.3 + rv(2) * 0.9, fz, 0.42, 3.6, kk + 80, true); // 围城与古殿没有树：立一根石笋 / 冰笋
     });
     // 贴地的小物：墙根、石根处的草丛（枯草 / 碎砾 / 冰凌），补上最细的一层
+    const tuft = new THREE.Group(); g.add(tuft);
     { const bladeG = Mo.geo.cone(4), bm = [lm({ color: new THREE.Color(Mo.PAL[ti].cap) }), lm({ color: new THREE.Color(Mo.PAL[ti].cap2) })], fm = ti === 0 ? lm({ color: new THREE.Color('#f2d6e0') }) : null;
       for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
         if (at(x, y) !== 0 || U.hash(x, y, sd + 40) > 0.6) continue;
@@ -418,9 +430,9 @@
         for (let k = 0; k < 4; k++) {
           const hgt = (ti === 2 ? 0.07 : 0.14) + U.hash(x * 5 + k, y, sd + 42) * (ti === 2 ? 0.08 : 0.2), b = new THREE.Mesh(bladeG, bm[k % 2]);
           b.position.set(bx + (U.hash(x * 5 + k, y, sd + 43) - 0.5) * (dy ? 0.5 : 0.16), hgt / 2, bz + (U.hash(x * 5 + k, y, sd + 44) - 0.5) * (dx ? 0.5 : 0.16));
-          b.scale.set(ti === 2 ? 0.14 : 0.06, hgt, ti === 2 ? 0.12 : 0.06); b.rotation.set((U.hash(x * 5 + k, y, sd + 45) - 0.5) * 0.5, U.hash(x * 5 + k, y, sd + 46) * 3, (U.hash(x * 5 + k, y, sd + 47) - 0.5) * 0.5); scn.add(b);
+          b.scale.set(ti === 2 ? 0.14 : 0.06, hgt, ti === 2 ? 0.12 : 0.06); b.rotation.set((U.hash(x * 5 + k, y, sd + 45) - 0.5) * 0.5, U.hash(x * 5 + k, y, sd + 46) * 3, (U.hash(x * 5 + k, y, sd + 47) - 0.5) * 0.5); tuft.add(b);
         }
-        if (fm && U.hash(x, y, sd + 48) < 0.3) { const f = new THREE.Mesh(Mo.geo.sph(6), fm); f.position.set(bx + 0.08, 0.12, bz - 0.06); f.scale.setScalar(0.07); scn.add(f); }
+        if (fm && U.hash(x, y, sd + 48) < 0.3) { const f = new THREE.Mesh(Mo.geo.sph(6), fm); f.position.set(bx + 0.08, 0.12, bz - 0.06); f.scale.setScalar(0.07); tuft.add(f); }
       }
     }
     // 北面：高出墙头的一道山脊，脊上有树
@@ -461,10 +473,12 @@
       g.add(isl);
     });
     const mergedScn = mergeStatic(scn);
-    if (mergedScn) { g.add(mergedScn); rs.geos.push(mergedScn.geometry); rs.mats.push(mergedScn.material); }
+    if (mergedScn) { g.add(mergedScn); rs.geos.push(mergedScn.geometry); rs.mats.push(mergedScn.material); inkOutline(mergedScn, 0.042, g, rs, th.ink); }
+    const mergedTuft = mergeStatic(tuft); // 草丛太细，不描线
+    if (mergedTuft) { mergedTuft.castShadow = false; g.add(mergedTuft); rs.geos.push(mergedTuft.geometry); rs.mats.push(mergedTuft.material); }
     rs.mats.push(...kit.mats());
     const mergedArch = mergeStatic(archRoot);
-    if (mergedArch) { g.add(mergedArch); rs.geos.push(mergedArch.geometry); rs.mats.push(mergedArch.material); }
+    if (mergedArch) { g.add(mergedArch); rs.geos.push(mergedArch.geometry); rs.mats.push(mergedArch.material); inkOutline(mergedArch, 0.022, g, rs, th.ink); }
     // 岩浆的光
     if (ti === 3) for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) if (at(x, y) === 3 && U.hash(x, y, 9) < 0.3) glowSprite(x + 0.5, 0.25, y + 0.5, 0xff7a28, 2.4, 0.3);
     return rs;
@@ -499,6 +513,21 @@
     return mesh;
   }
 
+  /* 墨线：把合并后的网格沿平滑法线外扩一圈、只画背面，轮廓处就露出一道墨色的边，像勾过线的画。
+     削面网格每个面各有法线，直接外扩会裂开，所以先把位置相同的顶点的法线取平均 */
+  function inkOutline(mesh, w, parent, rs, ink) {
+    const P = mesh.geometry.attributes.position, N = mesh.geometry.attributes.normal, acc = new Map(), keys = new Array(P.count);
+    for (let i = 0; i < P.count; i++) {
+      const k = (Math.round(P.getX(i) * 160) * 73856093) ^ (Math.round(P.getY(i) * 160) * 19349663) ^ (Math.round(P.getZ(i) * 160) * 83492791); keys[i] = k;
+      let a = acc.get(k); if (!a) acc.set(k, (a = [0, 0, 0])); a[0] += N.getX(i); a[1] += N.getY(i); a[2] += N.getZ(i);
+    }
+    const out = new Float32Array(P.count * 3);
+    for (let i = 0; i < P.count; i++) { const a = acc.get(keys[i]), l = Math.hypot(a[0], a[1], a[2]) || 1; out[i * 3] = P.getX(i) + (a[0] / l) * w; out[i * 3 + 1] = P.getY(i) + (a[1] / l) * w; out[i * 3 + 2] = P.getZ(i) + (a[2] / l) * w; }
+    const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.BufferAttribute(out, 3));
+    const m2 = new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ color: ink, side: THREE.BackSide }));
+    parent.add(m2); rs.geos.push(g2); rs.mats.push(m2.material);
+  }
+
   function disposeRoom(rs) {
     for (const t of rs.tex) t.dispose();
     for (const m of rs.mats) m.dispose();
@@ -524,7 +553,7 @@
     const th = G.Themes[room.theme], w = room.w, h = room.h;
     scene.background = new THREE.Color(th.bg);
     scene.fog.color.set(th.fog[0]); scene.fog.near = th.fog[1]; scene.fog.far = th.fog[2];
-    hemi.color.set(th.hemi[0]); hemi.groundColor.set(th.hemi[1]); hemi.intensity = th.hemi[2];
+    hemi.color.set(th.hemi[0]); hemi.groundColor.set(th.hemi[1]); hemi.intensity = th.hemi[2] * 0.88;
     sun.color.set(th.sun[0]); sun.intensity = th.sun[1];
     sun.position.set(w / 2 - 7, 15, h / 2 + 5); sun.target.position.set(w / 2, 0, h / 2);
     const e = Math.max(w, h) / 2 + 3, sc = sun.shadow.camera;
@@ -585,6 +614,9 @@
     for (let i = 0; i < MAX_LIGHTS; i++) if (cur.lights[i]) roomLights[i].intensity = 1.05 + Math.sin(t * 9 + i * 2.1) * 0.07;
     // 云海
     for (const s of mists) { const u = s.userData; u.a += u.sp * 0.016; s.position.set(room.w / 2 + Math.cos(u.a) * (u.r + room.w * 0.35), u.y, room.h / 2 + Math.sin(u.a) * (u.r * 0.6 + room.h * 0.35)); }
+    { const lc = rgb(th.lamp); // 烛火：每支一个跳动的光点，每簇一团暖晕
+      for (let i = 0; i < cur.flames.length; i++) { const f = cur.flames[i], fl = Math.sin(t * 17 + i * 2.3) * 0.5 + Math.sin(t * 29 + i) * 0.5; glows.push(f[0], f[1] + fl * 0.008, f[2], FLAME, 0.75, 0.085 + fl * 0.015); }
+      for (let i = 0; i < cur.candles.length; i++) { const cd = cur.candles[i]; glows.push(cd[0], 0.3, cd[1], lc, 0.13 + Math.sin(t * 9 + i * 1.7) * 0.025, 1.9); } }
     seas[0].material.map.offset.set(t * 0.0016, t * 0.0007); seas[1].material.map.offset.set(-t * 0.004, t * 0.0022);
     cshadow.material.map.offset.set(t * 0.006, t * 0.0035);
     shafts.forEach((m, i) => { if (m.visible) m.material.opacity = m.userData.o * (0.75 + Math.sin(t * 0.6 + i * 1.9) * 0.25); });
@@ -614,6 +646,16 @@
     const m = P.band.get(), dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
     m.position.set(((x1 + x2) / 2) * S, yy, ((y1 + y2) / 2) * S); m.rotation.set(-PI / 2, -Math.atan2(dy, dx), 0); m.scale.set(len * S, w * S, 1);
     m.material.color.copy(c.col); m.material.opacity = op; m.material.blending = THREE.NormalBlending; m.renderOrder = order || 2; return m;
+  }
+
+  /* 战斗留痕：0 血（暗绛，比预警的朱砂暗得多、也不闪）/ 1 鬼物的墨 / 2 碎屑 */
+  const STAIN = [['60,10,16', 0.74], ['15,12,26', 0.82], ['36,30,24', 0.7]];
+  function syncStains(Gm, room) {
+    const L = room.stains; if (!L) return;
+    for (const st of L) {
+      const k = Math.min(1, (Gm.stats.time - st.t) / 0.22), S0 = STAIN[st.kind], m = P['stain' + st.v].get(), r = st.r * (0.5 + 0.5 * k) * 2.3;
+      m.position.set(st.x * S, 0.014, st.y * S); m.scale.set(r * S, r * S, 1); m.rotation.z = st.rot; m.material.color.copy(rgb(S0[0]).col); m.material.opacity = S0[1] * k; m.renderOrder = 1;
+    }
   }
 
   function syncHazards(Gm, t) {
@@ -788,7 +830,7 @@
     orbs.count = orbRims.count = no; shards.count = shardRims.count = ns; fySw.count = nf; bugs.count = nb;
     for (const m of [orbs, orbRims, shards, shardRims, fySw, bugs]) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
   }
-  const WHITE = new THREE.Color(0xffffff), GOLD = [1, 0.92, 0.5], WHITE3 = [1, 1, 1];
+  const WHITE = new THREE.Color(0xffffff), GOLD = [1, 0.92, 0.5], WHITE3 = [1, 1, 1], FLAME = [1, 0.62, 0.22];
 
   function syncFx(t) {
     for (const p of G.FX.parts) {
@@ -1087,7 +1129,12 @@
       }
       c.globalAlpha = 1;
     }
-    c.drawImage(vignette, 0, 0, W, H);
+    if (world && p && room.theme !== undefined) { // 黑暗里的一圈光：离主角越远越暗
+      const dk = G.Themes[room.theme].dark, s = proj(p.x, p.y, 24), g = c.createRadialGradient(s.x, s.y, H * 0.3, s.x, s.y, Math.max(W, H) * 0.8);
+      g.addColorStop(0, 'rgba(2,4,10,0)'); g.addColorStop(0.5, `rgba(2,4,10,${dk * 0.5})`); g.addColorStop(1, `rgba(2,4,10,${dk})`);
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+      c.globalAlpha = 0.55; c.drawImage(vignette, 0, 0, W, H); c.globalAlpha = 1;
+    } else c.drawImage(vignette, 0, 0, W, H);
     if (world && p) {
       const low = p.hp < p.maxHp * 0.3 && !p.dead ? 0.18 + Math.sin(t * 5) * 0.08 : 0, hf = Math.max(Gm.hurtFlash || 0, low);
       if (hf > 0) {
@@ -1124,6 +1171,7 @@
     beginPools();
     updateCamera(dt, p.x * S, p.y * S, room, Gm.shakeAmt > 0.2 ? Gm.shakeAmt : 0);
     animateRoom(room, t);
+    syncStains(Gm, room);
     syncHazards(Gm, t);
     syncActors(Gm, room, p, t);
     syncProjs(Gm, t);

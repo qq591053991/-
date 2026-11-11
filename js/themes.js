@@ -17,14 +17,15 @@
   function ell(c, x, y, rx, ry, rot = 0) { c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, TAU); c.fill(); }
   function circ(c, x, y, r) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
 
-  /* bg 背景 / fog [色, 近, 远] / hemi [天, 地, 强度] / sun [色, 强度] / lamp 灯色 */
+  /* bg 背景 / fog [色, 近, 远] / hemi [天, 地, 强度] / sun [色, 强度] / lamp 灯色
+     cloudShadow [云影浓度, 云团大小] / dark 主角光圈之外压多暗 / ink 墨线的颜色 / sea 云海 / shaft 光柱 */
   G.Themes = [
     { // 0 神手谷 —— 月夜山谷庭院
       void: '#070b18', mist: '120,150,210',
       floor: '#5b6a61', floor2: '#52625a', line: 'rgba(14,22,22,0.42)', moss: '#3f6c47', grass: '#6aa860',
       face: '#cfc8b4', faceDark: '#a59d8a', base: '#67635c', top: '#343a47', topHi: '#505a6b',
       water: '#25546a', waterHi: '#86c8d4',
-      bg: 0x0a1430, fog: [0x2c4476, 21.5, 54], cloudShadow: [0.24, 15], hemi: [0x9fc6f2, 0x24384a, 0.95], sun: [0xd4e0ff, 1.0],
+      bg: 0x0a1430, fog: [0x2c4476, 21.5, 54], cloudShadow: [0.24, 15], dark: 0.5, ink: 0x0a121c, hemi: [0x9fc6f2, 0x24384a, 0.95], sun: [0xd4e0ff, 1.0],
       sea: [0xa8c4f4, 0.85, 0x5674b8, 0.9], shaft: [0xcfe0ff, 0.2], // 云海 [近层色, 近层浓度, 远层色, 远层浓度]；光柱 [色, 强度]
       lamp: '255,214,150', lampHex: 0xffd696,
       props: ['rock', 'bamboo', 'lantern', 'pine', 'bamboo', 'rock'], mote: 'firefly',
@@ -34,7 +35,7 @@
       floor: '#62533f', floor2: '#6d5c46', line: 'rgba(20,8,8,0.0)', moss: '#55633a', grass: '#c24a52',
       face: '#7a5a4c', faceDark: '#503a32', base: '#30221e', top: '#574236', topHi: '#8a5246',
       water: '#47131f', waterHi: '#d86878',
-      bg: 0x1a080c, fog: [0x54222a, 21.5, 52], cloudShadow: [0.4, 6.5], hemi: [0xffb0a0, 0x3a201c, 0.9], sun: [0xffcabc, 0.95],
+      bg: 0x1a080c, fog: [0x54222a, 21.5, 52], cloudShadow: [0.4, 6.5], dark: 0.6, ink: 0x1a0a0c, hemi: [0xffb0a0, 0x3a201c, 0.9], sun: [0xffcabc, 0.95],
       sea: [0xc85c68, 0.78, 0x74242e, 0.88], shaft: [0xffa696, 0.17],
       lamp: '255,150,130', lampHex: 0xff8a8a,
       props: ['deadtree', 'mushroom', 'rock', 'bones', 'deadtree', 'mushroom'], mote: 'spore',
@@ -44,7 +45,7 @@
       floor: '#55525f', floor2: '#4a4755', line: 'rgba(8,6,12,0.5)', moss: '#22202a', grass: '#5c1c26',
       face: '#575463', faceDark: '#3c3a47', base: '#292732', top: '#302e3a', topHi: '#4c4959',
       water: '#0a0812', waterHi: '#5a3a8a',
-      bg: 0x0e0a20, fog: [0x2c2458, 21.5, 52], cloudShadow: [0.26, 12], hemi: [0xb8a6ff, 0x241c36, 0.9], sun: [0xd4c8ff, 0.95],
+      bg: 0x0e0a20, fog: [0x2c2458, 21.5, 52], cloudShadow: [0.26, 12], dark: 0.62, ink: 0x0a0812, hemi: [0xb8a6ff, 0x241c36, 0.9], sun: [0xd4c8ff, 0.95],
       sea: [0x8e7cdc, 0.74, 0x40348a, 0.86], shaft: null,
       lamp: '130,255,170', lampHex: 0x82ffaa,
       props: ['brazier', 'barricade', 'banner', 'rubble', 'barricade', 'rubble'], mote: 'ash',
@@ -54,7 +55,7 @@
       floor: '#62788a', floor2: '#586e80', line: 'rgba(214,180,90,0.6)', moss: '#d8f0ff', grass: '#e8f8ff',
       face: '#2b4162', faceDark: '#1c2c47', base: '#131f38', top: '#8ea4b4', topHi: '#b6cad6',
       water: '#b83a0c', waterHi: '#ffd27a',
-      bg: 0x0a1630, fog: [0x2c4e88, 21.5, 58], cloudShadow: [0.16, 16], hemi: [0xc8dcff, 0x2c3c5e, 0.66], sun: [0xf0f6ff, 0.62], glowK: 0.85,
+      bg: 0x0a1630, fog: [0x2c4e88, 21.5, 58], cloudShadow: [0.16, 16], dark: 0.46, ink: 0x14244a, hemi: [0xc8dcff, 0x2c3c5e, 0.66], sun: [0xf0f6ff, 0.62], glowK: 0.85,
       sea: [0xc8e4ff, 0.85, 0x5e90d0, 0.9], shaft: [0xdff0ff, 0.19],
       lamp: '150,220,255', lampHex: 0x96dcff,
       props: ['icecrystal', 'pillar', 'brazier2', 'statue', 'icecrystal', 'pillar'], mote: 'snow',
@@ -291,6 +292,22 @@
         c.fillStyle = g; c.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
       }
     }
+    return cv;
+  };
+  /* 墨渍：一摊不规则的墨（白 + 透明度，由材质上色），四周甩出几点 */
+  Tx.splat = function (seed) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128; const c = cv.getContext('2d'), hh = (i) => U.hash(seed, i, 53);
+    c.fillStyle = '#fff';
+    c.beginPath(); // 主体：绕一圈、半径忽大忽小
+    for (let i = 0; i <= 26; i++) { const a = (i / 26) * TAU, r = 26 + hh(i % 26) * 16 + (hh((i % 26) + 40) < 0.2 ? 14 : 0), x = 64 + Math.cos(a) * r, y = 64 + Math.sin(a) * r; if (i) c.lineTo(x, y); else c.moveTo(x, y); }
+    c.closePath(); c.fill();
+    for (let i = 0; i < 14; i++) { // 甩出去的墨点，越远越小；近处的连一道细丝
+      const a = hh(60 + i) * TAU, d = 34 + hh(80 + i) * 26, r = 2 + hh(100 + i) * 5 * (1 - (d - 34) / 40);
+      circ(c, 64 + Math.cos(a) * d, 64 + Math.sin(a) * d, r);
+      if (hh(120 + i) < 0.4) { c.strokeStyle = '#fff'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(64 + Math.cos(a) * 28, 64 + Math.sin(a) * 28); c.lineTo(64 + Math.cos(a) * d, 64 + Math.sin(a) * d); c.stroke(); }
+    }
+    c.globalCompositeOperation = 'destination-out'; // 墨色不匀：中间略淡
+    const g = c.createRadialGradient(64, 64, 0, 64, 64, 30); g.addColorStop(0, 'rgba(0,0,0,0.28)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, 128, 128);
     return cv;
   };
   /* 光柱：中间亮、两边淡，自上而下渐隐 */
