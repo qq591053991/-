@@ -240,7 +240,7 @@
     pause() {
       const Gm = G.Game, p = Gm.player;
       const skills = p.skills.map((s, i) => { const d = G.Skills[s.id]; return `<div class="row"><span class="glyph" style="color:${d.color};border-color:${d.color}">${d.glyph}</span><div class="info"><b>${d.name} · 第${ROMAN[s.lv]}重 <small>[${'QER'[i]}]</small></b><em>${esc(d.desc(s.lv))}</em></div></div>`; }).join('');
-      const M = G.Mains[p.main], mlv = Gm.mainLv(), hasBao = p.fy || p.wd;
+      const M = G.Mains[Gm.mainId()], mlv = Gm.mainLv(), hasBao = p.fy || p.wd;
       const baoDesc = p.wd ? '本命法宝。飞剑命中积攒毒煞，满后放出「万毒瘴」：毒瘴随身七秒，瘴中敌人每半秒叠三层毒。'
         : p.fy ? '本命法宝。飞剑命中有几率引动辟邪神雷；命中积攒剑意，满后施展' + (p.dageng ? '「大庚剑阵」：七十二口飞剑环立成阵，困敌绞杀，收阵时降下辟邪神雷。' : '「蜂云剑阵」，七十二口飞剑齐出。')
         : '结丹之后，依主修功法炼成的本命法宝。';
@@ -322,8 +322,8 @@
         if (this.cache[lk] !== low) { this.cache[lk] = low; el.classList.toggle('nomp', low); }
       });
       // 功法与本命法宝
-      const M = G.Mains[p.main], mlv = G.Game.mainLv(), has = p.fy || p.wd;
-      const gf = (M ? `${M.name} · 第${G.CN_NUM[mlv]}层` : '长春功') + (has ? '|' + M.bao + (p.dageng ? ' · 大庚剑阵' : '') : '');
+      const M = G.Mains[G.Game.mainId()], mlv = G.Game.mainLv(), has = p.fy || p.wd;
+      const gf = (M ? `${M.name} · 第${G.CN_NUM[mlv]}层` : '长春功') + (has ? '|' + (M ? M.bao : p.wd ? '万毒幡' : '青竹蜂云剑') + (p.dageng ? ' · 大庚剑阵' : '') : '');
       if (this.cache.gf !== gf) { this.cache.gf = gf; const a = gf.split('|'); $('gongfa').innerHTML = '功法 · ' + a[0] + (a[1] ? '<br><b>本命 · ' + a[1] + '</b>' : ''); }
       const ue = $('ult'), uk = has ? Math.floor(p.sp) + (p.dageng ? 1000 : 0) + (p.wd ? 2000 : 0) : -1;
       if (this.cache.ult !== uk) {

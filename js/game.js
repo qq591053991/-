@@ -268,7 +268,7 @@
         return { name: u.name, glyph: u.glyph, tag: '感悟 · ' + rar.name, desc: u.desc(v), cls: rar.cls, pick: () => { u.apply(p, v); p.cdr = Math.min(0.6, p.cdr); p.armor = Math.min(0.6, p.armor); } };
       });
       // 主修功法尚未大成：有机会参悟下一层
-      const M = G.Mains[p.main], mlv = this.mainLv();
+      const M = G.Mains[this.mainId()], mlv = this.mainLv();
       if (M && mlv >= 1 && mlv < M.lv.length && U.chance(0.6)) {
         const L = M.lv[mlv];
         cards[U.randi(0, 2)] = { name: M.name, glyph: M.glyph, sch: M.sch, tag: `功法 · 第${G.CN_NUM[mlv + 1]}层【${L.name}】`, desc: L.desc, cls: 'r3', pick: () => this.gainMain() };
@@ -317,18 +317,19 @@
               room.interact.push({ kind: 'portal', x: (room.w / 2) * T, y: (room.h / 2) * T, r: 50, label: '踏入传送阵 · 前往下一章' });
               this.toast('传送阵已开启'); Au.sfx('portal');
             }, true);
-            if (p.realm >= 1 && !p.main) this.chooseMain(loot); else loot(); // 筑基之后先择主修功法，再取遗物
+            if (p.realm >= 1 && !this.mainId()) this.chooseMain(loot); else loot(); // 筑基之后先择主修功法，再取遗物
           });
         });
       });
     },
 
     /* 主修功法：筑基时择一门（青元剑诀 / 墨氏毒经），之后一层层参悟 */
-    mainLv() { const p = this.player; return p.main === 'du' ? p.du : p.main === 'qy' ? p.qy : 0; },
+    mainId() { const p = this.player; return p.main || (p.du ? 'du' : p.qy || p.fy ? 'qy' : null); }, // 没记下选了哪门时，从层数反推
+    mainLv() { const p = this.player, id = this.mainId(); return id === 'du' ? p.du : id === 'qy' ? p.qy : 0; },
     gainMain(quiet) {
-      const p = this.player, M = G.Mains[p.main]; if (!M) return;
+      const p = this.player, id = this.mainId(), M = G.Mains[id]; if (!M) return;
       const L = M.lv[this.mainLv()]; if (!L) return;
-      L.apply(p); if (p.main === 'du') p.du++; else p.qy++;
+      L.apply(p); if (id === 'du') p.du++; else p.qy++;
       if (!quiet) this.toast(`${M.name} · 第${G.CN_NUM[this.mainLv()]}层【${L.name}】`);
       Au.sfx('break');
     },
@@ -345,7 +346,7 @@
       if (i === 1) { p.realm = 1; p.realmLv = 1; p.maxHp += 40; p.maxMp += 30; p.dmgMul += 0.2; } // 筑基：主修功法随后由玩家自己选（chooseMain）
       if (i === 2) { // 结丹：炼成本命法宝——剑修是青竹蜂云剑，毒修是万毒幡
         p.realm = 2; p.realmLv = 1; p.maxHp += 50; p.maxMp += 40; p.dmgMul += 0.22; p.cdr = Math.min(0.6, p.cdr + 0.08);
-        if (!p.main) { p.main = 'qy'; this.gainMain(true); }
+        if (!p.main) { p.main = this.mainId() || 'qy'; if (!this.mainLv()) this.gainMain(true); }
         if (p.main === 'du') { if (!p.wd) { p.wd = 1; p.sp = 100; G.UI.skillDirty = true; } }
         else if (!p.fy) { p.fy = 1; p.sp = 100; p.flags.thunder = (p.flags.thunder || 0) + 1; G.UI.skillDirty = true; }
       }

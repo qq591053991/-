@@ -213,6 +213,11 @@
       const hc = room.hc || (room.hc = new Float32Array((w + 1) * (h + 1)));
       for (let y = y0; y <= y1 + 1; y++) for (let x = x0; x <= x1 + 1; x++) hc[y * (w + 1) + x] = H;
       for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) { if (x < x0 || x > x1 || y < y0 || y > y1) tiles[y * w + x] = 5; res(x, y); }
+      if (room.terrain !== 'court' && x1 - x0 >= 2 && y1 - y0 >= 2) { // 山野里的土台削去四角，不那么方正
+        for (const [ax, ay, vx, vy, ox, oy] of [[x0, y0, x0, y0, x0 - 1, y0 - 1], [x1, y0, x1 + 1, y0, x1 + 1, y0 - 1], [x0, y1, x0, y1 + 1, x0 - 1, y1 + 1], [x1, y1, x1 + 1, y1 + 1, x1 + 1, y1 + 1]]) {
+          tiles[ay * w + ax] = 5; hc[vy * (w + 1) + vx] = 0; tiles[oy * w + ox] = 0; // 角上的台面格变成坡；最外角那一格落回平地
+        }
+      }
       room.ramps = room.ramps || []; room.terr = room.terr || [];
       for (const [rx, ry] of ramps) {
         tiles[ry * w + rx] = 0;
