@@ -80,7 +80,8 @@
   function go(e, tx, ty, spd, dt, room) {
     let dx = tx - e.x, dy = ty - e.y; const d = Math.hypot(dx, dy) || 1;
     dx /= d; dy /= d;
-    if (e.mode === 1 && !W.los(room, e.x, e.y, tx, ty, 1)) { const f = W.flowDir(room, e.x, e.y); if (f) { dx = f.x; dy = f.y; } }
+    // 直线走不通就沿寻路场绕。会飞的（mode 2）能越过树石与水面，但越不过成片的林子与岩壁，被挡住时同样要绕
+    if (!W.los(room, e.x, e.y, tx, ty, e.mode === 2 ? 2 : 1)) { const f = W.flowDir(room, e.x, e.y); if (f) { dx = f.x; dy = f.y; } }
     W.move(room, e, dx * spd * dt, dy * spd * dt, e.mode);
     e.moving = true;
   }
