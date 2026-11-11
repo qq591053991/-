@@ -81,6 +81,19 @@
       for (let i = 0; i < 5; i++) { const gx = px + hh(40 + i) * T, gy = py + hh(50 + i) * TH; c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx + (hh(60 + i) - 0.5) * 4, gy - 4 - hh(70 + i) * 4); c.stroke(); }
       c.globalAlpha = 1;
       if (hh(80) < 0.16) { c.fillStyle = hh(81) < 0.5 ? '#f2e6c8' : '#e8b8cc'; for (let i = 0; i < 3; i++) circ(c, px + 8 + hh(82 + i) * 32, py + 8 + hh(86 + i) * 32, 1.5); }
+    } else if (ti === 2 && wild) { // 城外：焦土。深浅不一的黑土、灰烬、裂纹、零星余烬与碎砖
+      c.fillStyle = hh(1) < 0.5 ? '#3b3742' : '#36323d'; c.fillRect(px, py, T + 0.5, TH + 0.5);
+      for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#48444f' : '#27242c'; c.globalAlpha = 0.5; ell(c, px + hh(i * 3 + 2) * T, py + hh(i * 3 + 3) * TH, 8 + hh(i * 3 + 4) * 15, 5 + hh(i + 30) * 9); }
+      c.globalAlpha = 1;
+      if (hh(40) < 0.2) { c.strokeStyle = 'rgba(10,8,12,0.6)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(px + hh(41) * T, py + hh(42) * TH); c.lineTo(px + hh(43) * T, py + hh(44) * TH); c.lineTo(px + hh(45) * T, py + hh(46) * TH); c.stroke(); }
+      if (hh(50) < 0.14) { c.fillStyle = '#6a6474'; c.fillRect(px + hh(51) * 34, py + hh(52) * 36, 9, 5); c.fillStyle = 'rgba(255,255,255,0.08)'; c.fillRect(px + hh(51) * 34, py + hh(52) * 36, 9, 1.5); }
+      if (hh(60) < 0.1) { c.fillStyle = 'rgba(130,255,170,0.5)'; circ(c, px + hh(61) * T, py + hh(62) * TH, 1.6); }
+    } else if (ti === 3 && wild) { // 殿外：雪地。夜色下的雪是蓝灰的，雪堆略亮、洼处偏蓝，偶有一片冰
+      c.fillStyle = hh(1) < 0.5 ? '#8fa5bd' : '#96abc2'; c.fillRect(px, py, T + 0.5, TH + 0.5);
+      for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#b4c6da' : '#7790ad'; c.globalAlpha = 0.4; ell(c, px + hh(i * 3 + 2) * T, py + hh(i * 3 + 3) * TH, 10 + hh(i * 3 + 4) * 16, 6 + hh(i + 30) * 9); }
+      c.globalAlpha = 1;
+      if (hh(40) < 0.1) { c.fillStyle = 'rgba(200,232,255,0.45)'; ell(c, px + 24, py + 24, 16 + hh(41) * 8, 10 + hh(42) * 5); c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(px + 14, py + 20); c.lineTo(px + 30, py + 27); c.stroke(); }
+      if (hh(50) < 0.18) for (let i = 0; i < 3; i++) { c.fillStyle = 'rgba(70,92,124,0.4)'; ell(c, px + 10 + i * 11 + hh(51 + i) * 4, py + 14 + hh(55) * 20 + (i % 2) * 5, 3.2, 2.2); } // 一串脚印
     } else if (ti === 0) { // 庭院：手铺的不规则石板 —— 每个格点各自错开一点，石板之间是生苔的缝
       const J = (ix, iy, k) => (U.hash(ix, iy, 40 + k) - 0.5) * 13;
       const p = [[px + J(x, y, 0), py + J(x, y, 1)], [px + T + J(x + 1, y, 0), py + J(x + 1, y, 1)], [px + T + J(x + 1, y + 1, 0), py + TH + J(x + 1, y + 1, 1)], [px + J(x, y + 1, 0), py + TH + J(x, y + 1, 1)]];
@@ -222,7 +235,7 @@
     }
     if (open) {
       // 土路：从每个出口踩向空地中央的一条小径 —— 地图之间靠路连着，而不是靠门
-      const trail = ti === 0 ? '112,104,84' : ti === 1 ? '64,46,38' : '70,70,80', mx = (w / 2) * T, my = (h / 2) * T;
+      const trail = ti === 0 ? '112,104,84' : ti === 1 ? '64,46,38' : ti === 2 ? '96,90,104' : '104,122,146', mx = (w / 2) * T, my = (h / 2) * T; // 草地上的黄土路 / 林间的黑土路 / 焦土上的灰路 / 雪地里踩实的路
       c.lineCap = 'round';
       const stroke = (ax, ay, bx, by, ex, ey) => { for (const [lw, a] of [[T * 2.3, 0.2], [T * 1.6, 0.3], [T * 0.9, 0.3]]) { c.strokeStyle = `rgba(${trail},${a})`; c.lineWidth = lw; c.beginPath(); c.moveTo(ax, ay); c.quadraticCurveTo(bx, by, ex, ey); c.stroke(); } };
       if (room.paths) { // 大图：小径就是连接各片空地的那几条路

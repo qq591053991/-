@@ -286,6 +286,8 @@
     };
     const runs = (len, isWall, cb) => { let s = -1; for (let i = 0; i <= len; i++) { const on = i < len && isWall(i); if (on && s < 0) s = i; if (!on && s >= 0) { cb(s, i - s); s = -1; } } };
     const open = room.terrain && room.terrain !== 'court', cave = room.terrain === 'cave';
+    // 各章户外的树：七玄门是松与桃花，血色禁地是血枫，燕翎堡城外是烧焦的枯树，虚天殿外是压着雪的松
+    const woods = (ti < 2 || open) && !cave, treeKind = (r) => (ti === 1 || ti === 2 ? 'round' : ti === 0 && r < 0.2 ? 'bloom' : 'pine'), padKind = ti === 1 || ti === 2 ? 'round' : 'pine';
     if (open) {
       // 山野 / 洞窟：墙格上不立墙。山野是树与山石围出的空地（南面的树矮而暗，是前景）；洞窟四壁都是岩石，越往外越高
       const bark = lm({ color: new THREE.Color(Mo.PAL[ti].trunk) }), leaf = new THREE.MeshLambertMaterial({ vertexColors: true }), barkD = bark.clone(), leafD = new THREE.MeshLambertMaterial({ vertexColors: true, color: new THREE.Color(0.6, 0.62, 0.68) });
@@ -299,7 +301,7 @@
         if (at(x, y) !== 1 || taken.has(y * w + x)) continue;
         if (!cave && far[y * w + x] > 3) { // 林子深处：隔一格放一团压暗的树冠
           if ((x + y) % 2) continue;
-          const cm = new THREE.Mesh(Mo.padGeo(x + y, ti, ti === 1 ? 'round' : 'pine'), leafD), cs = 1.25 + U.hash(x, y, sd + 64) * 0.6;
+          const cm = new THREE.Mesh(Mo.padGeo(x + y, ti, padKind), leafD), cs = 1.25 + U.hash(x, y, sd + 64) * 0.6;
           cm.position.set(x + 0.5, 1.0 + U.hash(x, y, sd + 65) * 0.7, y + 0.5); cm.scale.set(cs, cs * 0.8, cs); cm.rotation.y = x * 1.3 + y; scn.add(cm); continue;
         }
         let edgeT = false;
@@ -318,7 +320,8 @@
         if (r1 > (edgeT ? 0.95 : 0.64)) continue; // 林间留一点缝
         const fg = (south && w <= 28) || below > 0;
         const big = w > 28; // 大图里"南北"是相对空地而言的：只有紧挨空地南沿的才算前景
-        const tr = Mo.tree(x * 31 + y * 17 + sd, ti, ti === 1 ? 'round' : r2 < 0.12 ? 'bloom' : 'pine', (below ? 0.6 : fg && !big ? 0.8 : north || big ? 1.2 : 1.05) + r2 * (below ? 0.2 : 0.35), { lite: !edgeT || fg, bark: fg ? barkD : bark, leaf: fg ? leafD : leaf });
+        if (ti === 2 && r1 > 0.5) continue; // 焦林稀疏
+        const tr = Mo.tree(x * 31 + y * 17 + sd, ti, treeKind(r2 * 1.6), (below ? 0.6 : fg && !big ? 0.8 : north || big ? 1.2 : 1.05) + r2 * (below ? 0.2 : 0.35), { lite: !edgeT || fg, bark: fg ? barkD : bark, leaf: fg ? leafD : leaf });
         tr.g.position.set(px, -0.04, pz); tr.g.rotation.y = r2 * TAU; scn.add(tr.g);
       }
       // 路口的火盆
@@ -379,11 +382,13 @@
       const out = G.World.DIRS[d], dkey = 900 + cells[1][0] * 7 + cells[1][1] * 3;
       if (room.doors[d].cave) { // 洞口：两侧立石、上压洞楣，里面一片漆黑
         const la = ns ? [1, 0] : [0, 1], hm = new THREE.MeshBasicMaterial({ color: 0x030203, side: THREE.DoubleSide }); rs.mats.push(hm);
-        if (d === 'n') { // 北面：一座完整的洞门，立在岩壁上
-          for (const sgn of [-1, 1]) rk(cx + sgn * 2.1, 2.3 + U.hash(dkey, sgn + 2, sd) * 0.6, cz, 0.98, 2.7, dkey + sgn);
-          rk(cx, 3.2, cz, 2.4, 0.42, dkey + 5);
-          const hole = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 2.5), hm); rs.geos.push(hole.geometry); hole.position.set(cx, 1.15, cz - 0.3); g.add(hole);
-        } else { // 其余三面：镜头会被高石挡住，所以做成一个向下的洞 —— 地上一口黑洞，洞沿围一圈矮石
+        if (d !== 's') { // 北、东、西三面：一座完整的洞门，立在岩壁上（东西两侧的略矮，洞楣往外挪，少挡一点场内）
+          const side = d !== 'n', hh2 = side ? 0.8 : 1;
+          for (const sgn of [-1, 1]) rk(cx + la[0] * sgn * 2.1, (2.3 + U.hash(dkey, sgn + 2, sd) * 0.6) * hh2, cz + la[1] * sgn * 2.1, 0.98, 2.7 * hh2, dkey + sgn);
+          rk(cx + out[0] * (side ? 0.9 : 0), 3.2 * hh2, cz + out[1] * (side ? 0.9 : 0), side ? 2.0 : 2.4, 0.42, dkey + 5);
+          const hole = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 2.5 * hh2), hm); rs.geos.push(hole.geometry);
+          hole.position.set(cx + out[0] * 0.3, 1.15 * hh2, cz + out[1] * 0.3); hole.rotation.y = d === 'n' ? 0 : d === 'w' ? PI / 2 : -PI / 2; g.add(hole);
+        } else { // 南面：镜头从南边看过来，立起来的洞门会挡住场内，所以做成一个向下的洞 —— 地上一口黑洞，洞沿围一圈矮石
           const hole = new THREE.Mesh(new THREE.CircleGeometry(1.5, 20), hm); rs.geos.push(hole.geometry);
           hole.rotation.x = -PI / 2; hole.scale.set(ns ? 1 : 0.72, ns ? 0.72 : 1, 1); hole.position.set(cx + out[0] * 0.25, 0.02, cz + out[1] * 0.25); hole.renderOrder = 1; g.add(hole);
           for (let i = 0; i < 7; i++) { const a = (i / 7) * TAU + 0.3, ex = Math.cos(a) * (ns ? 1.75 : 1.3), ez = Math.sin(a) * (ns ? 1.3 : 1.75); if (ex * -out[0] + ez * -out[1] > 0.7) continue; rk(cx + out[0] * 0.25 + ex, 0.3 + U.hash(dkey, i, sd) * 0.35, cz + out[1] * 0.25 + ez, 0.5, 1.4, dkey + i); } // 朝场内的一侧留出口子
@@ -398,7 +403,7 @@
           fl.position.set(fx + 0.32, 3.15, fz); g.add(fl); rs.geos.push(fl.geometry); rs.mats.push(fm); (rs.flags || (rs.flags = [])).push({ m: fl, d, x: fx, z: fz, ph: fx * 1.7 + fz });
         }
         rk(bx + out[0] * (L + 1.6), 0.04, bz + out[1] * (L + 1.6), 2.3, 2.0, dkey); rk(bx + out[0] * (L + 2.6) + out[1] * 1.8, 0.7, bz + out[1] * (L + 2.6) + out[0] * 1.8, 1.5, 2.2, dkey + 9);
-        if (ti < 2) { const tr = Mo.tree(dkey + sd, ti, ti === 1 ? 'round' : 'pine', 1.3); tr.g.position.set(bx + out[0] * (L + 2.2) - out[1] * 1.2, -0.06, bz + out[1] * (L + 2.2) - out[0] * 1.2); scn.add(tr.g); rs.mats.push(...tr.mats); }
+        if (woods) { const tr = Mo.tree(dkey + sd, ti, treeKind(1), 1.3); tr.g.position.set(bx + out[0] * (L + 2.2) - out[1] * 1.2, -0.06, bz + out[1] * (L + 2.2) - out[0] * 1.2); scn.add(tr.g); rs.mats.push(...tr.mats); }
       } else if (d === 'n') {
         const ag = Mo.archGate(ti); ag.g.position.set(cx, 0, 0.9); g.add(ag.g); rs.mats.push(...ag.mats); rs.tex.push(...ag.tex); // 青铜环门
       } else {
@@ -477,13 +482,13 @@
       const tx2 = side === 0 ? -1.5 + u * (w + 3) : side === 1 ? -2.3 - rv(2) * 1.9 : w + 2.3 + rv(2) * 1.9;
       const tz2 = side === 0 ? h + 2.1 + rv(2) * 2.2 : 0.5 + u * (h + 1.5), top = -1.2 - rv(3) * 2.4;
       rk(tx2, top, tz2, 1.5 + rv(4) * 1.1, 1.9 + rv(5) * 0.7, kk, side === 0);
-      if (ti < 2 && rv(6) < 0.45) plant(tx2, top, tz2, ti === 1 ? 'round' : rv(7) < 0.35 ? 'bloom' : 'pine', 1.15, kk, side === 0 ? 0.6 : 0);
+      if (woods && rv(6) < 0.45) plant(tx2, top, tz2, treeKind(rv(7) * 0.6), 1.15, kk, side === 0 ? 0.6 : 0);
     }
     // 前景：南面两角各立一座高石，石上的树探进画面；镜头一动，它和场内就错开了
     [[-1.4, h + 0.75], [w + 1.4, h + 0.75]].forEach(([fx, fz], i) => {
       kk++; const top = 0.45 + rv(1) * 0.5;
       rk(fx, top, fz, 1.25, 2.4, kk, true); rk(fx + (i ? 1 : -1), top - 0.8, fz + 0.5, 0.9, 2.2, kk + 50, true);
-      if (ti < 2) plant(fx, top, fz, ti === 1 ? 'round' : i ? 'bloom' : 'pine', 1.75, kk, 0.55);
+      if (woods) plant(fx, top, fz, treeKind(i ? 0 : 1), 1.75, kk, 0.55);
       else rk(fx, top + 1.3 + rv(2) * 0.9, fz, 0.42, 3.6, kk + 80, true); // 围城与古殿没有树：立一根石笋 / 冰笋
     });
     // 贴地的小物：墙根、石根处的草丛（枯草 / 碎砾 / 冰凌），补上最细的一层
@@ -507,7 +512,7 @@
       kk++; if (nearDoor('n', x, 0)) continue;
       const top = 1.15 + rv(2) * 1.25, rx = x + rv(1) * 0.6, rz = -0.8 - rv(3) * 0.9;
       rk(rx, top, rz, 1.3 + rv(4) * 0.9, 1.8 + rv(5) * 0.8, kk);
-      if (ti < 2 && !cave && rv(6) < 0.42) { const tr = Mo.tree(kk + sd, ti, ti === 1 ? 'round' : rv(7) < 0.3 ? 'bloom' : 'pine', 1.3); tr.g.position.set(rx, top - 0.12, rz); tr.g.rotation.y = rv(8) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); }
+      if (woods && rv(6) < 0.42) { const tr = Mo.tree(kk + sd, ti, treeKind(rv(7) * 0.66), 1.3); tr.g.position.set(rx, top - 0.12, rz); tr.g.rotation.y = rv(8) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); }
     }
     // 立轴：庭院与古殿的北墙上各挂两幅山水
     if ((ti === 0 || ti === 3) && !open) {
@@ -595,6 +600,50 @@
     parent.add(m2); rs.geos.push(g2); rs.mats.push(m2.material);
   }
 
+  /* 人物的墨线：角色、妖兽、灵宠也描一道边，和场景统一。
+     做法同样是"外扩一圈、只画背面"，但外扩放在屏幕空间里做（投影之后沿法线方向挪几个像素），
+     这样不管模型多大、带不带骨骼，线都一样粗 */
+  let actorInk = null;
+  function inkMaterial() {
+    if (actorInk) return actorInk;
+    actorInk = new THREE.MeshBasicMaterial({ color: 0x0a121c, side: THREE.BackSide });
+    actorInk.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+        #ifdef USE_SKINNING
+          vec3 inkN = normalize( transformedNormal );
+        #else
+          vec3 inkN = normalize( normalMatrix * normal );
+        #endif
+        vec2 inkO = ( projectionMatrix * vec4( inkN, 0.0 ) ).xy;
+        inkO = normalize( inkO + vec2( 1e-6 ) );
+        inkO.x *= projectionMatrix[0][0] / projectionMatrix[1][1];
+        gl_Position.xy += inkO * 0.0062 * gl_Position.w;`);
+    };
+    actorInk.customProgramCacheKey = () => 'actor-ink';
+    return actorInk;
+  }
+  function inkActor(m) {
+    const list = [], mat = inkMaterial();
+    m.g.traverse((o) => {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes.normal || o.userData.ink) return;
+      const mt = Array.isArray(o.material) ? o.material[0] : o.material;
+      if (!mt || mt.transparent || mt.blending === THREE.AdditiveBlending || mt.isMeshBasicMaterial || mt.side === THREE.DoubleSide) return; // 发光的、半透明的部件不描
+      list.push(o);
+    });
+    m.inks = [];
+    for (const o of list) {
+      const k = o.isSkinnedMesh ? new THREE.SkinnedMesh(o.geometry, mat) : new THREE.Mesh(o.geometry, mat);
+      if (o.isSkinnedMesh) { k.bind(o.skeleton, o.bindMatrix); k.frustumCulled = false; }
+      k.userData.ink = true; o.add(k); m.inks.push(k);
+    }
+    if (m.setAlpha) { // 半透明时（出场渐显）先不显示墨线
+      const sa = m.setAlpha;
+      m.setAlpha = function (a) { sa.call(this, a); const v = a > 0.7; if (this._inkV !== v) { this._inkV = v; for (const k of this.inks) k.visible = v; } };
+    }
+    return m;
+  }
+  const NO_INK = { ghost: 1, flame: 1, skull: 1, crystal: 1 }; // 鬼物、火灵、晶石本身就是一团光，不描线
+
   function disposeRoom(rs) {
     for (const t of rs.tex) t.dispose();
     for (const m of rs.mats) m.dispose();
@@ -633,6 +682,7 @@
     const mc = rgb(th.mist).col;
     for (const s of mists) s.material.color.copy(mc);
     for (const s of wisps) s.material.color.copy(mc);
+    inkMaterial().color.setHex(th.ink);
     const inCave = room.terrain === 'cave';
     for (const m of seas) m.visible = !inCave; for (const s of mists) s.visible = !inCave; cshadow.visible = !inCave;
     if (inCave) { scene.background = new THREE.Color(0x050304); scene.fog.color.set(0x140a0b); hemi.intensity *= 0.72; }
@@ -747,8 +797,8 @@
     if (room.zones && room.locked) for (const z of room.zones) {
       if (z.done) continue;
       // 一股黑烟夹着红色的火星往上冒：黑烟在哪一章的底色上都看得见
-      flatAt(P.circ, z.x * T, z.y * T, 90, rgb('10,4,8'), 0.3 + Math.sin(t * 2.2) * 0.06, 0.02, 2);
-      for (let i = 0; i < 12; i++) { const k = (t * 0.28 + i / 12) % 1, a = i * 2.4 + t * 0.5, r = 1.2 * (1 - k * 0.5); dusts.push(z.x + Math.cos(a) * r, 0.15 + k * 4.2, z.y + Math.sin(a) * r, MIASMA, 0.55 * (1 - k * 0.8), 0.5 + k * 0.6); }
+      flatAt(P.circ, z.x * T, z.y * T, 54, rgb('10,4,8'), 0.2 + Math.sin(t * 2.2) * 0.05, 0.02, 2);
+      for (let i = 0; i < 18; i++) { const k = (t * 0.26 + i / 18) % 1, a = i * 2.4 + t * 0.6, r = 0.5 * (1 - k * 0.3) + Math.sin(k * 9 + i) * 0.12; dusts.push(z.x + Math.cos(a) * r, 0.12 + k * 4.4, z.y + Math.sin(a) * r, MIASMA, 0.62 * (1 - k * 0.85), 0.17 + k * 0.3); } // 一缕细烟，不是一团团黑斑
       for (let i = 0; i < 5; i++) { const k = (t * 0.5 + i / 5) % 1, a = i * 1.9 + t; glows.push(z.x + Math.cos(a) * 0.7, 0.2 + k * 3.4, z.y + Math.sin(a) * 0.7, EMBER, 0.85 * (1 - k), 0.13); }
       glows.push(z.x, 0.3, z.y, EMBER, 0.14 + Math.sin(t * 3) * 0.04, 2.6);
     }
@@ -983,7 +1033,7 @@
         if (e.stT > 0.25) continue;
       }
       let m = actors.get(e);
-      if (!m) { m = Mo.forEnemy(e); if (!m.world && !m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); actors.set(e, m); }
+      if (!m) { m = Mo.forEnemy(e); if (!m.world && !m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); actors.set(e, m); if (!NO_INK[e.def.draw]) inkActor(m); }
       m.seen = frame;
       if (!m.world) { m.g.position.set(e.x * S, e.z * S, e.y * S); m.g.rotation.y = PI / 2 - e.face; }
       m.update(e);
@@ -1013,7 +1063,7 @@
 
     // 主角
     if (p) {
-      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = Mo.hero(p.look); if (!heroM.gl) heroM.g.scale.multiplyScalar(ACTOR); heroS0 = heroM.g.scale.x; dyn.add(heroM.g); heroOwner = p; }
+      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = Mo.hero(p.look); if (!heroM.gl) heroM.g.scale.multiplyScalar(ACTOR); heroS0 = heroM.g.scale.x; inkActor(heroM); dyn.add(heroM.g); heroOwner = p; }
       heroM.g.scale.setScalar(heroS0 * (p.apeT > 0 ? 1.3 * Math.min(1, 0.8 + (p.apeT > 0.3 ? 0.2 : 0)) : 1)); // 惊蛰十二变：身形暴涨
       heroM.g.visible = !p.dead && !(p.inv > 0 && p.dashing <= 0 && Math.floor(t * 20) % 2 === 0);
       place(heroM.g, p.x, p.y, 0); heroM.g.rotation.y = PI / 2 - p.face;
@@ -1055,7 +1105,7 @@
     // 灵宠灵虫
     for (const pt of Gm.pets) {
       let m = petM.get(pt);
-      if (!m) { m = Mo.pet(pt.id); if (!m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); }
+      if (!m) { m = Mo.pet(pt.id); if (!m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); inkActor(m); }
       m.seen = frame; m.g.visible = !(pt.hide > 0);
       const fly = pt.z ? pt.z + Math.sin(t * 3 + pt.slot) * 4 : 0;
       place(m.g, pt.x, pt.y, fly); m.g.rotation.y = PI / 2 - pt.face;
@@ -1078,7 +1128,7 @@
     // 傀儡
     for (const a of Gm.allies) {
       let m = allyM.get(a);
-      if (!m) { m = Mo.puppet({ body: '#d9b06a', dark: '#7a5a2a', eye: '#7dffea' }, { scale: 0.92 * ACTOR }); dyn.add(m.g); allyM.set(a, m); }
+      if (!m) { m = Mo.puppet({ body: '#d9b06a', dark: '#7a5a2a', eye: '#7dffea' }, { scale: 0.92 * ACTOR }); dyn.add(m.g); allyM.set(a, m); inkActor(m); }
       m.seen = frame; place(m.g, a.x, a.y, 0); m.g.rotation.y = PI / 2 - a.face; m.update({ t: a.t, moving: false, atk: Math.max(0, a.atk || 0) });
     }
     for (const [a, m] of allyM) if (m.seen !== frame) { dyn.remove(m.g); m.dispose(); allyM.delete(a); }
@@ -1304,7 +1354,7 @@
       G.World.buildRoom(menuRoom, true);
     }
     setRoom(menuRoom);
-    if (!menuHero && G.Assets.settled) { menuHero = Mo.hero({ robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' }); scene.add(menuHero.g); }
+    if (!menuHero && G.Assets.settled) { menuHero = Mo.hero({ robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' }); inkActor(menuHero); scene.add(menuHero.g); }
     if (heroM) heroM.g.visible = false;
     const cx = menuRoom.w / 2, cz = menuRoom.h / 2 + 0.6;
     if (menuHero) { menuHero.g.visible = true; menuHero.g.position.set(cx, 0, cz); menuHero.g.rotation.y = 0.5; menuHero.update({ t, moving: false }); }

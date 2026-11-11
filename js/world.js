@@ -87,9 +87,11 @@
        court 院落 —— 有墙有门，七玄门的屋舍、燕翎堡、虚天殿；
        wild  山野 —— 林木与山石围出的一片不规则空地，出口是土路接栈桥；
        cave  洞窟 —— 四壁都是岩石，没有天。
-       血色禁地整章是山野，墨蛟的巢穴是洞窟；七玄门是院落与山谷相间 */
+       血色禁地整章是山野，墨蛟的巢穴是洞窟；七玄门是院落与山谷相间；燕翎堡、虚天殿是殿宇城池与户外相间 */
     const ch = room.chapter || 0, fight = room.type === 'combat' || room.type === 'elite';
-    room.terrain = ch === 1 ? (room.type === 'boss' ? 'cave' : 'wild') : ch === 0 && (room.type === 'garden' || (fight && U.chance(0.6))) ? 'wild' : 'court';
+    room.terrain = ch === 1 ? (room.type === 'boss' ? 'cave' : 'wild')
+      : ch === 0 ? (room.type === 'garden' || (fight && U.chance(0.6)) ? 'wild' : 'court')
+      : fight && U.chance(0.5) ? 'wild' : 'court'; // 燕翎堡：一半的险地在城外的焦土战场；虚天殿：一半在殿外的雪原松林
     const big = room.terrain === 'wild' && fight; // 山野里的险地是大图：几片空地由小径连着，要走上两三屏
     let [w, h] = U.pick(big ? SIZES.big : SIZES[room.type]);
     if (room.terrain !== 'court' && room.type !== 'boss' && !big) { w += 4; h += 2; } // 边界会吃掉一圈，山野的小图也放大一点
