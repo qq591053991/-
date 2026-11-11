@@ -260,6 +260,8 @@
           }
         }
       },
+      /* 幡杆：一根高杆，顶上一截横木（幡布由渲染层挂上去，因为它要变色、要飘） */
+      pole(x, z, hgt) { put(box, M('dark'), x, hgt / 2, z, 0.11, hgt, 0.11); put(box, M('wood'), x + 0.3, hgt - 0.08, z, 0.75, 0.07, 0.07); put(pyr, M('gold'), x, hgt + 0.1, z, 0.2, 0.22, 0.2); },
       /* 火盆：三足架上的一只铁盆。返回火苗的位置 */
       firebowl(x, z) {
         for (let i = 0; i < 3; i++) { const a = (i / 3) * TAU + 0.5, l = put(box, M('dark'), x + Math.cos(a) * 0.12, 0.26, z + Math.sin(a) * 0.12, 0.05, 0.56, 0.05); l.rotation.set(Math.sin(a) * 0.32, 0, -Math.cos(a) * 0.32); }

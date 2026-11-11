@@ -391,6 +391,12 @@
       } else if (open) { // 栈桥：从出口伸向对面的山头
         const L = 5.4, bx = cx + out[0] * 0.5, bz = cz + out[1] * 0.5;
         kit.bridge(bx, bz, out[0], out[1], L);
+        for (const sgn of [-1, 1]) { // 地标：桥头两根高出树冠的幡杆，隔着林子也望得见；幡的颜色随"未解 / 可走 / 去过"而变
+          const fx = bx + out[1] * sgn * 1.75 + out[0] * 0.3, fz = bz + out[0] * sgn * 1.75 + out[1] * 0.3;
+          kit.pole(fx, fz, 4.1);
+          const fm = new THREE.MeshBasicMaterial({ color: 0x3a2a2a, side: THREE.DoubleSide }), fl = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 1.7), fm);
+          fl.position.set(fx + 0.32, 3.15, fz); g.add(fl); rs.geos.push(fl.geometry); rs.mats.push(fm); (rs.flags || (rs.flags = [])).push({ m: fl, d, x: fx, z: fz, ph: fx * 1.7 + fz });
+        }
         rk(bx + out[0] * (L + 1.6), 0.04, bz + out[1] * (L + 1.6), 2.3, 2.0, dkey); rk(bx + out[0] * (L + 2.6) + out[1] * 1.8, 0.7, bz + out[1] * (L + 2.6) + out[0] * 1.8, 1.5, 2.2, dkey + 9);
         if (ti < 2) { const tr = Mo.tree(dkey + sd, ti, ti === 1 ? 'round' : 'pine', 1.3); tr.g.position.set(bx + out[0] * (L + 2.2) - out[1] * 1.2, -0.06, bz + out[1] * (L + 2.2) - out[0] * 1.2); scn.add(tr.g); rs.mats.push(...tr.mats); }
       } else if (d === 'n') {
@@ -669,6 +675,16 @@
   function animateRoom(room, t) {
     for (const a of cur.anims) a(t);
     const th = G.Themes[room.theme];
+    for (const f of cur.flags || []) { // 幡：未解时暗沉，可走而没去过的是亮金色，去过的是褪色的青灰
+      const fresh = !room.doors[f.d].to.visited;
+      f.m.material.color.setHex(room.locked ? 0x3a2828 : fresh ? 0xf6dc9a : 0x62746e);
+      f.m.rotation.y = Math.sin(t * 2.1 + f.ph) * 0.35; f.m.position.x = f.x + 0.3 + Math.sin(t * 2.1 + f.ph) * 0.05;
+      if (!room.locked && fresh) glows.push(f.x + 0.3, 3.2, f.z, WAYGOLD, 0.28 + Math.sin(t * 3 + f.ph) * 0.06, 2.2);
+    }
+    for (const d in cur.doors) { // 没去过的出口上方有一道淡淡的光柱
+      if (room.locked || room.doors[d].to.visited) continue;
+      const c0 = room.doors[d].cells[1], bm = P.beam.get(); bm.position.set(c0[0] + 0.5, 3.4, c0[1] + 0.5); bm.rotation.set(0, t * 0.6, 0); bm.scale.set(0.7, 6.8, 0.7); bm.material.color.setRGB(WAYGOLD[0], WAYGOLD[1], WAYGOLD[2]); bm.material.opacity = 0.075 + Math.sin(t * 2.4) * 0.02;
+    }
     for (const d in cur.doors) {
       const o = cur.doors[d], locked = !!room.locked;
       o.barrier.visible = o.glyph.visible = locked; o.strip.visible = !locked;
@@ -695,17 +711,19 @@
     shafts.forEach((m, i) => { if (m.visible) m.material.opacity = m.userData.o * (0.75 + Math.sin(t * 0.6 + i * 1.9) * 0.25); });
     wisps.forEach((s, i) => { const u = s.userData, k = (t * u.v + u.ph) % 1; s.position.set(-2 + k * (room.w + 4), 0.45 + (i % 2) * 0.35, i < 3 ? 1.6 + i * 0.5 : room.h - 2 - (i - 3) * 0.6); s.material.opacity = 0.085 * Math.sin(k * PI); });
     // 氛围微粒
-    const kind = th.mote, w = room.w, h = room.h;
+    const kind = th.mote, w = room.w, h = room.h, wind = G.Game.guide && G.Game.guide.wx !== undefined ? G.Game.guide : null; // 风向：朝要去的方向
     for (const m of motes) {
       let c, a = 0.6, size = 0.12;
       if (kind === 'firefly' && m.ph < 2.3) { // 落英：花瓣是凡尘之物，不发光
         m.y -= 0.0015 * m.v; m.x += Math.sin(t * 0.7 + m.ph * 3) * 0.0007; if (m.y < 0) { m.y = 1; m.x = Math.random(); m.z = Math.random(); }
+        if (wind) { m.x += (wind.wx * 0.06) / (w + 4); m.z += (wind.wy * 0.06) / (h + 4); if (m.x < 0) m.x += 1; else if (m.x > 1) m.x -= 1; if (m.z < 0) m.z += 1; else if (m.z > 1) m.z -= 1; }
         dusts.push(m.x * (w + 4) - 2, 0.15 + m.y * 3.2, m.z * (h + 4) - 2, rgb('240,200,214'), 0.85, 0.075); continue;
       }
       if (kind === 'firefly') { m.x += Math.sin(t * 0.5 * m.v + m.ph) * 0.0006; m.z += Math.cos(t * 0.4 * m.v + m.ph * 2) * 0.0006; a = 0.4 + Math.sin(t * 2 * m.v + m.ph) * 0.4; c = rgb('200,255,140'); size = 0.16; }
       else if (kind === 'spore') { m.y += 0.0018 * m.v; if (m.y > 1) { m.y = 0; m.x = Math.random(); m.z = Math.random(); } c = rgb('255,90,100'); a = 0.5; }
       else if (kind === 'ash') { m.y -= 0.0022 * m.v; if (m.y < 0) { m.y = 1; m.x = Math.random(); m.z = Math.random(); } c = m.ph > 5 ? rgb('130,255,170') : rgb('150,145,160'); a = 0.45; }
       else { m.y -= 0.004 * m.v; m.x -= 0.0008 * m.v; if (m.y < 0 || m.x < 0) { m.y = 1; m.x = Math.random(); m.z = Math.random(); } c = rgb('230,245,255'); a = 0.7; size = 0.1; }
+      if (wind) { m.x += (wind.wx * 0.045) / (w + 4); m.z += (wind.wy * 0.045) / (h + 4); if (m.x < 0) m.x += 1; else if (m.x > 1) m.x -= 1; if (m.z < 0) m.z += 1; else if (m.z > 1) m.z -= 1; }
       if (a > 0.02) glows.push(m.x * (w + 4) - 2, 0.2 + m.y * 3.4, m.z * (h + 4) - 2, c, a, size);
     }
   }
@@ -721,10 +739,10 @@
     m.material.color.copy(c.col); m.material.opacity = op; m.material.blending = THREE.NormalBlending; m.renderOrder = order || 2; return m;
   }
 
-  /* 场景里的引导（没有小地图）：
-     · 灵蝶 —— 停在前面几格处带路，跟上去它就再往前飞；
-     · 煞气 —— 还有埋伏的空地上，一股暗红的气往上冒，隔着林子也看得见 */
-  const MIASMA = [0.035, 0.015, 0.03], EMBER = [0.95, 0.2, 0.16], BUTTERFLY = [1, 0.9, 0.62];
+  /* 隐式的引导（没有小地图、箭头或带路的角色）：
+     · 流光 —— 一缕光点顺着小径往目标飘，金色是去路，红色是敌人；
+     · 煞气 —— 还有埋伏的空地上，一股黑烟夹着红色火星往上冒，隔着林子也看得见 */
+  const MIASMA = [0.035, 0.015, 0.03], EMBER = [0.95, 0.2, 0.16], WAYGOLD = [1, 0.88, 0.56], WAYRED = [1, 0.34, 0.2];
   function syncGuide(Gm, room, t) {
     if (room.zones && room.locked) for (const z of room.zones) {
       if (z.done) continue;
@@ -734,16 +752,13 @@
       for (let i = 0; i < 5; i++) { const k = (t * 0.5 + i / 5) % 1, a = i * 1.9 + t; glows.push(z.x + Math.cos(a) * 0.7, 0.2 + k * 3.4, z.y + Math.sin(a) * 0.7, EMBER, 0.85 * (1 - k), 0.13); }
       glows.push(z.x, 0.3, z.y, EMBER, 0.14 + Math.sin(t * 3) * 0.04, 2.6);
     }
-    const g = Gm.guide; if (!g || !g.on || Gm.state !== 'play') { if (g) g._tr = null; return; }
-    if (g.px === undefined) { g.px = g.x; g.py = g.y; }
-    if (Math.hypot(g.x - g.px, g.y - g.py) > 0.4) g.a = Math.atan2(g.y - g.py, g.x - g.px);
-    g.px = g.x; g.py = g.y;
-    const x = g.x * S, z = g.y * S, y = 0.78 + Math.sin(t * 3.1) * 0.12, a = g.a || 0, flap = 0.07 + Math.abs(Math.sin(t * 15)) * 0.15, sx = -Math.sin(a), sz = Math.cos(a), c = rgb('255,232,160');
-    glows.push(x, y, z, BUTTERFLY, 0.95, 0.2);
-    glows.push(x + sx * flap, y + 0.03, z + sz * flap, BUTTERFLY, 0.8, 0.26); glows.push(x - sx * flap, y + 0.03, z - sz * flap, BUTTERFLY, 0.8, 0.26);
-    glows.push(x, y, z, c, 0.22, 1.5); glows.push(x, 0.05, z, c, 0.1, 1.2);
-    trail(g, x, y, z, c, 0.045, 0.75);
-    if (((t * 12) | 0) % 3 === 0) glows.push(x + U.rand(-0.2, 0.2), y - Math.random() * 0.4, z + U.rand(-0.2, 0.2), BUTTERFLY, 0.6, 0.08); // 洒下的光屑
+    const g = Gm.guide; if (!g || !g.on || !g.motes || Gm.state !== 'play') return;
+    const col = g.foe ? WAYRED : WAYGOLD;
+    for (const m of g.motes) {
+      if (!(m.life > 0)) continue;
+      const k = m.life / m.max, a = Math.min(1, k * 4) * Math.min(1, (1 - k) * 5), y = 0.3 + Math.sin(m.life * 4 + m.ph) * 0.1 + (1 - k) * 0.3;
+      glows.push(m.x * S, y, m.y * S, col, 0.85 * a, 0.12); glows.push(m.x * S, y, m.y * S, col, 0.2 * a, 0.5);
+    }
   }
 
   /* 战斗留痕：0 血（暗绛，比预警的朱砂暗得多、也不闪）/ 1 鬼物的墨 / 2 碎屑 */

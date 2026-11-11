@@ -377,9 +377,9 @@
       if (this.chapter + 1 < G.Chapters.length) this.enterChapter(this.chapter + 1);
     },
 
-    /* 引路：没有小地图，靠场景里的一只灵蝶带路。
-       它总是停在"从你这里往目标走五格"的地方 —— 你跟上去，它就再往前飞。
-       目标依次是：躲在看不见处的残敌、还没惊动的埋伏（大图）、没开的宝匣 / 传送阵、通往没去过的地方的出口。到了跟前就不再带路 */
+    /* 隐式的引导：没有小地图，没有箭头，也没有带路的角色。这里只算出"该往哪去"，
+       画面上用环境来暗示 —— 一缕光点顺着小径往那边飘（金色是去路，红色是敌人），落花、萤火、飞雪也朝那边吹。
+       目标依次是：躲在看不见处的残敌、还没惊动的埋伏（大图）、没开的宝匣 / 传送阵、通往没去过的地方的出口。到了跟前就停 */
     updateGuide(raw) {
       const room = this.room, p = this.player, g = this.guide || (this.guide = { x: p.x, y: p.y, on: false });
       let tx = null, ty = null, key = null, bd = 1e9;
@@ -395,7 +395,8 @@
         for (const it of room.interact) if (!it.used && (it.kind === 'chest' || it.kind === 'portal' || it.kind === 'event')) pick(it.x, it.y + 30, 'i' + it.kind);
         if (key === null) for (const d in room.doors) if (!room.doors[d].to.visited) { const c = room.doors[d].cells[1]; pick((c[0] + 0.5) * T, (c[1] + 0.5) * T, 'd' + d); }
       }
-      if (key === null || bd < (key[0] === 'z' ? 1.6 : key === 'e' ? 0.8 : 3) * T) { g.on = false; g.key = null; return; } // 埋伏要带进空地里面才会惊动；出口和宝匣带到跟前就够了
+      if (key === null || bd < (key[0] === 'z' ? 1.6 : key === 'e' ? 0.8 : 3) * T) { g.on = false; g.key = null; g.wx = (g.wx || 0) * 0.96; g.wy = (g.wy || 0) * 0.96; return; }
+      g.foe = key === 'e' || key[0] === 'z'; // 那边是敌人：流光是红的 // 埋伏要带进空地里面才会惊动；出口和宝匣带到跟前就够了
       g.dT = (g.dT || 0) - raw;
       if (g.key !== key || g.room !== room || (key === 'e' && g.dT <= 0)) { g.key = key; g.room = room; g.D = W.distField(room, tx, ty); g.dT = 0.8; } // 敌人会动，追它时每隔一会儿重算一次路
       const D = g.D, w = room.w, h = room.h;
@@ -408,6 +409,21 @@
       const gx = (cx + 0.5) * T, gy = (cy + 0.5) * T;
       if (!g.on) { g.on = true; g.x = p.x; g.y = p.y; g._tr = null; g.px = undefined; } // 刚现身：拖尾从头算起
       const k = Math.min(1, raw * 3.4); g.x += (gx - g.x) * k; g.y += (gy - g.y) * k;
+      // 风向：从主角指向前方五格处，慢慢转过去
+      const wl = Math.hypot(gx - p.x, gy - p.y) || 1, wk = Math.min(1, raw * 1.5);
+      g.wx = (g.wx || 0) + ((gx - p.x) / wl - (g.wx || 0)) * wk; g.wy = (g.wy || 0) + ((gy - p.y) / wl - (g.wy || 0)) * wk;
+      // 流光：十几个光点从主角身边出发，各自顺着步数场往目标飘一段，淡去后回到主角身边重来
+      const M = g.motes || (g.motes = Array.from({ length: 16 }, () => ({ life: 0 })));
+      for (const m of M) {
+        m.life -= raw;
+        const tx2 = Math.floor(m.x / T), ty2 = Math.floor(m.y / T), here = m.life > 0 && tx2 >= 0 && ty2 >= 0 && tx2 < w && ty2 < h ? D[ty2 * w + tx2] : -1;
+        if (here < 0) { const a = U.rand(Math.PI * 2), r = U.rand(14, 70); m.x = p.x + Math.cos(a) * r; m.y = p.y + Math.sin(a) * r; m.life = m.max = U.rand(1.5, 2.6); m.ph = U.rand(6.3); m.sp = U.rand(150, 230); continue; }
+        let best = here, bx2 = tx2, by2 = ty2;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) { const nx = tx2 + dx, ny = ty2 + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const d = D[ny * w + nx]; if (d >= 0 && d < best && (!dx || !dy || (D[ty2 * w + nx] >= 0 && D[ny * w + tx2] >= 0))) { best = d; bx2 = nx; by2 = ny; } }
+        const ax = (bx2 + 0.5) * T - m.x, ay = (by2 + 0.5) * T - m.y, al = Math.hypot(ax, ay) || 1, wob = Math.sin(m.life * 6 + m.ph) * 0.5;
+        m.x += ((ax / al) - (ay / al) * wob) * m.sp * raw; m.y += ((ay / al) + (ax / al) * wob) * m.sp * raw;
+        if (here === 0) m.life = Math.min(m.life, 0.2);
+      }
     },
 
     /* 换图的过渡：沿着出口的方向走出去（上桥 / 进洞 / 出门），画面渐暗；到了下一张图，从对面的入口走进来。
