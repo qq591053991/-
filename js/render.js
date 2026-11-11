@@ -322,7 +322,7 @@
         tr.g.position.set(px, -0.04, pz); tr.g.rotation.y = r2 * TAU; scn.add(tr.g);
       }
       // 路口的火盆
-      for (const dd of room.deco) if (dd.kind === 'firebowl') (rs.bowls || (rs.bowls = [])).push(kit.firebowl(dd.x, dd.y));
+      for (const dd of room.deco) if (dd.kind === 'firebowl') { const f = kit.firebowl(dd.x, dd.y); f.push(dd.d); (rs.bowls || (rs.bowls = [])).push(f); } // 记下这只火盆守着哪个出口
     } else {
     // 北墙。七玄门：粉墙 + 黛瓦坡顶 + 檐柱；血色禁地：一道山岩；燕翎堡：城墙 + 垛口 + 扶壁；虚天殿：玉墙 + 金脊 + 玉柱
     runs(w, (x) => at(x, 0) === 1, (x0, len) => {
@@ -432,7 +432,10 @@
     candle(1.32, 1.36, 1); candle(w - 1.32, 1.36, 2); candle(1.32, h - 1.36, 3); candle(w - 1.32, h - 1.36, 4);
     if (room.doors.n) { const dc = room.doors.n.cells[1][0] + 0.5; candle(dc - 2.35, 1.3, 5); candle(dc + 2.35, 1.3, 6); }
     if (['treasure', 'event', 'shop', 'garden', 'start'].includes(room.type)) for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU + 0.52; candle(w / 2 + Math.cos(a) * 3.35, h / 2 + Math.sin(a) * 3.35, 7 + i); }
-    for (const f of rs.bowls || []) { rs.flames.push(f); rs.candles.push([f[0], f[2]]); }
+    for (const f of rs.bowls || []) { rs.flames.push(f); rs.candles.push([f[0], f[2], f[4]]); }
+    for (const dd of room.deco) if (dd.kind === 'lamp') { // 小径旁的石灯
+      const m = Mo.stoneLantern(Math.floor(dd.x * 3 + dd.y), ti); m.g.scale.setScalar(0.74); m.g.position.set(dd.x, 0, dd.y); propRoot.add(m.g); rs.mats.push(...m.mats); rs.candles.push([dd.x, dd.y]);
+    }
     const merged = mergeStatic(propRoot);
     if (merged) { g.add(merged); rs.geos.push(merged.geometry); rs.mats.push(merged.material); inkOutline(merged, 0.028, g, rs, th.ink); }
     // 灯光与光晕
@@ -676,8 +679,17 @@
     // 云海
     for (const s of mists) { const u = s.userData; u.a += u.sp * 0.016; s.position.set(room.w / 2 + Math.cos(u.a) * (u.r + room.w * 0.35), u.y, room.h / 2 + Math.sin(u.a) * (u.r * 0.6 + room.h * 0.35)); }
     { const lc = rgb(th.lamp); // 烛火：每支一个跳动的光点，每簇一团暖晕
-      for (let i = 0; i < cur.flames.length; i++) { const f = cur.flames[i], fl = Math.sin(t * 17 + i * 2.3) * 0.5 + Math.sin(t * 29 + i) * 0.5; glows.push(f[0], f[1] + fl * 0.008, f[2], FLAME, 0.8, (f[3] || 0.085) * (1 + fl * 0.16)); if (f[3]) glows.push(f[0], f[1] + 0.16 + fl * 0.03, f[2], FLAME, 0.5, f[3] * 0.6); }
-      for (let i = 0; i < cur.candles.length; i++) { const cd = cur.candles[i]; glows.push(cd[0], 0.3, cd[1], lc, 0.13 + Math.sin(t * 9 + i * 1.7) * 0.025, 1.9); } }
+      for (let i = 0; i < cur.flames.length; i++) {
+        const f = cur.flames[i], fl = Math.sin(t * 17 + i * 2.3) * 0.5 + Math.sin(t * 29 + i) * 0.5;
+        if (f[4]) { // 出口的火盆：禁制未解时是熄的，只剩一点余烬；解开后点燃，通往没去过的地方的烧得更旺、火星升得更高
+          if (room.locked) { glows.push(f[0], f[1], f[2], FLAME, 0.3, 0.07); continue; }
+          const fresh = !room.doors[f[4]].to.visited, sz = f[3] * (fresh ? 1.3 : 0.8);
+          glows.push(f[0], f[1] + fl * 0.01, f[2], FLAME, 0.85, sz * (1 + fl * 0.16)); glows.push(f[0], f[1] + 0.18 + fl * 0.03, f[2], FLAME, 0.5, sz * 0.6);
+          for (let j = 0, n = fresh ? 6 : 2; j < n; j++) { const k = (t * 0.45 + j / n + i * 0.17) % 1; glows.push(f[0] + Math.sin(t * 2 + j * 2.1) * 0.12, f[1] + 0.2 + k * (fresh ? 3.2 : 1.4), f[2] + Math.cos(t * 1.7 + j) * 0.1, FLAME, 0.7 * (1 - k), 0.13); }
+          continue;
+        }
+        glows.push(f[0], f[1] + fl * 0.008, f[2], FLAME, 0.8, (f[3] || 0.085) * (1 + fl * 0.16)); if (f[3]) glows.push(f[0], f[1] + 0.16 + fl * 0.03, f[2], FLAME, 0.5, f[3] * 0.6); }
+      for (let i = 0; i < cur.candles.length; i++) { const cd = cur.candles[i]; if (cd[2] && room.locked) continue; glows.push(cd[0], 0.3, cd[1], lc, 0.13 + Math.sin(t * 9 + i * 1.7) * 0.025, 1.9); } }
     seas[0].material.map.offset.set(t * 0.0016, t * 0.0007); seas[1].material.map.offset.set(-t * 0.004, t * 0.0022);
     cshadow.material.map.offset.set(t * 0.006, t * 0.0035);
     shafts.forEach((m, i) => { if (m.visible) m.material.opacity = m.userData.o * (0.75 + Math.sin(t * 0.6 + i * 1.9) * 0.25); });
@@ -707,6 +719,31 @@
     const m = P.band.get(), dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
     m.position.set(((x1 + x2) / 2) * S, yy, ((y1 + y2) / 2) * S); m.rotation.set(-PI / 2, -Math.atan2(dy, dx), 0); m.scale.set(len * S, w * S, 1);
     m.material.color.copy(c.col); m.material.opacity = op; m.material.blending = THREE.NormalBlending; m.renderOrder = order || 2; return m;
+  }
+
+  /* 场景里的引导（没有小地图）：
+     · 灵蝶 —— 停在前面几格处带路，跟上去它就再往前飞；
+     · 煞气 —— 还有埋伏的空地上，一股暗红的气往上冒，隔着林子也看得见 */
+  const MIASMA = [0.035, 0.015, 0.03], EMBER = [0.95, 0.2, 0.16], BUTTERFLY = [1, 0.9, 0.62];
+  function syncGuide(Gm, room, t) {
+    if (room.zones && room.locked) for (const z of room.zones) {
+      if (z.done) continue;
+      // 一股黑烟夹着红色的火星往上冒：黑烟在哪一章的底色上都看得见
+      flatAt(P.circ, z.x * T, z.y * T, 90, rgb('10,4,8'), 0.3 + Math.sin(t * 2.2) * 0.06, 0.02, 2);
+      for (let i = 0; i < 12; i++) { const k = (t * 0.28 + i / 12) % 1, a = i * 2.4 + t * 0.5, r = 1.2 * (1 - k * 0.5); dusts.push(z.x + Math.cos(a) * r, 0.15 + k * 4.2, z.y + Math.sin(a) * r, MIASMA, 0.55 * (1 - k * 0.8), 0.5 + k * 0.6); }
+      for (let i = 0; i < 5; i++) { const k = (t * 0.5 + i / 5) % 1, a = i * 1.9 + t; glows.push(z.x + Math.cos(a) * 0.7, 0.2 + k * 3.4, z.y + Math.sin(a) * 0.7, EMBER, 0.85 * (1 - k), 0.13); }
+      glows.push(z.x, 0.3, z.y, EMBER, 0.14 + Math.sin(t * 3) * 0.04, 2.6);
+    }
+    const g = Gm.guide; if (!g || !g.on || Gm.state !== 'play') { if (g) g._tr = null; return; }
+    if (g.px === undefined) { g.px = g.x; g.py = g.y; }
+    if (Math.hypot(g.x - g.px, g.y - g.py) > 0.4) g.a = Math.atan2(g.y - g.py, g.x - g.px);
+    g.px = g.x; g.py = g.y;
+    const x = g.x * S, z = g.y * S, y = 0.78 + Math.sin(t * 3.1) * 0.12, a = g.a || 0, flap = 0.07 + Math.abs(Math.sin(t * 15)) * 0.15, sx = -Math.sin(a), sz = Math.cos(a), c = rgb('255,232,160');
+    glows.push(x, y, z, BUTTERFLY, 0.95, 0.2);
+    glows.push(x + sx * flap, y + 0.03, z + sz * flap, BUTTERFLY, 0.8, 0.26); glows.push(x - sx * flap, y + 0.03, z - sz * flap, BUTTERFLY, 0.8, 0.26);
+    glows.push(x, y, z, c, 0.22, 1.5); glows.push(x, 0.05, z, c, 0.1, 1.2);
+    trail(g, x, y, z, c, 0.045, 0.75);
+    if (((t * 12) | 0) % 3 === 0) glows.push(x + U.rand(-0.2, 0.2), y - Math.random() * 0.4, z + U.rand(-0.2, 0.2), BUTTERFLY, 0.6, 0.08); // 洒下的光屑
   }
 
   /* 战斗留痕：0 血（暗绛，比预警的朱砂暗得多、也不闪）/ 1 鬼物的墨 / 2 碎屑 */
@@ -1190,21 +1227,6 @@
       }
       c.globalAlpha = 1;
     }
-    if (world && p && room.zones && room.locked && room.waves && room.waveI < room.waves.length && !room.enemies.some((e) => !e.dead)) {
-      // 大图：下一波埋伏在哪片空地。在画面里就画一圈墨晕，在画面外就在边上指个方向
-      let z = null, bd = 1e9; for (const q of room.zones) { if (q.done) continue; const d = U.dist(p.x, p.y, q.x * T, q.y * T); if (d < bd) { bd = d; z = q; } }
-      if (z) {
-        const s = proj(z.x * T, z.y * T, 0), ps = proj(p.x, p.y, 0), m = 70, inside = s.x > m && s.x < W - m && s.y > m && s.y < H - m, pulse = 0.55 + Math.sin(t * 4) * 0.25;
-        c.save(); c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `20px ${FONT}`;
-        if (inside) { c.strokeStyle = `rgba(190,60,60,${pulse * 0.7})`; c.lineWidth = 2; c.beginPath(); c.ellipse(s.x, s.y, 46 + Math.sin(t * 4) * 5, 26 + Math.sin(t * 4) * 3, 0, 0, TAU); c.stroke(); c.fillStyle = `rgba(230,170,160,${pulse})`; c.fillText('妖气', s.x, s.y); }
-        else {
-          const a = Math.atan2(s.y - ps.y, s.x - ps.x), ex = U.clamp(s.x, m, W - m), ey = U.clamp(s.y, m + 30, H - m - 40);
-          c.translate(ex, ey); c.fillStyle = `rgba(230,170,160,${pulse})`; c.fillText('妖气', 0, -22);
-          c.rotate(a); c.fillStyle = `rgba(200,70,70,${pulse})`; c.beginPath(); c.moveTo(16, 0); c.lineTo(-8, -10); c.lineTo(-3, 0); c.lineTo(-8, 10); c.closePath(); c.fill();
-        }
-        c.restore();
-      }
-    }
     if (world && p && room.theme !== undefined) { // 黑暗里的一圈光：离主角越远越暗
       const dk = Math.min(0.86, G.Themes[room.theme].dark * (room.terrain === 'cave' ? 1.35 : 1)), s = proj(p.x, p.y, 24), g = c.createRadialGradient(s.x, s.y, H * 0.3, s.x, s.y, Math.max(W, H) * 0.8);
       g.addColorStop(0, 'rgba(2,4,10,0)'); g.addColorStop(0.5, `rgba(2,4,10,${dk * 0.5})`); g.addColorStop(1, `rgba(2,4,10,${dk})`);
@@ -1250,6 +1272,7 @@
     syncStains(Gm, room);
     syncHazards(Gm, t);
     syncActors(Gm, room, p, t);
+    syncGuide(Gm, room, t);
     syncProjs(Gm, t);
     syncFx(t);
     endPools();

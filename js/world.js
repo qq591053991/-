@@ -179,7 +179,7 @@
         const [mx, my] = cells[1];
         for (const s of [-1, 1]) {
           const fx = mx + 0.5 + dx * 1.6 + (dx ? 0 : s * 2.15), fy = my + 0.5 + dy * 1.6 + (dy ? 0 : s * 2.15);
-          room.deco.push({ kind: 'firebowl', x: fx, y: fy });
+          room.deco.push({ kind: 'firebowl', x: fx, y: fy, d });
           room.lights.push({ x: fx * T, y: fy * T, z: 30, r: 300, c: 0xffb060 });
         }
       }
@@ -265,6 +265,17 @@
       if (room.type !== 'shop') { prop(2, h - 3, k2); prop(w - 3, h - 3, k2); }
     }
 
+    // 小径旁的石灯：每条路的中段立一盏，夜里顺着灯就能看出路往哪里通
+    for (const q of room.paths || []) {
+      const mx = 0.25 * q[0] + 0.5 * q[2] + 0.25 * q[4], my = 0.25 * q[1] + 0.5 * q[3] + 0.25 * q[5], l = Math.hypot(q[4] - q[0], q[5] - q[1]) || 1;
+      for (const s of [1.25, -1.25]) {
+        const lx = Math.floor(mx - ((q[5] - q[1]) / l) * s), ly = Math.floor(my + ((q[4] - q[0]) / l) * s);
+        if (lx < 2 || ly < 2 || lx > w - 3 || ly > h - 3 || tiles[ly * w + lx] !== 0 || room.deco.some((dd) => Math.abs(dd.x - lx - 0.5) < 5.5 && Math.abs(dd.y - ly - 0.5) < 4)) continue; // 灯与灯、灯与火盆之间隔开些
+        room.deco.push({ kind: 'lamp', x: lx + 0.5, y: ly + 0.5 });
+        room.lights.push({ x: (lx + 0.5) * T, y: (ly + 0.5) * T, z: 30, r: 190, c: th.lampHex });
+        break;
+      }
+    }
     // 物件光源
     for (const p of room.props) {
       const L = G.PROP_LIGHT[p.kind];
@@ -399,6 +410,22 @@
   };
 
   /* 进门位置 */
+  /* 从 (px, py) 出发的步数场：每格记下走到那里要几步（走不到的是 -1）。引路用 */
+  W.distField = function (room, px, py) {
+    const { w, h } = room, D = new Int16Array(w * h).fill(-1), s = U.clamp(Math.floor(py / T), 0, h - 1) * w + U.clamp(Math.floor(px / T), 0, w - 1), q = [s];
+    D[s] = 0;
+    for (let qi = 0; qi < q.length; qi++) {
+      const i = q[qi], x = i % w, y = (i / w) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const j = ny * w + nx, t = room.tiles[j];
+        if (D[j] >= 0 || (t !== 0 && t !== 4)) continue;
+        D[j] = D[i] + 1; q.push(j);
+      }
+    }
+    return D;
+  };
+
   /* 在 (cx, cy) 周围 rad 像素内找一格空地；找不到就退回全图随机 */
   W.randomFloorNear = function (room, cx, cy, rad, awayX, awayY, minD) {
     for (let i = 0; i < 60; i++) {

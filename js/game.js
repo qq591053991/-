@@ -74,7 +74,7 @@
       W.buildRoom(room);
       this.room = room; room.visited = true;
       for (const d in room.links) room.links[d].seen = true;
-      this.projs.length = 0; this.haz.length = 0; this.allies.length = 0; this.ghosts.length = 0; this.barks.length = 0; this.target = null;
+      this.projs.length = 0; this.haz.length = 0; this.allies.length = 0; this.ghosts.length = 0; this.barks.length = 0; this.target = null; if (this.guide) this.guide.on = false;
       FX.clear();
       const pos = fromDir ? W.entryPos(room, fromDir) : { x: (room.w / 2) * T, y: (room.h / 2 + 1.5) * T };
       p.x = pos.x; p.y = pos.y; p.dashing = 0; p.formT = 0;
@@ -377,6 +377,34 @@
       if (this.chapter + 1 < G.Chapters.length) this.enterChapter(this.chapter + 1);
     },
 
+    /* 引路：没有小地图，靠场景里的一只灵蝶带路。
+       它总是停在"从你这里往目标走五格"的地方 —— 你跟上去，它就再往前飞。
+       目标依次是：还没惊动的埋伏（大图）、没开的宝匣 / 传送阵、通往没去过的地方的出口。到了跟前就不再带路 */
+    updateGuide(raw) {
+      const room = this.room, p = this.player, g = this.guide || (this.guide = { x: p.x, y: p.y, on: false });
+      let tx = null, ty = null, key = null, bd = 1e9;
+      const pick = (x, y, k) => { const d = U.dist(p.x, p.y, x, y); if (d < bd) { bd = d; tx = x; ty = y; key = k; } };
+      if (this.transit || p.dead) key = null;
+      else if (room.locked) {
+        if (room.zones && room.waves && room.waveI < room.waves.length && !room.enemies.some((e) => !e.dead)) for (const z of room.zones) if (!z.done) pick(z.x * T, z.y * T, 'z' + z.x);
+      } else {
+        for (const it of room.interact) if (!it.used && (it.kind === 'chest' || it.kind === 'portal' || it.kind === 'event')) pick(it.x, it.y + 30, 'i' + it.kind);
+        if (key === null) for (const d in room.doors) if (!room.doors[d].to.visited) { const c = room.doors[d].cells[1]; pick((c[0] + 0.5) * T, (c[1] + 0.5) * T, 'd' + d); }
+      }
+      if (key === null || bd < (key[0] === 'z' ? 1.6 : 3) * T) { g.on = false; g.key = null; return; } // 埋伏要带进空地里面才会惊动；出口和宝匣带到跟前就够了
+      if (g.key !== key || g.room !== room) { g.key = key; g.room = room; g.D = W.distField(room, tx, ty); }
+      const D = g.D, w = room.w, h = room.h;
+      let cx = U.clamp(Math.floor(p.x / T), 0, w - 1), cy = U.clamp(Math.floor(p.y / T), 0, h - 1);
+      for (let s = 0; s < 5; s++) { // 顺着步数场往目标走五格
+        let best = D[cy * w + cx], bx = cx, by = cy; if (best < 0) best = 1e9;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const d = D[ny * w + nx]; if (d >= 0 && d < best) { best = d; bx = nx; by = ny; } }
+        if (bx === cx && by === cy) break; cx = bx; cy = by;
+      }
+      const gx = (cx + 0.5) * T, gy = (cy + 0.5) * T;
+      if (!g.on) { g.on = true; g.x = p.x; g.y = p.y; g._tr = null; g.px = undefined; } // 刚现身：拖尾从头算起
+      const k = Math.min(1, raw * 3.4); g.x += (gx - g.x) * k; g.y += (gy - g.y) * k;
+    },
+
     /* 换图的过渡：沿着出口的方向走出去（上桥 / 进洞 / 出门），画面渐暗；到了下一张图，从对面的入口走进来。
        两张图的出入口是成对的 —— 从东边的桥离开，就从下一张图西边的桥上来 */
     stepTransit(raw) {
@@ -474,6 +502,7 @@
         this.stats.time += raw;
         this.updateTarget();
         if (this.transit) this.stepTransit(raw); else E.updatePlayer(dt);
+        this.updateGuide(raw);
       } else this.target = null;
       E.updateEnemies(dt);
       E.updateProjs(dt);
