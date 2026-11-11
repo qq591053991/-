@@ -82,7 +82,15 @@
 
   W.buildRoom = function (room) {
     if (room.built) return;
-    const [w, h] = U.pick(SIZES[room.type]);
+    /* 地形：不是每张图都是"四面墙 + 四扇门"。
+       court 院落 —— 有墙有门，七玄门的屋舍、燕翎堡、虚天殿；
+       wild  山野 —— 林木与山石围出的一片不规则空地，出口是土路接栈桥；
+       cave  洞窟 —— 四壁都是岩石，没有天。
+       血色禁地整章是山野，墨蛟的巢穴是洞窟；七玄门是院落与山谷相间 */
+    const ch = room.chapter || 0, fight = room.type === 'combat' || room.type === 'elite';
+    room.terrain = ch === 1 ? (room.type === 'boss' ? 'cave' : 'wild') : ch === 0 && (room.type === 'garden' || (fight && U.chance(0.6))) ? 'wild' : 'court';
+    let [w, h] = U.pick(SIZES[room.type]);
+    if (room.terrain !== 'court' && room.type !== 'boss') { w += 4; h += 2; } // 边界会吃掉一圈，山野的图整体放大，空地才够打
     room.w = w; room.h = h;
     const tiles = (room.tiles = new Uint8Array(w * h));
     for (let x = 0; x < w; x++) { tiles[x] = 1; tiles[(h - 1) * w + x] = 1; }
@@ -102,13 +110,6 @@
     }
     room.props = []; room.lights = []; room.interact = []; room.deco = [];
     room.enemies = []; room.pickups = []; room.puddles = [];
-    /* 地形：不是每张图都是"四面墙 + 四扇门"。
-       court 院落 —— 有墙有门，七玄门的屋舍、燕翎堡、虚天殿；
-       wild  山野 —— 林木与山石围出的一片不规则空地，出口是土路接栈桥；
-       cave  洞窟 —— 四壁都是岩石，没有天。
-       血色禁地整章是山野，墨蛟的巢穴是洞窟；七玄门是院落与山谷相间 */
-    const ch = room.chapter || 0, fight = room.type === 'combat' || room.type === 'elite';
-    room.terrain = ch === 1 ? (room.type === 'boss' ? 'cave' : 'wild') : ch === 0 && (room.type === 'garden' || (fight && U.chance(0.6))) ? 'wild' : 'court';
     for (const d in room.doors) room.doors[d].cave = room.terrain === 'cave' || (ch === 1 && room.links[d].type === 'boss'); // 通往洞窟的出口是洞口
 
     const reserve = new Set(); // 禁止放障碍的格
@@ -150,6 +151,8 @@
     const put = (x, y, t) => {
       if (x < 2 || y < 2 || x > w - 3 || y > h - 3) return false;
       if (reserve.has(y * w + x) || tiles[y * w + x] !== 0) return false;
+      // 山野 / 洞窟：障碍不许紧贴林子、岩壁，否则会夹出进不去、打不到的死角
+      if (room.terrain !== 'court') for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (tiles[(y + j) * w + x + i] === 1) return false;
       tiles[y * w + x] = t; return true;
     };
     const prop = (x, y, kind) => {
