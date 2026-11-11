@@ -307,7 +307,7 @@
     const kit = Mo.archKit(archRoot, ti);
     // 一格山岩：顶面在 top，根部埋进地里
     let wk = 700;
-    const crag = (x, z, top) => { wk++; const sc = 0.6 + U.hash(wk, 11, sd) * 0.17; rk(x + (U.hash(wk, 13, sd) - 0.5) * 0.2, top, z + (U.hash(wk, 15, sd) - 0.5) * 0.2, sc, (top + 0.3) / (1.1 * sc), wk); return wk; };
+    const crag = (x, z, top, fg) => { wk++; const sc = 0.6 + U.hash(wk, 11, sd) * 0.17; rk(x + (U.hash(wk, 13, sd) - 0.5) * 0.2, top, z + (U.hash(wk, 15, sd) - 0.5) * 0.2, sc, (top + 0.3) / (1.1 * sc), wk, fg); return wk; };
     const treeOn = (x, top, z, kind, sc) => { const tr = Mo.tree(wk + sd, ti, kind, sc); tr.g.position.set(x, top - 0.1, z); tr.g.rotation.y = U.hash(wk, 17, sd) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); };
 
     // 墙体
@@ -328,6 +328,9 @@
       // 山野 / 洞窟：墙格上不立墙。山野是树与山石围出的空地（南面的树矮而暗，是前景）；洞窟四壁都是岩石，越往外越高
       const bark = lm({ color: new THREE.Color(Mo.PAL[ti].trunk) }), leaf = new THREE.MeshLambertMaterial({ vertexColors: true }), barkD = bark.clone(), leafD = new THREE.MeshLambertMaterial({ vertexColors: true, color: new THREE.Color(0.6, 0.62, 0.68) });
       barkD.color.multiplyScalar(0.6); rs.mats.push(leaf, barkD, leafD);
+      // 前景：夹在镜头与场内之间的东西（它的北面几格之内就是空地）。一律压成暗影，不许比场内亮、不许比场内艳
+      const leafFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: new THREE.Color(0.3, 0.32, 0.4) }), barkFg = bark.clone(); barkFg.color.multiplyScalar(0.4); rs.mats.push(leafFg, barkFg);
+      const northFloor = (x, y, n) => { for (let k = 1; k <= n; k++) if (y - k >= 0 && tiles[(y - k) * w + x] !== 1) return k; return 0; };
       const taken = new Set(room.deco.map((dd) => Math.floor(dd.y) * w + Math.floor(dd.x)));
       const cliffN = !cave && room.doors.n && room.doors.n.cave; // 北面的出口是洞口
       // 每格离最近的空地有几格远：贴着空地的一圈种整棵的树，往里两圈用简化的树，再深处只放一团团树冠（大图里林子很厚，不能棵棵都画全）
@@ -338,8 +341,8 @@
         if (at(x, y) !== 1 || taken.has(y * w + x)) continue;
         if (!cave && far[y * w + x] > 3) { // 林子深处：隔一格放一团压暗的树冠
           if ((x + y) % 2) continue;
-          const cm = new THREE.Mesh(Mo.padGeo(x + y, ti, padKind), leafD), cs = 1.25 + U.hash(x, y, sd + 64) * 0.6;
-          cm.position.set(x + 0.5, 1.0 + U.hash(x, y, sd + 65) * 0.7, y + 0.5); cm.scale.set(cs, cs * 0.8, cs); cm.rotation.y = x * 1.3 + y; scn.add(cm); continue;
+          const fgc = northFloor(x, y, 8), cm = new THREE.Mesh(Mo.padGeo(x + y, ti, padKind), fgc ? leafFg : leafD), cs = (fgc ? 1.05 : 1.25) + U.hash(x, y, sd + 64) * 0.6;
+          cm.position.set(x + 0.5, (fgc ? 0.7 : 1.0) + U.hash(x, y, sd + 65) * 0.7, y + 0.5); cm.scale.set(cs, cs * 0.8, cs); cm.rotation.y = x * 1.3 + y; scn.add(cm); continue;
         }
         let edgeT = false;
         for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const xx = x + i, yy = y + j; if (xx >= 0 && yy >= 0 && xx < w && yy < h && tiles[yy * w + xx] !== 1) edgeT = true; }
@@ -355,14 +358,15 @@
         }
         // 空地南沿：镜头从南面看过来，这里的东西会挡住场内。紧贴空地的一排只放矮石，往外两排的树又小又疏
         let below = 0; for (let k = 1; k <= 3; k++) if (y - k >= 0 && tiles[(y - k) * w + x] !== 1) { below = k; break; }
-        if (below === 1) { if (r1 < 0.55) crag(px, pz, 0.2 + r2 * 0.22); continue; }
-        if (below && r1 > 0.42) { if (r1 < 0.7) crag(px, pz, 0.25 + r2 * 0.3); continue; }
-        if (r1 < (edgeT ? 0.24 : 0.1)) { crag(px, pz, (south ? 0.3 : 0.5) + r2 * (south ? 0.3 : 0.8)); continue; }
+        const nf = below || northFloor(x, y, 6); // 北面六格之内有空地：这是前景
+        if (below === 1) { if (r1 < 0.55) crag(px, pz, 0.2 + r2 * 0.22, true); continue; }
+        if (below && r1 > 0.42) { if (r1 < 0.7) crag(px, pz, 0.25 + r2 * 0.3, true); continue; }
+        if (r1 < (edgeT ? 0.24 : 0.1)) { crag(px, pz, (south || nf ? 0.3 : 0.5) + r2 * (south || nf ? 0.3 : 0.8), !!nf); continue; }
         if (r1 > (edgeT ? 0.95 : 0.64)) continue; // 林间留一点缝
-        const fg = (south && w <= 28) || below > 0;
+        const fg = (south && w <= 28) || nf > 0;
         const big = w > 28; // 大图里"南北"是相对空地而言的：只有紧挨空地南沿的才算前景
         if (ti === 2 && r1 > 0.5) continue; // 焦林稀疏
-        const tr = Mo.tree(x * 31 + y * 17 + sd, ti, treeKind(r2 * 1.6), (below ? 0.6 : fg && !big ? 0.8 : north || big ? 1.2 : 1.05) + r2 * (below ? 0.2 : 0.35), { lite: !edgeT || fg, bark: fg ? barkD : bark, leaf: fg ? leafD : leaf });
+        const tr = Mo.tree(x * 31 + y * 17 + sd, ti, treeKind(r2 * 1.6), (below ? 0.6 : fg && !big ? 0.8 : north || big ? 1.2 : 1.05) + r2 * (below ? 0.2 : 0.35), { lite: !edgeT || fg, bark: fg ? barkFg : bark, leaf: fg ? leafFg : leaf });
         tr.g.position.set(px, -0.04, pz); tr.g.rotation.y = r2 * TAU; scn.add(tr.g);
       }
       // 路口的火盆
@@ -448,6 +452,7 @@
         if (!(a || b || c2 || d)) continue;
         const k = at(x, y) === 5 ? (open ? 0.6 : 0.56) : a === b && b === c2 && c2 === d ? 1 : 0.9; // 坡压暗，台阶略暗，台面原色
         const V = [[x, a, y], [x + 1, b, y], [x, c2, y + 1], [x + 1, d, y + 1]];
+        if (open) for (const q of V) if (!q[1]) { const jx = (U.hash(q[0], q[2], sd + 81) - 0.5) * 0.56, jz = (U.hash(q[0], q[2], sd + 82) - 0.5) * 0.56; q[0] += jx; q[2] += jz; } // 土台的坡脚错开一点，轮廓不贴着格子
         for (const j of a + d >= b + c2 ? [0, 2, 1, 1, 2, 3] : [0, 2, 3, 0, 3, 1]) { const q = V[j]; pos.push(q[0], q[1] + 0.004, q[2]); uv.push(q[0] / w, 1 - q[2] / h); colr.push(k, k, k * (open ? 0.94 : 1.04)); }
       }
       const tg = new THREE.BufferGeometry(); rs.geos.push(tg);

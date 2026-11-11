@@ -213,11 +213,6 @@
       const hc = room.hc || (room.hc = new Float32Array((w + 1) * (h + 1)));
       for (let y = y0; y <= y1 + 1; y++) for (let x = x0; x <= x1 + 1; x++) hc[y * (w + 1) + x] = H;
       for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) { if (x < x0 || x > x1 || y < y0 || y > y1) tiles[y * w + x] = 5; res(x, y); }
-      if (room.terrain !== 'court' && x1 - x0 >= 2 && y1 - y0 >= 2) { // 山野里的土台削去四角，不那么方正
-        for (const [ax, ay, vx, vy, ox, oy] of [[x0, y0, x0, y0, x0 - 1, y0 - 1], [x1, y0, x1 + 1, y0, x1 + 1, y0 - 1], [x0, y1, x0, y1 + 1, x0 - 1, y1 + 1], [x1, y1, x1 + 1, y1 + 1, x1 + 1, y1 + 1]]) {
-          tiles[ay * w + ax] = 5; hc[vy * (w + 1) + vx] = 0; tiles[oy * w + ox] = 0; // 角上的台面格变成坡；最外角那一格落回平地
-        }
-      }
       room.ramps = room.ramps || []; room.terr = room.terr || [];
       for (const [rx, ry] of ramps) {
         tiles[ry * w + rx] = 0;
@@ -231,15 +226,48 @@
     const dais = (mx, my, hw, hh) => terrace(mx - hw, my - hh, mx + hw, my + hh,
       [[mx - 1, my + hh + 1], [mx, my + hh + 1], [mx + 1, my + hh + 1], [mx - 1, my - hh - 1], [mx, my - hh - 1], [mx + 1, my - hh - 1], [mx - hw - 1, my], [mx + hw + 1, my]]);
     const flat = () => { room.hc = null; room.ramps = null; room.terr = null; };
+    /* 山野里的土台：一团不规则的台面。四个方向上各找最靠外的一格，在它外面开一道上坡的口子 */
+    const mound = (mx, my, rx, ry, H = 0.45) => {
+      const seed = room.gx * 31 + room.gy * 17 + 5, inT = new Set(), K = (x, y) => y * w + x;
+      for (let y = Math.floor(my - ry - 1); y <= my + ry + 1; y++) for (let x = Math.floor(mx - rx - 1); x <= mx + rx + 1; x++) {
+        const dx = (x + 0.5 - mx) / rx, dy = (y + 0.5 - my) / ry;
+        if (dx * dx + dy * dy < 1 + (U.hash(x, y, seed) - 0.5) * 0.55) inT.add(K(x, y));
+      }
+      for (const k of [...inT]) { const x = k % w, y = (k / w) | 0; let n = 0; for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inT.has(K(x + ax, y + ay))) n++; if (n < 2) inT.delete(k); } // 去掉孤零零伸出去的格子
+      if (inT.size < 6) return false;
+      const ring = new Set();
+      for (const k of inT) { const x = k % w, y = (k / w) | 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const q = K(x + i, y + j); if (!inT.has(q)) ring.add(q); } }
+      for (const k of [...inT, ...ring]) { const x = k % w, y = (k / w) | 0; if (x < 2 || y < 2 || x > w - 3 || y > h - 3 || tiles[k] !== 0 || doorRes.has(k)) return false; }
+      // 上坡口：某个方向上最靠外的台面格，它外面那一格是口子，再外面一格得是空地
+      const ramps = [];
+      for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        let best = null, bv = -1e9;
+        for (const k of inT) { const x = k % w, y = (k / w) | 0, v = (x * dx + y * dy) * 100 - Math.abs(dx ? y + 0.5 - my : x + 0.5 - mx); if (v > bv) { bv = v; best = [x, y]; } }
+        const rx2 = best[0] + dx, ry2 = best[1] + dy, ox = rx2 + dx, oy = ry2 + dy;
+        if (ox < 2 || oy < 2 || ox > w - 3 || oy > h - 3 || tiles[K(ox, oy)] !== 0 || ring.has(K(ox, oy)) || inT.has(K(ox, oy))) continue;
+        ramps.push({ x: rx2, y: ry2, dx: -dx, dy: -dy });
+      }
+      if (ramps.length < 2) return false;
+      const hc = room.hc || (room.hc = new Float32Array((w + 1) * (h + 1)));
+      let x0 = w, y0 = h, x1 = 0, y1 = 0;
+      for (const k of inT) { const x = k % w, y = (k / w) | 0; for (const [i, j] of [[0, 0], [1, 0], [0, 1], [1, 1]]) hc[(y + j) * (w + 1) + x + i] = H; res(x, y); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+      for (const k of ring) { tiles[k] = 5; reserve.add(k); }
+      room.ramps = room.ramps || []; room.terr = room.terr || [];
+      for (const r of ramps) { tiles[K(r.x, r.y)] = 0; res(r.x - r.dx, r.y - r.dy); room.ramps.push(r); }
+      room.terr.push({ x0, y0, x1, y1, H, blob: true });
+      return true;
+    };
+    // 院落里垒方正的石台，山野里堆不规则的土台
+    const plat = (mx, my, hw, hh) => (room.terrain === 'court' ? dais(mx, my, hw, hh) : mound(mx + 0.5, my + 0.5, hw + U.rand(0.5, 1.1), hh + U.rand(0.6, 1.0)));
 
     if (room.type === 'combat' || room.type === 'elite') {
       const snapshot = tiles.slice();
       for (let tryN = 0; tryN < 8; tryN++) {
         tiles.set(snapshot); room.props.length = 0; flat();
         const pat = U.pick(['pillars', 'pond', 'scatter', 'scatter', 'blocks', 'twin', 'ring', 'mix', 'terrace', 'terrace', 'terrace']);
-        if (big && room.zones && U.chance(0.8)) { const z = U.pick(room.zones.slice(1)); dais(Math.floor(z.x), Math.floor(z.y), 2, 1); } // 不选正中那片：场心的地台纹样不该铺到坡上 // 大图：挑一片空地垒一座土台
+        if (big && room.zones && U.chance(0.8)) { const z = U.pick(room.zones.slice(1)); plat(Math.floor(z.x), Math.floor(z.y), 2, 1); } // 不选正中那片：场心的地台纹样不该铺到坡上 // 大图：挑一片空地垒一座土台
         if (pat === 'terrace') { // 场中一座台地，四面有台阶：占住台子居高临下，或者绕着它周旋
-          dais(cx + U.randi(-2, 2), cy + U.randi(-1, 1), U.randi(2, 3), U.randi(1, 2));
+          plat(cx + U.randi(-2, 2), cy + U.randi(-1, 1), U.randi(2, 3), U.randi(1, 2));
           for (let i = 0; i < 5; i++) prop(U.randi(2, w - 3), U.randi(2, h - 3), pk());
         } else if (pat === 'pillars') {
           const ox = U.randi(3, 5), oy = U.randi(2, 3), k = pk();
@@ -297,7 +325,7 @@
       }
     } else {
       // 机缘、药园：东西供在一座台子上
-      if (room.type === 'treasure' || room.type === 'event' || room.type === 'garden') dais(cx, cy, 2, 1) || dais(cx, cy, 1, 1); // 屋子小就垒一座小的
+      if (room.type === 'treasure' || room.type === 'event' || room.type === 'garden') plat(cx, cy, 2, 1) || plat(cx, cy, 1, 1); // 屋子小就垒一座小的
       // 安全房：四角点缀
       const k1 = th.props[2], k2 = th.props[0];
       prop(2, 2, k1); prop(w - 3, 2, k1);
