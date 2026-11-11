@@ -240,12 +240,13 @@
     pause() {
       const Gm = G.Game, p = Gm.player;
       const skills = p.skills.map((s, i) => { const d = G.Skills[s.id]; return `<div class="row"><span class="glyph" style="color:${d.color};border-color:${d.color}">${d.glyph}</span><div class="info"><b>${d.name} · 第${ROMAN[s.lv]}重 <small>[${'QER'[i]}]</small></b><em>${esc(d.desc(s.lv))}</em></div></div>`; }).join('');
-      const M = G.Mains[Gm.mainId()], mlv = Gm.mainLv(), hasBao = p.fy || p.wd;
+      const M = G.Mains[Gm.mainId()], mlv = Gm.mainLv(), hasBao = p.fy || p.wd || p.ky;
       const baoDesc = p.wd ? '本命法宝。飞剑命中积攒毒煞，满后放出「万毒瘴」：毒瘴随身七秒，瘴中敌人每半秒叠三层毒。'
+        : p.ky ? '本命法宝。飞剑命中积攒神识，满后「傀儡齐出」：四具傀儡同时现身，所有自动祭出的法宝立刻再出手一次。'
         : p.fy ? '本命法宝。飞剑命中有几率引动辟邪神雷；命中积攒剑意，满后施展' + (p.dageng ? '「大庚剑阵」：七十二口飞剑环立成阵，困敌绞杀，收阵时降下辟邪神雷。' : '「蜂云剑阵」，七十二口飞剑齐出。')
         : '结丹之后，依主修功法炼成的本命法宝。';
       const arts = `<div class="row"><span class="glyph r3">${M ? M.glyph : '春'}</span><div class="info"><b>${M ? M.name + ' · 第' + G.CN_NUM[mlv] + '层' : '长春功'}</b><em>${M ? M.lv.slice(0, mlv).map((x) => x.desc).join('；') : '炼气期功法。筑基之后方可择一门主修功法。'}</em></div></div>` +
-        `<div class="row ${hasBao ? '' : 'sold'}"><span class="glyph r3">${p.wd ? '幡' : '蜂'}</span><div class="info"><b>${M ? M.bao : '本命法宝'} ${hasBao ? '<small>[V] ' + (p.wd ? '毒煞 ' : '剑意 ') + Math.floor(p.sp) + '/100</small>' : '<small>未炼成</small>'}</b><em>${baoDesc}</em></div></div>`;
+        `<div class="row ${hasBao ? '' : 'sold'}"><span class="glyph r3">${p.wd ? '幡' : p.ky ? '傀' : '蜂'}</span><div class="info"><b>${M ? M.bao : '本命法宝'} ${hasBao ? '<small>[V] ' + (p.wd ? '毒煞 ' : p.ky ? '神识 ' : '剑意 ') + Math.floor(p.sp) + '/100</small>' : '<small>未炼成</small>'}</b><em>${baoDesc}</em></div></div>`;
       const row = (id) => { const r = G.Relics[id], n = p.relics[id]; return `<div class="row"><span class="glyph r${r.rar}">${r.glyph}</span><div class="info"><b>${r.name}${r.kind === 'craft' ? ' · 第' + G.CN_NUM[n] + '重' : n > 1 ? ' ×' + n : ''}${r.auto ? ' <small>自动祭出</small>' : ''}</b><em>${esc(r.desc)}</em></div></div>`; };
       const relics = Object.keys(G.KIND).map((k) => { const ids = p.relicList.filter((id) => G.Relics[id].kind === k); return ids.length ? `<h4>${G.KIND[k]}${k === 'pet' ? ` <small>${p.pets.length} / ${p.petCap}</small>` : ''}</h4>` + ids.map(row).join('') : ''; }).join('') || '<p class="sub">身无长物。</p>';
       this.open(`<div class="panel pause"><h2>${G.Chapters[Gm.chapter].title}</h2>
@@ -323,16 +324,16 @@
         if (this.cache[lk] !== low) { this.cache[lk] = low; el.classList.toggle('nomp', low); }
       });
       // 功法与本命法宝
-      const M = G.Mains[G.Game.mainId()], mlv = G.Game.mainLv(), has = p.fy || p.wd;
-      const gf = (M ? `${M.name} · 第${G.CN_NUM[mlv]}层` : '长春功') + (has ? '|' + (M ? M.bao : p.wd ? '万毒幡' : '青竹蜂云剑') + (p.dageng ? ' · 大庚剑阵' : '') : '');
+      const M = G.Mains[G.Game.mainId()], mlv = G.Game.mainLv(), has = p.fy || p.wd || p.ky;
+      const gf = (M ? `${M.name} · 第${G.CN_NUM[mlv]}层` : '长春功') + (has ? '|' + (M ? M.bao : p.wd ? '万毒幡' : p.ky ? '大衍傀儡' : '青竹蜂云剑') + (p.dageng ? ' · 大庚剑阵' : '') : '');
       if (this.cache.gf !== gf) { this.cache.gf = gf; const a = gf.split('|'); $('gongfa').innerHTML = '功法 · ' + a[0] + (a[1] ? '<br><b>本命 · ' + a[1] + '</b>' : ''); }
-      const ue = $('ult'), uk = has ? Math.floor(p.sp) + (p.dageng ? 1000 : 0) + (p.wd ? 2000 : 0) : -1;
+      const ue = $('ult'), uk = has ? Math.floor(p.sp) + (p.dageng ? 1000 : 0) + (p.wd ? 2000 : p.ky ? 3000 : 0) : -1;
       if (this.cache.ult !== uk) {
-        this.cache.ult = uk; ue.querySelector('.g').textContent = p.wd ? '幡' : p.dageng ? '庚' : '蜂';
+        this.cache.ult = uk; ue.querySelector('.g').textContent = p.wd ? '幡' : p.ky ? '傀' : p.dageng ? '庚' : '蜂';
         ue.classList.toggle('locked', !has); ue.classList.toggle('full', has && p.sp >= 100);
         ue.querySelector('.cd').style.height = has ? 100 - Math.floor(p.sp) + '%' : '0%';
-        ue.querySelector('.lv').textContent = has ? (p.sp >= 100 ? (p.wd ? '毒煞满' : '剑意满') : Math.floor(p.sp)) : '结丹';
-        ue.title = !has ? '本命法宝 —— 结丹之后方可炼成' : p.wd ? '本命法宝【万毒幡】\n飞剑命中积攒毒煞，满 100 后按 V：放出万毒瘴，毒瘴随身七秒，瘴中敌人每半秒叠三层毒。'
+        ue.querySelector('.lv').textContent = has ? (p.sp >= 100 ? (p.wd ? '毒煞满' : p.ky ? '神识满' : '剑意满') : Math.floor(p.sp)) : '结丹';
+        ue.title = !has ? '本命法宝 —— 结丹之后方可炼成' : p.ky ? '本命法宝【大衍傀儡】\n飞剑命中积攒神识，满 100 后按 V：四具傀儡同时现身，所有自动祭出的法宝立刻再出手一次。' : p.wd ? '本命法宝【万毒幡】\n飞剑命中积攒毒煞，满 100 后按 V：放出万毒瘴，毒瘴随身七秒，瘴中敌人每半秒叠三层毒。'
           : p.dageng ? '本命法宝【青竹蜂云剑】· 大庚剑阵\n剑意满 100 后按 V：在目标处布下大庚剑阵，困住阵中敌人，剑丝绞杀 7 秒，收阵时降下辟邪神雷。'
           : '本命法宝【青竹蜂云剑】\n飞剑命中积攒剑意，满 100 后按 V：七十二口飞剑倾巢而出，自行追击并引动辟邪神雷。';
       }

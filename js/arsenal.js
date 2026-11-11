@@ -63,6 +63,16 @@
     },
   };
 
+  /* 大衍傀儡 · 傀儡齐出：四具傀儡同时现身，所有自动祭出的法宝立刻再出手一次 */
+  E.castKui = function () {
+    const Gm = G.Game, p = Gm.player, lv = 2 + Math.floor((p.dy || 0) / 2);
+    for (let i = 0; i < 4; i++) SK.puppet(p, 0, 0, lv);
+    for (const id of p.relicList) if (G.Relics[id].auto) p.autoT[id] = 0;
+    FX.ring(p.x, p.y, 10, 180, '255,190,90', 0.5, 6); FX.burst(p.x, p.y, 24, 30, { c: '255,216,154', s1: 300, l1: 0.7 });
+    FX.text(p.x, p.y, 70, '傀儡齐出', '#ffd89a', 22); Au.sfx('roar'); Gm.shake(6);
+    return true;
+  };
+
   /* 万毒幡 · 万毒瘴：毒瘴随身七秒 */
   E.castWandu = function () {
     const Gm = G.Game, p = Gm.player;
@@ -234,7 +244,8 @@
         if (!e && BAO_RANGE[id]) e = E.nearestEnemy(p.x, p.y, rng);
         if (e) {
           const lead = BAO_LEAD[id] !== undefined ? BAO_LEAD[id] : Math.min(0.5, U.dist(p.x, p.y, e.x, e.y) / 540);
-          BAO[id](p, { x: e.x + (e.vx || 0) * lead, y: e.y + (e.vy || 0) * lead }, p.baoMul * p.dmgMul * schK(p, def.sch), e);
+          const aim = { x: e.x + (e.vx || 0) * lead, y: e.y + (e.vy || 0) * lead }, k = p.baoMul * p.dmgMul * schK(p, def.sch);
+          BAO[id](p, aim, k, e); if (p.flags.twice && U.chance(0.3)) BAO[id](p, aim, k, e); // 大衍诀 · 一心多用
           FX.text(p.x, p.y, 62, def.name, G.Schools[def.sch].color, 12);
           t = def.auto * p.baoCd;
         } else t = 0;
@@ -364,6 +375,11 @@
     const Gm = G.Game, p = Gm.player, room = Gm.room;
     if (p.dead) return;
     updateAutos(dt, Gm, p);
+    // 大衍诀 · 傀儡随行：场上有敌人时，每 12 秒自动放出傀儡
+    if (p.flags.kuiAuto) {
+      p.kuiT -= dt;
+      if (p.kuiT <= 0 && room.enemies.some((e) => !e.dead && e.st !== 'spawn')) { for (let i = 0; i < p.flags.kuiAuto; i++) SK.puppet(p, 0, 0, 1 + Math.floor((p.dy || 1) / 2)); p.kuiT = 12; }
+    }
     // 混元钵：收满之后歇十息
     if (p.flags.bowl && p.bowlN < 12) { p.bowlT += dt; if (p.bowlT >= 10) { p.bowlT = 0; p.bowlN = 12; } }
     // 皇鳞甲：鳞光重凝

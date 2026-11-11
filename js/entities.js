@@ -115,7 +115,7 @@
       formT: 0, formN: 0, formLv: 1, formTick: 0, potionCd: 0,
       // 流派增伤 / 法宝 / 灵宠 / 技艺
       schMul: {}, baoMul: 1, baoCd: 1, petMul: 1, kuiMul: 1, potionMul: 1, craft: {}, pets: [], petCap: 3, autoT: {},
-      main: null, du: 0, wd: 0, psn: 0, psnMul: 1, psnCap: 6, psnVuln: 0, // 主修功法；墨氏毒经的层数、本命万毒幡；毒
+      main: null, du: 0, wd: 0, dy: 0, ky: 0, kuiT: 0, psn: 0, psnMul: 1, psnCap: 6, psnVuln: 0, // 主修功法；墨氏毒经的层数、本命万毒幡；毒
       dageng: 0, lin: 0, linT: 0, apeT: 0, apeB: 0, wardT: 0, fanT: 0, bowlN: 0, bowlT: 0, fuT: 6, auraT: 0, bmB: 0,
       look: { robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' },
     };
@@ -246,7 +246,7 @@
       for (let i = 0; i < n; i++) E.dropPickup('stone', e.x, e.y, Math.round(U.randi(2, 4) * (1 + ch * 0.25) * (e.boss ? 3 : 1)));
       if (!e.boss && U.chance(e.elite ? 0.5 : 0.035)) E.dropPickup('potion', e.x, e.y, 1);
     }
-    if (p.fy || p.wd) p.sp = Math.min(100, p.sp + G.Fengyun.perKill);
+    if (p.fy || p.wd || p.ky) p.sp = Math.min(100, p.sp + G.Fengyun.perKill);
     if (e.psn > 0) {
       if (p.flags.psnBurst) { // 尸毒相传
         const n = Math.ceil(e.psn / 2);
@@ -309,7 +309,7 @@
     if (pr.mini) return;
     if (p.flags.iceflame && !e.dead) { e.slowT = Math.max(e.slowT, 1.6); e.burnT = Math.max(e.burnT, 2.4); }
     if (!e.dead) { if (p.psn) E.poison(e, p.psn); if (p.flags.qidu && U.chance(0.3)) E.poison(e, p.flags.qidu); } // 淬毒的飞剑
-    if (p.fy || p.wd) p.sp = Math.min(100, p.sp + G.Fengyun.perHit);
+    if (p.fy || p.wd || p.ky) p.sp = Math.min(100, p.sp + G.Fengyun.perHit);
     if (p.flags.thunder && U.chance(0.06 + 0.14 * p.flags.thunder)) E.chainThunder(e, pr.dmg * 0.7, 3);
     if (p.flags.split && !pr.back) {
       const a = Math.atan2(pr.vy, pr.vx);
@@ -347,10 +347,11 @@
   /* 青竹蜂云剑 · 蜂云剑阵：七十二口飞剑倾巢而出，自行追击 */
   E.castUlt = function () {
     const Gm = G.Game, p = Gm.player, F = G.Fengyun;
-    const has = p.fy || p.wd;
-    if (!has || p.sp < 100 || p.dead) { if (has && !(p.noMpT > 0)) { FX.text(p.x, p.y, 58, p.wd ? '毒煞未满' : '剑意未满', '#b8ff8a', 13); Au.sfx('deny'); p.noMpT = 0.6; } return false; }
+    const has = p.fy || p.wd || p.ky;
+    if (!has || p.sp < 100 || p.dead) { if (has && !(p.noMpT > 0)) { FX.text(p.x, p.y, 58, p.wd ? '毒煞未满' : p.ky ? '神识未满' : '剑意未满', '#b8ff8a', 13); Au.sfx('deny'); p.noMpT = 0.6; } return false; }
     p.sp = 0;
     if (p.wd) return E.castWandu();
+    if (p.ky) return E.castKui();
     if (p.dageng) return E.castDageng();
     const dmg = swordDamage(p) * F.dmgMul;
     for (let i = 0; i < F.swords; i++) {

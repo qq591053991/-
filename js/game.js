@@ -326,12 +326,12 @@
     },
 
     /* 主修功法：筑基时择一门（青元剑诀 / 墨氏毒经），之后一层层参悟 */
-    mainId() { const p = this.player; return p.main || (p.du ? 'du' : p.qy || p.fy ? 'qy' : null); }, // 没记下选了哪门时，从层数反推
-    mainLv() { const p = this.player, id = this.mainId(); return id === 'du' ? p.du : id === 'qy' ? p.qy : 0; },
+    mainId() { const p = this.player; return p.main || (p.du ? 'du' : p.dy ? 'dy' : p.qy || p.fy ? 'qy' : null); }, // 没记下选了哪门时，从层数反推
+    mainLv() { const id = this.mainId(); return id ? this.player[id] : 0; }, // 层数就记在 p.qy / p.du / p.dy 上
     gainMain(quiet) {
       const p = this.player, id = this.mainId(), M = G.Mains[id]; if (!M) return;
       const L = M.lv[this.mainLv()]; if (!L) return;
-      L.apply(p); if (id === 'du') p.du++; else p.qy++;
+      L.apply(p); p[id]++;
       if (!quiet) this.toast(`${M.name} · 第${G.CN_NUM[this.mainLv()]}层【${L.name}】`);
       Au.sfx('break');
     },
@@ -350,6 +350,7 @@
         p.realm = 2; p.realmLv = 1; p.maxHp += 50; p.maxMp += 40; p.dmgMul += 0.22; p.cdr = Math.min(0.6, p.cdr + 0.08);
         if (!p.main) { p.main = this.mainId() || 'qy'; if (!this.mainLv()) this.gainMain(true); }
         if (p.main === 'du') { if (!p.wd) { p.wd = 1; p.sp = 100; G.UI.skillDirty = true; } }
+        else if (p.main === 'dy') { if (!p.ky) { p.ky = 1; p.sp = 100; G.UI.skillDirty = true; } }
         else if (!p.fy) { p.fy = 1; p.sp = 100; p.flags.thunder = (p.flags.thunder || 0) + 1; G.UI.skillDirty = true; }
       }
       p.hp = p.maxHp; p.mp = p.maxMp; p.potions = Math.min(G.POTION_MAX, p.potions + 1);
