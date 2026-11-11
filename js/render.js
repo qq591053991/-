@@ -336,6 +336,7 @@
     runs(w, (x) => at(x, 0) === 1, (x0, len) => {
       if (ti === 1) { for (let i = 0; i < len; i++) { const top = 1.25 + U.hash(x0 + i, 1, sd) * 0.75; crag(x0 + i + 0.5, 0.5, top); if (U.hash(x0 + i, 2, sd) < 0.2) treeOn(x0 + i + 0.5, top, 0.4, 'round', 1.15); } return; }
       wallBox(x0, 0, len, 1, HN, tx(ctex(Tx.wallFace(ti, x0, len, room.gx * 7 + room.gy))));
+      kit.slab(x0 + len / 2, 0.07, 1.1, len, 0.14, 0.22, 'stone'); kit.slab(x0 + len / 2, 0.03, 1.27, len, 0.06, 0.16, 'dark'); // 墙根的台基：两级石条
       if (ti === 0) {
         kit.roofX(x0, len, 0.5, HN, 1.9, 0.52);
         for (let cx = x0 + 0.45; cx <= x0 + len - 0.4; cx += 3.05) kit.column(cx, 1.12, HN, 0.1);
@@ -361,10 +362,20 @@
     for (const x of [0, w - 1]) runs(h - 2, (i) => at(x, i + 1) === 1, (y0, len) => {
       if (ti === 1) { for (let i = 0; i < len; i++) crag(x + 0.5, y0 + 1 + i + 0.5, 0.72 + U.hash(x, y0 + i, sd) * 0.42); return; }
       wallBox(x, y0 + 1, 1, len, HS);
+      kit.slab(x ? x - 0.08 : 1.08, 0.06, y0 + 1 + len / 2, 0.18, 0.12, len, 'stone'); // 台基
       if (ti === 0) kit.roofZ(x + 0.5, y0 + 1, len, HS, 1.34, 0.3);
       else if (ti === 2) { for (let i = 0; i < len; i += 2) kit.crenel(x + 0.5, HS - 0.02, y0 + 1 + i + 0.5, 1.04, 0.56); }
       else mesh(lm({ color: new THREE.Color('#d9b45a') }), x + 0.5, HS + 0.05, y0 + 1 + len / 2, 0.24, 0.1, len + 0.04);
     });
+    // 水边的石沿：水面四周围一圈略高出地面的石条，水就像是凹下去的
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      if (at(x, y) !== 3) continue;
+      const mat = ti === 3 ? 'gold' : 'stone';
+      if (at(x, y - 1) !== 3) kit.slab(x + 0.5, 0.045, y + 0.03, 1.1, 0.09, 0.13, mat);
+      if (at(x, y + 1) !== 3) kit.slab(x + 0.5, 0.045, y + 0.97, 1.1, 0.09, 0.13, mat);
+      if (at(x - 1, y) !== 3) kit.slab(x + 0.03, 0.045, y + 0.5, 0.13, 0.09, 1.1, mat);
+      if (at(x + 1, y) !== 3) kit.slab(x + 0.97, 0.045, y + 0.5, 0.13, 0.09, 1.1, mat);
+    }
     // 四角：角楼（山岩墙没有角楼）
     if (ti !== 1) for (const [cxx, czz, north] of [[0.5, 0.5, 1], [w - 0.5, 0.5, 1], [0.5, h - 0.5, 0], [w - 0.5, h - 0.5, 0]]) {
       if (at(Math.floor(cxx), Math.floor(czz)) !== 1) continue;
@@ -411,6 +422,7 @@
         if (woods) { const tr = Mo.tree(dkey + sd, ti, treeKind(1), 1.3); tr.g.position.set(bx + out[0] * (L + 2.2) - out[1] * 1.2, -0.06, bz + out[1] * (L + 2.2) - out[0] * 1.2); scn.add(tr.g); rs.mats.push(...tr.mats); }
       } else if (d === 'n') {
         const ag = Mo.archGate(ti); ag.g.position.set(cx, 0, 0.9); g.add(ag.g); rs.mats.push(...ag.mats); rs.tex.push(...ag.tex); // 青铜环门
+        kit.slab(cx, 0.05, 1.2, 3.3, 0.1, 0.5, 'stone'); kit.slab(cx, 0.025, 1.62, 3.7, 0.05, 0.42, 'dark'); // 门前两级台阶
       } else {
         if (d === 's') { for (const sx of [-1.78, 1.78]) kit.tower(cx + sx, cz, 0.62, 0.52); } // 南门：两只带攒尖顶的门墩，不挡视线
         else { // 东西两侧：门楼 —— 两根立柱托着一道横在门上的屋顶（燕翎堡是城门：石过梁上压垛口）

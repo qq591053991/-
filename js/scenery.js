@@ -269,6 +269,8 @@
         put(hex, M('gold'), x, 0.69, z, 0.56, 0.04, 0.56);
         return [x, 0.84, z, 0.34];
       },
+      /* 石条：台阶、台基、水沿都用它 */
+      slab(x, y, z, sx, sy, sz, m) { return put(box, M(m || 'stone'), x, y, z, sx, sy, sz); },
       /* 垛口：城墙顶上的一排齿 */
       crenel(x, y, z, sx, sz) { put(box, M('stone'), x, y + 0.17, z, sx, 0.34, sz); },
     };
@@ -307,7 +309,142 @@
     return { g, mats: [st, dk, gd, cap, top.material], anim: null };
   };
 
-  /* 接管几样场景物件：山石、松（偶尔是一树桃花）、血枫、石灯 */
+  const HEX = () => gg('hex6', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 6));
+  const adder = (g) => (geo, m, x, y, z, sx, sy, sz) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); o.castShadow = true; g.add(o); return o; };
+
+  /* 一丛竹：每竿三截、节上一圈深色的箍，越往上越向外弯；叶是一片片下垂的扁叶团 */
+  Mo.bamboo = function (v, ti) {
+    const g = new THREE.Group(), h = (i) => U.hash(v * 9 + i, i * 3 + 2, ti + 23), add = adder(g);
+    const s1 = lam('#5f9c5a'), s2 = lam('#47804d'), nd = lam('#29503a'), leaf = vcol(), rk = vcol();
+    const lg = (k) => lump('bleaf' + k, 71 + k * 13, { rough: 0.3, top: 0.4, flat: 0.5, bot: 0.3, sy: 0.3, dark: '#2c6238', lite: '#9bd476', byNormal: true });
+    const n = 5 + ((h(0) * 2) | 0);
+    for (let i = 0; i < n; i++) {
+      const a = h(i + 1) * TAU, r = 0.07 + h(i + 11) * 0.27, H = 1.45 + h(i + 21) * 1.0, bend = 0.1 + h(i + 31) * 0.26, mat = i % 2 ? s1 : s2;
+      const at = (t) => new V3(Math.cos(a) * (r + bend * t * t), H * t, Math.sin(a) * (r + bend * t * t));
+      const pts = [at(0), at(0.36), at(0.7), at(1)];
+      for (let k = 0; k < 3; k++) {
+        stick(g, pts[k], pts[k + 1], 0.046 - k * 0.009, mat);
+        if (k) add(HEX(), nd, pts[k].x, pts[k].y, pts[k].z, 0.115 - k * 0.014, 0.03, 0.115 - k * 0.014).castShadow = false;
+      }
+      for (let k = 0; k < 3; k++) {
+        const c = at(0.6 + k * 0.19), la = a + (k - 1) * 2.0 + (h(i * 3 + k + 40) - 0.5) * 1.4, s = 0.3 - k * 0.04;
+        const m = add(lg((i + k) % 3), leaf, c.x + Math.cos(la) * 0.2, c.y - 0.05, c.z + Math.sin(la) * 0.2, s, s, s * 0.42);
+        m.rotation.set(0, -la, -0.42 - h(i + k * 7 + 50) * 0.3);
+      }
+    }
+    add(rockGeo(v % 4, ti), rk, 0.2, -0.03, 0.16, 0.2, 0.16, 0.17); add(rockGeo((v + 2) % 4, ti), rk, -0.24, -0.03, 0.1, 0.14, 0.11, 0.14);
+    return { g, mats: [s1, s2, nd, leaf, rk], anim: null };
+  };
+
+  /* 灵菇：骨白的伞盖、伞底泛着暗紫，伞沿缀几点灵光。不用红——朱砂只留给敌人的预警 */
+  Mo.shroom = function (v, ti) {
+    const g = new THREE.Group(), h = (i) => U.hash(v * 7 + i, i * 5 + 4, ti + 31), add = adder(g);
+    const stem = lam('#b8ac9c'), cap = vcol(), rim = lam('#4a3c5c'), dot = new THREE.MeshBasicMaterial({ color: 0x9fffe0 });
+    const cg = (k) => lump('shcap' + k, 91 + k * 7, { rough: 0.24, top: 0.2, flat: 0.5, bot: 0.02, sy: 0.75, dark: '#6a5a78', lite: '#bfb3a4' }); // 伞顶骨白
+    const one = (x, z, s, k) => {
+      const lean = (h(k) - 0.5) * 0.26, tx = x + lean * s;
+      stick(g, new V3(x, -0.02, z), new V3(tx, 0.44 * s, z), 0.062 * s, stem);
+      const ry = h(k + 5) * TAU, c = add(cg(k % 3), cap, tx, 0.37 * s, z, 0.25 * s, 0.3 * s, 0.25 * s); c.rotation.y = ry;
+      const sk = add(cg(k % 3), rim, tx, 0.34 * s, z, 0.31 * s, 0.17 * s, 0.31 * s); sk.rotation.y = ry; // 底下再垫一层大一圈的暗紫伞沿
+      for (let i = 0; i < 4; i++) { // 伞面上的几点灵光
+        const a = (i / 4) * TAU + h(k * 4 + i + 9) * 1.2, rho = 0.34 + h(k * 4 + i + 19) * 0.34, r = rho * 0.25 * s;
+        const y = 0.37 * s + 0.3 * s * (0.2 + 0.75 * (0.2 + (Math.sqrt(1 - rho * rho) - 0.2) * 0.5)) + 0.012 * s;
+        add(Mo.geo.sph(6), dot, tx + Math.cos(a) * r, y, z + Math.sin(a) * r, 0.075 * s, 0.04 * s, 0.075 * s).castShadow = false;
+      }
+    };
+    one(-0.1, 0, 1.15, 1); one(0.27, 0.15, 0.8, 2); one(-0.33, 0.2, 0.58, 3);
+    return { g, mats: [stem, cap, rim, dot], anim: null };
+  };
+
+  /* 鼎式火盆：三足撑着一只束腰的铜盆，盆沿一圈金，两只立耳；火是两片削面的焰。blue：虚天殿的寒焰 */
+  Mo.cauldron = function (v, ti, blue) {
+    const g = new THREE.Group(), K = KIT[ti], add = adder(g), dk = lam(ti === 3 ? '#4f6076' : K.dark), gd = lam(K.gold), st = lam(K.stone);
+    const fc = blue ? [0x5ab8ff, 0xe0f6ff] : [0x3aff8a, 0xd8ffe0];
+    const m1 = new THREE.MeshBasicMaterial({ color: fc[0], transparent: true, opacity: 0.88, depthWrite: false }), m2 = new THREE.MeshBasicMaterial({ color: fc[1] });
+    const bowl = gg('bowl', () => new THREE.CylinderGeometry(0.5, 0.3, 1, 8)), flame = gg('flame5', () => new THREE.ConeGeometry(0.5, 1, 5));
+    add(HEX(), st, 0, 0.05, 0, 0.84, 0.1, 0.84);
+    for (let i = 0; i < 3; i++) { const a = (i / 3) * TAU + 0.5; stick(g, new V3(Math.cos(a) * 0.31, 0.08, Math.sin(a) * 0.31), new V3(Math.cos(a) * 0.15, 0.62, Math.sin(a) * 0.15), 0.046, dk); }
+    add(HEX(), dk, 0, 0.56, 0, 0.32, 0.07, 0.32); add(bowl, dk, 0, 0.73, 0, 0.64, 0.3, 0.64); add(HEX(), gd, 0, 0.9, 0, 0.7, 0.05, 0.7);
+    for (const sx of [-1, 1]) add(Mo.geo.box(), gd, sx * 0.34, 1.0, 0, 0.05, 0.18, 0.17);
+    const em = add(HEX(), m2, 0, 0.925, 0, 0.5, 0.02, 0.5), f1 = add(flame, m1, 0, 1.2, 0, 0.36, 0.62, 0.36), f2 = add(flame, m2, 0, 1.1, 0, 0.19, 0.36, 0.19);
+    em.castShadow = f1.castShadow = f2.castShadow = false;
+    const anim = (t) => { f1.scale.y = 0.62 + Math.sin(t * 11 + v) * 0.1; f1.rotation.y = t * 1.4 + v; f1.rotation.z = Math.sin(t * 7 + v) * 0.1; f2.scale.y = 0.36 + Math.sin(t * 14 + v) * 0.07; f2.rotation.y = -t * 2 + v; f1.position.y = 0.92 + f1.scale.y * 0.5; f2.position.y = 0.92 + f2.scale.y * 0.5; };
+    return { g, mats: [dk, gd, st, m1, m2], anim };
+  };
+
+  /* 魔道战幡：斜插在乱石里的一杆破幡。幡面墨紫、镶暗金边，下摆撕成几绺、还烧出两个洞（同样不用红） */
+  const bannerTex = () => gg('bannerT', () => {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 224; const x = c.getContext('2d');
+    x.beginPath(); x.moveTo(4, 2); x.lineTo(124, 2); x.lineTo(124, 172);
+    for (const q of [[112, 198], [100, 176], [86, 216], [72, 182], [58, 221], [44, 186], [30, 207], [16, 178], [4, 199]]) x.lineTo(q[0], q[1]);
+    x.closePath();
+    const gr = x.createLinearGradient(0, 0, 0, 224); gr.addColorStop(0, '#3c2b50'); gr.addColorStop(1, '#1d1429'); x.fillStyle = gr; x.fill();
+    x.save(); x.clip();
+    x.strokeStyle = '#9a8248'; x.lineWidth = 5; x.strokeRect(10, 8, 108, 240);
+    x.fillStyle = '#dccb96'; x.font = '900 80px "Noto Serif SC","Songti SC","STSong","SimSun",serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('魔', 64, 88);
+    for (let i = 0; i < 26; i++) { x.fillStyle = `rgba(12,8,18,${0.1 + U.hash(i, 3, 61) * 0.2})`; x.beginPath(); x.ellipse(U.hash(i, 1, 61) * 128, U.hash(i, 2, 61) * 224, 4 + U.hash(i, 4, 61) * 12, 3 + U.hash(i, 5, 61) * 8, U.hash(i, 6, 61) * 3, 0, TAU); x.fill(); } // 污迹
+    x.restore();
+    x.globalCompositeOperation = 'destination-out';
+    for (const q of [[97, 138, 7, 11], [31, 46, 4, 6], [70, 160, 3, 5]]) { x.beginPath(); x.ellipse(q[0], q[1], q[2], q[3], 0.4, 0, TAU); x.fill(); }
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+  });
+  Mo.warBanner = function (v, ti) {
+    const g = new THREE.Group(), K = KIT[ti], add = adder(g), dk = lam('#2c2630'), gd = lam(K.gold), rk = vcol(), h = (i) => U.hash(v * 5 + i, i + 3, 67);
+    const cloth = new THREE.MeshLambertMaterial({ map: bannerTex(), alphaTest: 0.5, side: THREE.DoubleSide });
+    add(rockGeo(v % 4, ti), rk, 0, -0.03, 0, 0.26, 0.2, 0.24); add(rockGeo((v + 1) % 4, ti), rk, 0.22, -0.03, 0.12, 0.15, 0.12, 0.15); add(rockGeo((v + 2) % 4, ti), rk, -0.2, -0.03, 0.14, 0.13, 0.1, 0.13);
+    const lean = (h(1) - 0.5) * 0.3, top = new V3(lean, 2.15, -0.05);
+    stick(g, new V3(0, 0.05, 0), top, 0.04, dk);
+    add(Mo.geo.box(), dk, top.x + 0.3, top.y - 0.12, top.z, 0.78, 0.06, 0.06); add(Mo.geo.cone(4), gd, top.x, top.y + 0.12, top.z, 0.16, 0.26, 0.16);
+    const piv = new THREE.Group(); piv.position.set(top.x + 0.34, top.y - 0.15, top.z); g.add(piv);
+    const fl = new THREE.Mesh(gg('plane1', () => new THREE.PlaneGeometry(1, 1)), cloth); fl.position.y = -0.56; fl.scale.set(0.64, 1.12, 1); fl.castShadow = true; piv.add(fl);
+    const anim = (t) => { piv.rotation.x = Math.sin(t * 1.7 + v) * 0.1; piv.rotation.y = Math.sin(t * 1.1 + v * 2) * 0.16; };
+    return { g, mats: [dk, gd, rk, cloth], anim };
+  };
+
+  /* 石像：拄剑而立的守殿人。两层石座、收腰的袍身，肩与头是削面的石块——苔与雪自然落在肩头 */
+  Mo.guardian = function (v, ti) {
+    const g = new THREE.Group(), add = adder(g), st = lam(ti === 3 ? '#a8bccd' : ti === 1 ? '#8a7468' : '#8d939b'), dk = lam(ti === 3 ? '#6c84a0' : '#585e68'), rk = vcol();
+    const waist = gg('waist', () => new THREE.CylinderGeometry(0.34, 0.5, 1, 6)), box = Mo.geo.box();
+    add(HEX(), dk, 0, 0.08, 0, 0.86, 0.16, 0.72); add(HEX(), st, 0, 0.21, 0, 0.68, 0.1, 0.56);
+    add(waist, st, 0, 0.63, 0, 0.52, 0.74, 0.4);                                  // 袍身
+    add(rockGeo(v % 4, ti), rk, 0, 0.9, 0, 0.3, 0.2, 0.19);                       // 肩
+    add(rockGeo((v + 1) % 4, ti), rk, 0, 1.09, 0, 0.125, 0.17, 0.125);            // 头
+    add(Mo.geo.cone(4), dk, 0, 1.36, 0, 0.11, 0.18, 0.11);                        // 冠
+    add(box, st, 0, 0.86, 0.19, 0.3, 0.12, 0.13);                                 // 合在身前的双手
+    add(box, dk, 0, 0.58, 0.25, 0.055, 0.7, 0.03); add(box, dk, 0, 0.92, 0.25, 0.22, 0.04, 0.05); add(box, dk, 0, 1.02, 0.25, 0.04, 0.16, 0.04); // 拄在身前的剑
+    for (const sx of [-1, 1]) { const sl = add(box, st, sx * 0.2, 0.8, 0.08, 0.1, 0.3, 0.14); sl.rotation.z = sx * 0.3; } // 垂下的袖
+    return { g, mats: [st, dk, rk], anim: null };
+  };
+
+  /* 冰晶簇：几根六棱的冰锥从一块雪石里斜长出来，根上深蓝、尖上发白。整簇是一个几何体 */
+  const shardGeo = (k) => gg('shard' + k, () => {
+    const pos = [], col = [], lo = new THREE.Color('#3b78b8'), hi = new THREE.Color('#e9f8ff'), t = new THREE.Color(), m = new THREE.Matrix4(), q = new THREE.Quaternion(), ax = new V3(), A = new V3(), B = new V3(), C = new V3(), N = new V3();
+    const hh = (i) => U.hash(k * 31 + i, i * 3 + 7, 77), n = 4 + (k % 2);
+    for (let s = 0; s < n; s++) {
+      const main = s === 0, H = main ? 1.2 + hh(1) * 0.35 : 0.5 + hh(s + 2) * 0.5, R = main ? 0.21 : 0.1 + hh(s + 8) * 0.07;
+      const a = (s / n) * TAU + hh(s + 14) * 1.2, d = main ? 0 : 0.2 + hh(s + 20) * 0.13, tilt = main ? 0.07 : 0.32 + hh(s + 26) * 0.36, off = hh(s + 30) * TAU;
+      q.setFromAxisAngle(ax.set(Math.sin(a), 0, -Math.cos(a)), tilt); m.makeRotationFromQuaternion(q); m.setPosition(Math.cos(a) * d, -0.05, Math.sin(a) * d);
+      const ring = (y, r) => Array.from({ length: 6 }, (_, i) => [Math.cos((i / 6) * TAU + off) * r, y, Math.sin((i / 6) * TAU + off) * r]);
+      const b = ring(0, R * 0.7), sh = ring(H * 0.68, R), apex = [0, H, 0];
+      const tri = (p0, p1, p2) => {
+        A.fromArray(p0); B.fromArray(p1); C.fromArray(p2); N.subVectors(B, A).cross(ax.subVectors(C, A));
+        if (N.x * (A.x + B.x + C.x) + N.z * (A.z + B.z + C.z) < 0) { const w = p1; p1 = p2; p2 = w; } // 让面朝外
+        for (const p of [p0, p1, p2]) { const ty = p[1] / H; t.copy(lo).lerp(hi, ty * ty); A.fromArray(p).applyMatrix4(m); pos.push(A.x, A.y, A.z); col.push(t.r, t.g, t.b); }
+      };
+      for (let i = 0; i < 6; i++) { const j = (i + 1) % 6; tri(b[i], sh[i], sh[j]); tri(b[i], sh[j], b[j]); tri(sh[i], apex, sh[j]); }
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.computeVertexNormals();
+    return geo;
+  });
+  Mo.iceCluster = function (v, ti) {
+    const g = new THREE.Group(), add = adder(g), rk = vcol();
+    const ice = new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, transparent: true, opacity: 0.9, emissive: 0x143a58, shininess: 90 });
+    add(shardGeo(v % 3), ice, 0, 0, 0, 1);
+    add(rockGeo(v % 4, 3), rk, 0.05, -0.04, 0.05, 0.34, 0.15, 0.3); add(rockGeo((v + 1) % 4, 3), rk, -0.26, -0.03, 0.16, 0.14, 0.1, 0.14);
+    return { g, mats: [ice, rk], anim: null };
+  };
+
+  /* 接管场景物件：山石、松（偶尔是一树桃花）、血枫、石灯、瓦砾、残柱、竹、灵菇、火盆、战幡、石像、冰晶 */
   const prop0 = Mo.prop;
   Mo.prop = function (kind, v, ti) {
     if (kind === 'rock') return Mo.crag(v + ti * 5, ti);
@@ -316,6 +453,12 @@
     if (kind === 'lantern') return Mo.stoneLantern(v, ti);
     if (kind === 'rubble') return Mo.rubble(v, ti);
     if (kind === 'pillar') return Mo.brokenPillar(v, ti);
+    if (kind === 'bamboo') return Mo.bamboo(v, ti);
+    if (kind === 'mushroom') return Mo.shroom(v, ti);
+    if (kind === 'brazier' || kind === 'brazier2') return Mo.cauldron(v, ti, kind === 'brazier2');
+    if (kind === 'banner') return Mo.warBanner(v, ti);
+    if (kind === 'statue') return Mo.guardian(v, ti);
+    if (kind === 'icecrystal') return Mo.iceCluster(v, ti);
     return prop0(kind, v, ti);
   };
 })();

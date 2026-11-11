@@ -18,6 +18,7 @@
       $('btn-start').disabled = true; $('btn-start').textContent = '载入中…';
       $('btn-meta').onclick = () => { Au.init(); Au.sfx('ui'); this.metaPanel(); };
       $('btn-help').onclick = () => { Au.init(); Au.sfx('ui'); this.help(); };
+      $('chap').onclick = () => { this.mapPin = !this.mapPin; };
       // 触屏按钮
       const bind = (el, name) => {
         const down = (e) => { G.Input.btn[name] = true; G.Input.btnPressed[name] = true; e.preventDefault(); e.stopPropagation(); };
@@ -71,7 +72,7 @@
             <p><kbd>Q</kbd>/<kbd>右键</kbd>　<kbd>E</kbd>　<kbd>R</kbd> 施展神通</p>
             <p><kbd>V</kbd> 本命法宝 · 蜂云剑阵 / 大庚剑阵（结丹后）</p>
             <p><kbd>C</kbd> 服用丹药　<kbd>F</kbd> 交互</p>
-            <p><kbd>Esc</kbd> 暂停/查看　<kbd>M</kbd> 静音</p>
+            <p><kbd>Esc</kbd> 暂停/查看　<kbd>Tab</kbd> 按住看舆图　<kbd>M</kbd> 静音</p>
           </div>
           <div><h3>触屏</h3>
             <p>左半屏拖动：移动</p>
@@ -345,9 +346,11 @@
       // 首领血条
       const b = this.bossRef;
       if (b) { this.width('boss-fill', U.clamp(b.hp / b.maxHp, 0, 1)); $('boss').classList.toggle('p2', b.phase === 2); }
-      // 小地图
+      // 舆图：平时收起，按住 Tab 或点一下地名才展开
+      const showMap = !!(G.Input.keys.Tab || this.mapPin);
+      if (showMap !== this.cache.showMap) { this.cache.showMap = showMap; $('minimap').classList.toggle('show', showMap); if (showMap) this.mapDirty = true; }
       this.mapT -= dt;
-      if (this.mapDirty || this.mapT <= 0) { this.mapDirty = false; this.mapT = 0.5; G.Render.drawMinimap($('minimap')); }
+      if (showMap && (this.mapDirty || this.mapT <= 0)) { this.mapDirty = false; this.mapT = 0.5; G.Render.drawMinimap($('minimap')); }
     },
   });
 })();

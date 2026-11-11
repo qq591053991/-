@@ -74,8 +74,10 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px; b
 .glyph.big { width: 58px; height: 58px; font-size: 32px; }
 
 #hud-tr { position: absolute; right: calc(14px + var(--sr)); top: calc(12px + var(--st)); text-align: right; }
-#chap { font-family: var(--kai); font-size: 16px; letter-spacing: 2px; color: #e8e4d8; text-shadow: 0 1px 3px #000; margin-bottom: 4px; }
-#minimap { width: 220px; height: 150px; background: rgba(6, 10, 16, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; }
+#chap { font-family: var(--kai); font-size: 16px; letter-spacing: 2px; color: #e8e4d8; text-shadow: 0 1px 3px #000; margin-bottom: 4px; pointer-events: auto; cursor: pointer; }
+/* 舆图平时收起：画面留给场景，路靠场景里的光与风去认；按住 Tab（或点一下地名）才展开 */
+#minimap { width: 220px; height: 150px; background: rgba(6, 10, 16, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; opacity: 0; transform: translateY(-6px); transition: opacity 0.16s, transform 0.16s; }
+#minimap.show { opacity: 1; transform: none; }
 
 #boss { position: absolute; left: 50%; top: calc(14px + var(--st)); width: min(46vw, 560px); transform: translateX(-50%); display: none; text-align: center; }
 #boss.show { display: block; }
