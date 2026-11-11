@@ -435,7 +435,140 @@
         { label: '不碰来历不明之物', hint: '修为小幅增长', run: (g, p) => { g.gainXp(p.xpNeed * 0.2, true); return '谨慎，是你活到今天最大的倚仗。'; } },
       ],
     },
+    /* ---------- 以下取材于原著各篇。ch：只在这几章出现；不写就是哪一章都可能遇上。
+       同一局里每桩奇遇只遇一次。选项里可以动手（g.ambush）：打完再结算 ---------- */
+    {
+      title: '厉师兄的药丸', glyph: '厉', ch: [0],
+      text: '同门的厉飞雨师兄练完功，额上青筋未消。他见四下无人，塞给你一只瓷瓶：“抽髓丸。吃了功力立涨……只是折寿。我是没得选，你自己看着办。”',
+      options: [
+        { label: '服下一枚', hint: '伤害 +15%，气血上限 -15', run: (g, p) => { p.dmgMul += 0.15; p.maxHp = Math.max(40, p.maxHp - 15); return '一股热流自丹田炸开，筋骨噼啪作响。你知道这力气是借来的，迟早要还。'; } },
+        { label: '把药还给他，陪他练一夜刀', hint: '攻击速度 +6%，修为小幅增长', run: (g, p) => { p.atkSpd *= 1.06; g.gainXp(p.xpNeed * 0.25, true); return '厉师兄苦笑着把瓷瓶收了回去。那一夜他的刀快得只剩残影，你看了一夜，手上也快了几分。'; } },
+        { label: '收下不吃，下山换钱', hint: '灵石 +45', run: (g, p) => { g.addStones(45, true); return '这种虎狼之药，山下的江湖人肯出大价钱。'; } },
+      ],
+    },
+    {
+      title: '药房夜火', glyph: '药', ch: [0],
+      text: '墨大夫下山未归，药房的灯却亮着。门虚掩，药柜最底下那只上了锁的抽屉，今夜不知为何开了一道缝。',
+      options: [
+        { label: '翻看药柜', hint: (p) => (p.craft.dan ? '丹药 +2（炼丹术：认得出哪些是好药）' : '丹药 +1'), run: (g, p) => { const n = p.craft.dan ? 2 : 1; p.potions = Math.min(G.POTION_MAX, p.potions + n); return n > 1 ? '你一眼认出两瓶上好的黄龙丹，其余的碰都没碰。' : '你不敢多拿，只取了一枚认得的黄龙丹。'; } },
+        { label: '抄下抽屉里的毒方', hint: '获得【七毒水】', run: (g, p) => { g.giveRelic('qidu'); return '那是一张淬毒的方子，七味药、七种死法。你默记于心，回去便照方配了一瓶。'; } },
+        { label: '吹灯，掩门，离开', hint: '修为小幅增长', run: (g, p) => { g.gainXp(p.xpNeed * 0.3, true); return '你把灯吹了，把门照原样掩好。有些东西，知道得越晚越好。'; } },
+      ],
+    },
+    {
+      title: '野狼帮的暗哨', glyph: '哨', ch: [0],
+      text: '山道拐角的树上蹲着两个人，腰里别着野狼帮的短斧。他们还没看见你。',
+      options: [
+        { label: '先下手为强', hint: '一场恶战；胜后得其财物', run: (g) => { g.ambush(['thug', 'thug', 'archer', 'thug!', 'archer'], (gm) => { gm.addStones(60, true); const r = gm.randomRelic(1); gm.giveRelic(r); gm.toast(`从暗哨身上搜出【${G.Relics[r].name}】`); }); return '你刚摸到近前，林子里一声唿哨——暗哨不止两个。'; } },
+        { label: '丢下买路钱', hint: '灵石 -30', can: (p) => p.stones >= 30, run: (g, p) => { p.stones -= 30; g.gainXp(p.xpNeed * 0.15, true); return '你把钱袋远远抛了过去。那两人掂了掂，挥手放行。'; } },
+        { label: '原路退回，绕远', hint: '', run: () => '你悄悄退了回去，多走了半个时辰的山路。' },
+      ],
+    },
+    {
+      title: '守药的妖兽', glyph: '守', ch: [1],
+      text: '崖缝里长着一株紫猴花，花苞将开未开。花下盘着一条铁背蜈蚣，旁边的水洼里还伏着几只毒蟾——都在等它熟。',
+      options: [
+        { label: '斩妖取药', hint: '一场恶战；胜后立刻提升一层', run: (g) => { g.ambush(['centipede!', 'toad', 'toad', 'centipede'], (gm, p) => { gm.gainXp(p.xpNeed - p.xp + 0.01, true); p.drops = Math.min(9, p.drops + 1); gm.toast('紫猴花入腹，修为暴涨'); }); return '你飞剑出手的同时，蜈蚣也人立而起。'; } },
+        { label: '以灵露催熟，抢了就走', hint: '消耗 2 滴灵露：法力上限 +30，神通冷却 -6%', can: (p) => p.drops >= 2, run: (g, p) => { p.drops -= 2; p.maxMp += 30; p.mp += 30; p.cdr = Math.min(0.6, p.cdr + 0.06); return '两滴灵露滴在花根，花苞应声绽开。你一把摘下，在妖兽扑到之前掠出了崖缝。'; } },
+        { label: '放灵宠去引开它们', hint: '气血上限 +20', can: (p) => p.pets.length > 0, run: (g, p) => { p.maxHp += 20; p.hp += 20; return '灵宠在林子那头闹出好大动静。妖兽追过去的工夫，你从容折下花枝——没等到全熟，药力只得三成。'; } },
+      ],
+    },
+    {
+      title: '散落的储物袋', glyph: '袋', ch: [1],
+      text: '一具女修的尸身伏在溪边，四周散着五六只储物袋。看这副身家，多半是那位以法器众多出名的“多宝女”。溪对岸的林子里，似乎有人影一闪。',
+      options: [
+        { label: '只取最近的一只', hint: '获得一件珍品以上的物件', run: (g) => { const r = g.randomRelic(2); g.giveRelic(r); return `你俯身抄起一只就走，头也没回。袋里是【${G.Relics[r].name}】。`; } },
+        { label: '全部卷走', hint: '获得两件物件；但会被人盯上', run: (g) => { const a = g.randomRelic(1), b = g.randomRelic(2, false, [a]); g.giveRelic(a); g.giveRelic(b); g.ambush(['disciple', 'disciple', 'ghostcult', 'disciple!']); return `你把储物袋尽数扫进怀里：【${G.Relics[a].name}】、【${G.Relics[b].name}】……林子里的人影不再躲了。`; } },
+        { label: '就地掩埋', hint: '修为增长', run: (g, p) => { g.gainXp(p.xpNeed * 0.4, true); return '你把人埋了，储物袋一只没动。禁地里死的人太多，谁也说不准下一个是不是自己。'; } },
+      ],
+    },
+    {
+      title: '千竹教的逃亡者', glyph: '竹', ch: [2],
+      text: '一个浑身是伤的青年撞进院子，自称千竹教弃徒，身后追着魔道的人。他喘着气说：“救我一命，本门的傀儡真经，分你一半。”',
+      options: [
+        { label: '出手相救', hint: (p) => '一场恶战；胜后习得【傀儡术】' + (G.Game.mainId() === 'dy' ? '，大衍诀再进一层' : ''), run: (g) => {
+          g.ambush(['bloodguard', 'flamecult', 'bloodguard!', 'ghostcult'], (gm) => { gm.giveSkill('puppet'); if (gm.mainId() === 'dy' && gm.mainLv() < G.Mains.dy.lv.length) gm.gainMain(); });
+          return '你一步跨到院门前。追兵见有人插手，也不废话，法器齐出。'; } },
+        { label: '花灵石买下玉简，不沾因果', hint: '灵石 -60，习得【傀儡术】', can: (p) => p.stones >= 60, run: (g, p) => { p.stones -= 60; return '你把灵石和一张敛息符一并塞给他，接过玉简，指了指后墙。' + G.teach(g, p, 'puppet'); } },
+        { label: '闭门不理', hint: '', run: () => '你合上了门。墙外的打斗声响了一阵，渐渐远了。' },
+      ],
+    },
+    {
+      title: '病中的阵法师', glyph: '阵', ch: [2],
+      text: '小院里住着一位面色苍白的女阵法师，咳得直不起腰，案上却摊着半幅极精妙的阵图。她抬头看了你一眼：“道友若是来求阵的，我如今怕是布不动了。”',
+      options: [
+        { label: '赠她一枚丹药', hint: '消耗 1 枚丹药，习得【颠倒五行阵】', can: (p) => p.potions > 0, run: (g, p) => { p.potions--; return '她服了药，气色略缓，提笔在阵图上添了几处，递给你：“颠倒五行，拿去防身。”' + G.teach(g, p, 'wuxing'); } },
+        { label: '出灵石请教阵理', hint: '灵石 -40，获得技艺【阵法】', can: (p) => p.stones >= 40, run: (g, p) => { p.stones -= 40; g.giveRelic('zhenfa'); return '她讲了半个时辰，句句都在要害。你回去照着推演了一夜，总算入了门。'; } },
+        { label: '不便打扰，告辞', hint: '', run: () => '你拱了拱手，退出院子，替她把门带上了。' },
+      ],
+    },
+    {
+      title: '废弃的灵石矿', glyph: '矿', ch: [2],
+      text: '半山腰有个塌了一半的矿洞，洞口的木桩上还钉着“七派共管”的牌子。往里看，石壁上隐约闪着灵石的光。',
+      options: [
+        { label: '深入矿洞', hint: '多半能挖到不少灵石；也可能塌方', run: (g, p) => { if (U.chance(0.65)) { g.addStones(110, true); return '你一路挖到矿脉尽头，储物袋沉了不少。'; } p.hp = Math.max(1, p.hp - p.maxHp * 0.2); g.addStones(30, true); return '刚敲下几块，头顶一声闷响。你抱着灵石滚出来时，洞口已经塌实了。'; } },
+        { label: '放傀儡下去挖', hint: '灵石 +110，万无一失', can: (p) => p.flags.kuiAuto || p.skills.some((s) => s.id === 'puppet') || !!p.relics.renxing, run: (g) => { g.addStones(110, true); return '傀儡不怕塌方。它进进出出搬了十几趟，你在洞口数灵石。'; } },
+        { label: '只在洞口捡拾', hint: '灵石 +35', run: (g) => { g.addStones(35, true); return '洞口的碎矿里还剩些零碎灵石，聊胜于无。'; } },
+      ],
+    },
+    {
+      title: '冰火道', glyph: '冰', ch: [3],
+      text: '前路一分为二：左边是万载玄冰凝成的甬道，寒气割面；右边是地肺烈焰烧出的石廊，热浪灼人。两条路的尽头是同一扇门。',
+      options: [
+        { label: '走冰道', hint: '损失 15% 气血，法力上限 +40', run: (g, p) => { p.hp = Math.max(1, p.hp - p.maxHp * 0.15); p.maxMp += 40; p.mp += 40; return '你运功硬抗着走到尽头，眉发皆白。寒气入体，灵力反倒凝实了几分。'; } },
+        { label: '走火道', hint: '损失 15% 气血，伤害 +8%', run: (g, p) => { p.hp = Math.max(1, p.hp - p.maxHp * 0.15); p.dmgMul += 0.08; return '衣角烧焦了半幅。火毒在经脉里走了一圈，被你炼成了一口纯阳之气。'; } },
+        { label: '祭起法宝护身，踩着两道之间的石脊过去', hint: '法力上限 +20，伤害 +4%', can: (p) => p.relicList.filter((id) => G.Relics[id].kind === 'bao').length >= 3, run: (g, p) => { p.maxMp += 20; p.mp += 20; p.dmgMul += 0.04; return '三件法宝轮番撑起光罩，你走在冰与火的夹缝里，两边的好处都沾了一点。'; } },
+      ],
+    },
+    {
+      title: '求购养魂木的女修', glyph: '魂', ch: [3],
+      text: '一名女修拦住你，开口便问有没有养魂木。她身后跟着的师姐目光呆滞、一言不发——那是神魂受了重创的样子。',
+      options: [
+        { label: '把养魂木让给她', hint: '失去【养魂木】，换得一件至宝', can: (p) => !!p.relics.yanghun, run: (g, p) => { p.relics.yanghun = 0; p.relicList = p.relicList.filter((id) => id !== 'yanghun'); p.cdr = Math.max(0, p.cdr - 0.1); p.maxMp = Math.max(20, p.maxMp - 20); p.mp = Math.min(p.mp, p.maxMp); G.UI.relicDirty = true; const r = g.randomRelic(3); g.giveRelic(r); return `她怔了一下，随即郑重一礼，从储物袋最深处取出一物：【${G.Relics[r].name}】。`; } },
+        { label: '告诉她哪里可能寻到', hint: '修为增长，灵石 +40', run: (g, p) => { g.gainXp(p.xpNeed * 0.35, true); g.addStones(40, true); return '你把听来的几处去向都说了。她记下，留了一袋灵石作谢。'; } },
+        { label: '摇头走开', hint: '', run: () => '你摇了摇头。她没有纠缠，扶着师姐往别处去了。' },
+      ],
+    },
+    {
+      title: '残图一角', glyph: '图', ch: [3],
+      text: '石缝里塞着一块巴掌大的兽皮，是虚天残图的一角。几乎同时，另一只手也伸了过来——那人手里捏着另一角。',
+      options: [
+        { label: '拼图，同去', hint: '或得至宝，或遭暗算', run: (g, p) => { if (U.chance(0.5)) { const r = g.randomRelic(3); g.giveRelic(r); return `两角一合，图上显出一条暗道。尽头的石匣里是【${G.Relics[r].name}】，那人倒也守信，只取了另一件。`; } p.hp = Math.max(1, p.hp - p.maxHp * 0.25); g.addStones(60, true); return '暗道走到一半，背后寒光一闪。你早有防备，仍被划开一道口子；那人丢下储物袋遁走了。'; } },
+        { label: '把这一角卖给他', hint: '灵石 +120', run: (g) => { g.addStones(120, true); return '他出价很痛快。你数着灵石想，有命花的才叫宝物。'; } },
+        { label: '自己留着参详', hint: '修为增长', run: (g, p) => { g.gainXp(p.xpNeed * 0.4, true); return '你把残图揣进怀里，没理那人。图上的禁制纹路，够你琢磨一阵了。'; } },
+      ],
+    },
+    {
+      title: '夺舍', glyph: '夺',
+      text: '枯骨堆里忽然扑出一缕残魂，直取你的识海——是个寿元耗尽、不肯入轮回的老怪。',
+      options: [
+        { label: '紧守识海，硬拼神识', hint: (p) => (G.Game.mainId() === 'dy' ? '大衍诀神识远胜同阶：毫发无伤，神通冷却 -8%' : '损失 20% 气血，神通冷却 -6%'), run: (g, p) => {
+          if (g.mainId() === 'dy') { p.cdr = Math.min(0.6, p.cdr + 0.08); return '残魂一头撞上来，像撞在了铁壁上。你的神识反卷过去，把它连同那点残存的记忆一并炼化了。'; }
+          p.hp = Math.max(1, p.hp - p.maxHp * 0.2); p.cdr = Math.min(0.6, p.cdr + 0.06); return '识海里翻江倒海。你七窍渗血，总算把那缕残魂磨灭了，神识经此一役凝练了不少。'; } },
+        { label: '祭出辟邪之物', hint: '灵石 +50，修为增长', can: (p) => !!p.flags.evilBane || p.fy > 0 || p.skills.some((s) => s.id === 'thunder'), run: (g, p) => { g.addStones(50, true); g.gainXp(p.xpNeed * 0.3, true); return '一道金色雷光劈下，残魂连惨叫都没来得及发出。枯骨旁留着它生前的储物袋。'; } },
+        { label: '立刻遁走', hint: '', run: () => '你头也不回地掠出百丈。身后那声尖啸追了一阵，散了。' },
+      ],
+    },
+    {
+      title: '灵兽蛋', glyph: '卵',
+      text: '一处废弃的兽巢里卧着一枚拳头大的蛋，蛋壳上有天然的云纹，摸上去尚有余温。',
+      options: [
+        { label: '以灵力温养，孵它出来', hint: '获得一只灵宠', can: (p) => p.pets.length < p.petCap, run: (g, p) => {
+          const ids = Object.keys(G.Relics).filter((id) => G.Relics[id].kind === 'pet' && !p.relics[id] && (!G.Relics[id].req || G.Relics[id].req(p)));
+          if (!ids.length) { g.addStones(80, true); return '蛋壳裂开，里面却是空的——早被别的东西吸干了。你把蛋壳卖给了收材料的修士。'; }
+          const id = U.pick(ids); g.giveRelic(id); return `蛋壳裂开，钻出来的小东西蹭了蹭你的手指——是【${G.Relics[id].name}】。`; } },
+        { label: '喂给自己的灵宠', hint: '灵宠伤害 +15%', can: (p) => p.pets.length > 0, run: (g, p) => { p.petMul += 0.15; return '灵宠吃得很香。它打了个饱嗝，周身的灵光亮了一圈。'; } },
+        { label: '带去坊市卖掉', hint: '灵石 +80', run: (g) => { g.addStones(80, true); return '认得这种云纹的人不多，但出得起价的总有。'; } },
+      ],
+    },
   ];
+  // 奇遇里传授神通：已会则升一重，栏位有空则习得，栏满则折成灵石（奇遇面板开着的时候不能再弹"舍弃哪一门"）
+  G.teach = function (g, p, id) {
+    const s = p.skills.find((x) => x.id === id), d = G.Skills[id];
+    if (s) { if (s.lv < 3) { s.lv++; G.UI.skillDirty = true; return `【${d.name}】升至第 ${s.lv} 重。`; } g.addStones(60, true); return `【${d.name}】你早已练到头了，玉简转手卖了 60 块灵石。`; }
+    if (p.skills.length < 3) { p.skills.push({ id, lv: 1, cd: 0 }); G.UI.skillDirty = true; return `习得神通【${d.name}】。`; }
+    g.addStones(60, true); return '你的神通已经修满三门，贪多嚼不烂，玉简转手卖了 60 块灵石。';
+  };
 
   /* ---------------- 轮回感悟（局外成长） ---------------- */
   G.Meta = [

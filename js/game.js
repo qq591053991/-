@@ -53,6 +53,7 @@
       const m = this.meta.up;
       this.player = E.makePlayer({ body: m.body, root: m.root, wit: m.wit, bag: m.bag, luck: m.luck, vial: m.vial });
       this.stats = { kills: 0, dmg: 0, taken: 0, casts: 0, rooms: 0, time: 0, bosses: 0 };
+      this.seenEvents = new Set(); // 这一局遇过的奇遇
       this.meta.runs++; this.saveMeta();
       this.timers.length = 0; this.slowT = 0; this.combo = 0; this.comboT = 0; this.transit = null;
       G.UI.hideMenu();
@@ -112,6 +113,22 @@
 
     /* ---------------- 工具 ---------------- */
     after(t, fn) { this.timers.push({ t, fn }); },
+    /* 奇遇：优先挑这一章才有的、这一局还没遇过的 */
+    pickEvent() {
+      const seen = this.seenEvents || (this.seenEvents = new Set()), ch = this.chapter;
+      const fresh = G.Events.filter((e) => !seen.has(e.title) && (!e.ch || e.ch.includes(ch)));
+      const local = fresh.filter((e) => e.ch), pool = local.length && U.chance(0.7) ? local : fresh.length ? fresh : G.Events.filter((e) => !e.ch || e.ch.includes(ch));
+      const ev = U.pick(pool); seen.add(ev.title); return ev;
+    },
+    /* 奇遇里动手：把这间安全的屋子临时变成险地，打完再结算（onWin）。名字后面带 ! 的是精英 */
+    ambush(keys, onWin) {
+      const room = this.room, p = this.player;
+      this.after(0.45, () => {
+        room.locked = true; room.cleared = false; room.waves = []; room.waveI = 0; room.onClear = onWin || null;
+        keys.forEach((k, i) => { const elite = k.endsWith('!'), q = W.randomFloorNear(room, p.x, p.y, 240, p.x, p.y, 110); E.spawnEnemy(elite ? k.slice(0, -1) : k, q.x, q.y, { delay: 0.5 + i * 0.12, elite }); });
+        Au.sfx('door'); G.UI.mapDirty = true; this.shake(5); this.toast('伏兵四起');
+      });
+    },
     shake(a) { this.shakeAmt = Math.min(16, Math.max(this.shakeAmt, a)); },
     toast(m) { G.UI.toast(m); },
     say(e, text) { this.barks.push({ e, text, life: 2.2 }); },
@@ -282,6 +299,7 @@
     onRoomCleared() {
       const room = this.room, p = this.player;
       room.cleared = true; room.locked = false;
+      if (room.onClear) { const f = room.onClear; room.onClear = null; this.after(0.8, () => f(this, this.player)); } // 奇遇里那一仗的结算
       this.stats.rooms++;
       this.clearHostile = true;
       if (p.drops < 9) { const n = Math.min(9 - p.drops, p.flags.vial ? 2 : 1); p.drops += n; this.toast(n > 1 ? '掌天瓶吞吐月华，凝出两滴灵露' : '玉瓶里凝出一滴灵露'); }
@@ -498,7 +516,7 @@
         G.UI.garden(it);
       } else if (it.kind === 'event') {
         it.used = true;
-        G.UI.event(U.pick(G.Events));
+        G.UI.event(this.pickEvent());
       } else if (it.kind === 'portal') {
         it.used = true; Au.sfx('portal');
         this.nextChapter();

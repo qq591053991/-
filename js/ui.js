@@ -214,7 +214,7 @@
 
     event(ev) {
       const Gm = G.Game, p = Gm.player;
-      const opts = ev.options.map((o, i) => `<button class="opt" data-i="${i}" ${o.can && !o.can(p) ? 'disabled' : ''}><b>${esc(o.label)}</b><em>${esc(o.hint || '')}</em></button>`).join('');
+      const opts = ev.options.map((o, i) => `<button class="opt" data-i="${i}" ${o.can && !o.can(p) ? 'disabled' : ''}><b>${esc(o.label)}</b><em>${esc(typeof o.hint === 'function' ? o.hint(p) : o.hint || '')}</em></button>`).join('');
       this.open(`<div class="panel event"><span class="glyph r3 big">${ev.glyph}</span><h2>${esc(ev.title)}</h2><p class="text">${esc(ev.text)}</p><div class="opts">${opts}</div></div>`, 'dim');
       this.ov.querySelectorAll('.opt').forEach((b) => (b.onclick = () => {
         const res = ev.options[+b.dataset.i].run(Gm, p);
