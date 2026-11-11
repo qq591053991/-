@@ -149,7 +149,7 @@
         if (e.cd <= 0 && d < 340 && W.los(room, e.x, e.y, p.x, p.y, 1)) {
           e.st = 'wind'; e.stT = 0.55; e.dir = e.face;
           E.hazLine(e.x, e.y, e.x + Math.cos(e.dir) * 340, e.y + Math.sin(e.dir) * 340, e.r * 2, 0.55, 0, { visual: true });
-        } else if (d > 230) go(e, p.x, p.y, e.spd * sm, dt, room);
+        } else if (d > 230 || !W.los(room, e.x, e.y, p.x, p.y, 1)) go(e, p.x, p.y, e.spd * sm, dt, room); // 看不见玩家（被树石挡住）就绕路靠过去，而不是原地打转
         else strafe(e, p, e.spd * 0.7 * sm, dt, room);
       } else if (e.st === 'wind') {
         e.stT -= dt; e.wind = 1; e.moving = false;
@@ -266,7 +266,7 @@
       e.cd -= dt;
       if (e.st === 'idle') {
         e.face = angTo(e, p);
-        if (d > 170) go(e, p.x, p.y, e.spd * 0.7 * sm, dt, room); else strafe(e, p, e.spd * 0.5 * sm, dt, room);
+        if (d > 170 || !W.los(room, e.x, e.y, p.x, p.y, 1)) go(e, p.x, p.y, e.spd * 0.7 * sm, dt, room); else strafe(e, p, e.spd * 0.5 * sm, dt, room);
         if (e.cd <= 0) { e.st = 'fade'; e.stT = 0.4; }
       } else if (e.st === 'fade') {
         e.stT -= dt; e.alpha = Math.max(0, e.stT / 0.4);
