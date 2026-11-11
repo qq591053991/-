@@ -289,6 +289,24 @@
     return { g, mats: [wax], flames };
   };
 
+  /* 瓦砾：一丛碎石里夹着几块断砖 */
+  Mo.rubble = function (v, ti) {
+    const m = Mo.crag(v + 3, ti, 0.78), brick = lam(KIT[ti].stone), h = (i) => U.hash(v * 7 + i, i + 2, ti + 31);
+    for (let i = 0; i < 4; i++) { const b = new THREE.Mesh(Mo.geo.box(), brick); b.position.set((h(i) - 0.5) * 0.8, 0.05 + h(i + 5) * 0.1, (h(i + 9) - 0.5) * 0.7); b.scale.set(0.24, 0.1, 0.13); b.rotation.set(h(i + 13) * 0.5, h(i + 17) * 3, h(i + 21) * 0.5); b.castShadow = true; m.g.add(b); }
+    m.mats.push(brick); return m;
+  };
+  /* 残柱：一截断了的殿柱，柱身箍金环，断口参差；旁边倒着一节柱鼓 */
+  Mo.brokenPillar = function (v, ti) {
+    const g = new THREE.Group(), K = KIT[ti], st = lam(K.wood), dk = lam(K.dark), gd = lam(K.gold), cap = lam(PAL[ti].cap), h = (i) => U.hash(v * 5 + i, i + 1, ti + 41);
+    const col = gg('col8', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 8)), hex = gg('hex6', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 6)), H = 0.85 + h(1) * 0.75;
+    const add = (geo, m, x, y, z, sx, sy, sz) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; g.add(o); return o; };
+    add(hex, dk, 0, 0.07, 0, 0.62, 0.14, 0.62); add(col, st, 0, 0.14 + H / 2, 0, 0.36, H, 0.36);
+    add(col, gd, 0, 0.3, 0, 0.42, 0.06, 0.42); add(col, gd, 0, 0.14 + H * 0.8, 0, 0.42, 0.06, 0.42);
+    const top = add(rockGeo(v % 4, ti), cap, 0, 0.14 + H - 0.06, 0, 0.2, 0.22, 0.2); top.material = vcol(); // 断口：一块参差的石头
+    const drum = add(col, st, 0.42, 0.16, 0.2 - h(2) * 0.4, 0.34, 0.34, 0.34); drum.rotation.set(Math.PI / 2, 0, h(3) * 3);
+    return { g, mats: [st, dk, gd, cap, top.material], anim: null };
+  };
+
   /* 接管几样场景物件：山石、松（偶尔是一树桃花）、血枫、石灯 */
   const prop0 = Mo.prop;
   Mo.prop = function (kind, v, ti) {
@@ -296,6 +314,8 @@
     if (kind === 'pine') return Mo.tree(v * 3 + ti, ti, v === 2 ? 'bloom' : 'pine', 1.05);
     if (kind === 'deadtree') return Mo.tree(v * 3 + ti + 1, ti, 'round', 1.1);
     if (kind === 'lantern') return Mo.stoneLantern(v, ti);
+    if (kind === 'rubble') return Mo.rubble(v, ti);
+    if (kind === 'pillar') return Mo.brokenPillar(v, ti);
     return prop0(kind, v, ti);
   };
 })();

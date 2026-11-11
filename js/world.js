@@ -60,8 +60,12 @@
     const dist = new Map([[start, 0]]); const q = [start];
     while (q.length) { const r = q.shift(); for (const d in r.links) { const o = r.links[d]; if (!dist.has(o)) { dist.set(o, dist.get(r) + 1); q.push(o); } } }
     for (const r of all) r.depth = dist.get(r) || 0;
-    // 最远的尽头房 = 首领
+    // 首领 = 最远的、位于邻居正北的尽头房。这样通往首领的永远是北面那道门：
+    // 院落里是青铜环门，血色禁地里是立在岩壁上的洞门（山洞外景）
     added.sort((a, b) => b.depth - a.depth);
+    const northIdx = added.findIndex((r) => r.links.s && r.depth >= 3);
+    if (northIdx > 0) added.unshift(added.splice(northIdx, 1)[0]);
+    if (northIdx < 0 && !force) return null;
     if (added[0] && added[0].depth < 3 && !force) return null;
     const rest = U.shuffle(specials.slice(1));
     added.forEach((r, i) => { r.type = i === 0 ? 'boss' : rest[i - 1]; });

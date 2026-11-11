@@ -165,7 +165,7 @@
     { base: '#2a2836', hi: '#3c394c', line: '#8fb89e', glyph: '燕' }, // 玄铁 + 褪了色的铜绿
     { base: '#38526a', hi: '#587890', line: '#ecca72', glyph: '' },   // 寒玉 + 鎏金星图
   ];
-  function medallion(c, cx, cy, R, ti, worn, seed) {
+  function medallion(c, cx, cy, R, ti, worn, seed, boss) {
     const M = MED[ti], th = G.Themes[ti], hh = (i) => U.hash(seed, i, 11);
     c.save(); c.translate(cx, cy);
     c.fillStyle = 'rgba(0,0,0,0.38)'; circ(c, 0, 0, R * 1.045); // 陷进地面的一圈暗影
@@ -195,7 +195,8 @@
     }
     // 中心
     c.globalAlpha = 0.86; c.fillStyle = M.line;
-    if (M.glyph) { c.font = `${Math.round(R * 0.5)}px "STKaiti","KaiTi","Kaiti SC","楷体","Noto Serif CJK SC","Songti SC",serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(M.glyph, 0, R * 0.03); }
+    if (boss) bossMotif(c, R, ti, M);
+    else if (M.glyph) { c.font = `${Math.round(R * 0.5)}px "STKaiti","KaiTi","Kaiti SC","楷体","Noto Serif CJK SC","Songti SC",serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(M.glyph, 0, R * 0.03); }
     else { // 北斗七星 + 周天星点
       const D = [[0.27, 0.0], [0.21, 0.15], [0.07, 0.1], [0.03, -0.06], [-0.08, -0.15], [-0.2, -0.2], [-0.31, -0.12]];
       c.lineWidth = 1.3; c.beginPath();
@@ -217,8 +218,45 @@
     }
     c.restore();
   }
+  /* 首领的场地：每位首领一个占满地台中心的纹样。
+     墨大夫 —— 太极（医者调和阴阳，他却要夺舍）；墨蛟 —— 一条盘蛟；王蝉 —— 一只张翅的蝉；极阴祖师 —— 北斗与十二地支 */
+  function bossMotif(c, R, ti, M) {
+    c.strokeStyle = M.line; c.fillStyle = M.line; c.lineCap = 'round';
+    if (ti === 0) { // 太极
+      const r = R * 0.37;
+      c.globalAlpha = 0.9; c.beginPath(); c.arc(0, 0, r, 0, TAU); c.fill();
+      c.fillStyle = M.base; c.beginPath(); c.arc(0, 0, r * 0.96, -Math.PI / 2, Math.PI / 2); c.arc(0, r * 0.48, r * 0.48, Math.PI / 2, -Math.PI / 2, true); c.arc(0, -r * 0.48, r * 0.48, Math.PI / 2, -Math.PI / 2); c.fill();
+      c.fillStyle = M.line; circ(c, 0, r * 0.48, r * 0.13); c.fillStyle = M.base; circ(c, 0, -r * 0.48, r * 0.13);
+    } else if (ti === 1) { // 盘蛟：一条由粗到细的螺线，背上有鳞，头在外圈
+      c.globalAlpha = 0.88;
+      let px = 0, py = 0;
+      for (let i = 0; i <= 150; i++) { const t = i / 150, a = t * TAU * 2.6 + 0.6, r = R * (0.04 + t * 0.35), x = Math.cos(a) * r, y = Math.sin(a) * r; if (i) { c.lineWidth = 2 + t * R * 0.05; c.beginPath(); c.moveTo(px, py); c.lineTo(x, y); c.stroke(); if (i % 6 === 0) { c.lineWidth = 1.4; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * R * 0.035, y + Math.sin(a) * R * 0.035); c.stroke(); } } px = x; py = y; }
+      const ha = TAU * 2.6 + 0.6; c.save(); c.translate(px, py); c.rotate(ha + Math.PI / 2);
+      c.beginPath(); c.moveTo(0, -R * 0.07); c.lineTo(R * 0.045, R * 0.03); c.lineTo(-R * 0.045, R * 0.03); c.closePath(); c.fill();
+      c.lineWidth = 1.6; for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(sx * R * 0.03, -R * 0.03); c.quadraticCurveTo(sx * R * 0.1, -R * 0.06, sx * R * 0.12, -R * 0.13); c.stroke(); } // 须
+      c.restore();
+    } else if (ti === 2) { // 蝉：身子居中，两对带翅脉的翅向两侧张开
+      c.globalAlpha = 0.95; c.lineWidth = 2.8;
+      for (const sx of [-1, 1]) for (const [len, wid, ang] of [[0.36, 0.13, 0.5], [0.26, 0.09, 1.1]]) {
+        c.save(); c.scale(sx, 1); c.rotate(-ang); c.beginPath(); c.ellipse(R * len * 0.52, 0, R * len * 0.5, R * wid, 0, 0, TAU); c.stroke();
+        for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(R * 0.03, 0); c.quadraticCurveTo(R * len * 0.5, k * R * wid * 0.5, R * len * 0.98, k * R * wid * 0.22); c.stroke(); }
+        c.restore();
+      }
+      ell(c, 0, R * 0.04, R * 0.055, R * 0.17); circ(c, 0, -R * 0.15, R * 0.05);
+      for (const sx of [-1, 1]) circ(c, sx * R * 0.055, -R * 0.17, R * 0.022);
+    } else { // 北斗 + 十二地支
+      const D = [[0.27, 0.0], [0.21, 0.15], [0.07, 0.1], [0.03, -0.06], [-0.08, -0.15], [-0.2, -0.2], [-0.31, -0.12]];
+      c.globalAlpha = 0.9; c.lineWidth = 1.5; c.beginPath();
+      [0, 1, 2, 3, 0].forEach((k, i) => (i ? c.lineTo(D[k][0] * R, D[k][1] * R) : c.moveTo(D[k][0] * R, D[k][1] * R)));
+      c.moveTo(D[3][0] * R, D[3][1] * R); for (let k = 4; k < 7; k++) c.lineTo(D[k][0] * R, D[k][1] * R);
+      c.stroke();
+      for (const d of D) circ(c, d[0] * R, d[1] * R, Math.max(2.6, R * 0.028));
+      c.font = `${Math.round(R * 0.085)}px "STKaiti","KaiTi","Kaiti SC","楷体","Noto Serif CJK SC","Songti SC",serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+      '子丑寅卯辰巳午未申酉戌亥'.split('').forEach((ch, i) => { const a = (i / 12) * TAU - Math.PI / 2; c.save(); c.translate(Math.cos(a) * R * 0.385, Math.sin(a) * R * 0.385); c.rotate(a + Math.PI / 2); c.fillText(ch, 0, 0); c.restore(); });
+    }
+  }
   // 各类房间的地台大小（格）；寻常险地只有三成有，而且残破
-  const MED_R = { boss: 4.4, elite: 3.2, start: 2.8, treasure: 2.5, shop: 2.5, garden: 2.5, event: 2.5 };
+  const MED_R = { boss: 5.2, elite: 3.2, start: 2.8, treasure: 2.5, shop: 2.5, garden: 2.5, event: 2.5 };
   const LITTER = [['#f0c8d6', '#e8a8c0', '#f8e4ea'], ['#6a2a2a', '#8a3a30', '#4a2420'], ['#1c1a22', '#3a2a2a', '#5a3a20'], ['#eaf6ff', '#cfe6f6', '#ffffff']]; // 落英 / 枯叶 / 余烬 / 霜花
 
   Tx.floor = function (room) {
@@ -255,7 +293,7 @@
     // 青铜地台
     const seed = (room.gx || 0) * 7 + (room.gy || 0) * 13 + ti * 31;
     let mr = MED_R[room.type] || (U.hash(seed, 3, 9) < 0.34 ? 2.6 : 0);
-    if (mr) { mr = Math.min(mr, Math.min(w, h) / 2 - 1.6); medallion(c, (w / 2) * T, (h / 2) * T, mr * T, ti, !MED_R[room.type], seed); }
+    if (mr) { mr = Math.min(mr, Math.min(w, h) / 2 - 1.6); medallion(c, (w / 2) * T, (h / 2) * T, mr * T, ti, !MED_R[room.type], seed, room.type === 'boss'); }
     // 散落物：成簇的落英 / 枯叶 / 余烬 / 霜花，让地面不那么"干净"
     const nL = Math.round(w * h * (ti === 2 ? 0.5 : 0.9)), LC = LITTER[ti];
     for (let i = 0; i < nL; i++) {

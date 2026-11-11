@@ -293,6 +293,7 @@
       const bark = lm({ color: new THREE.Color(Mo.PAL[ti].trunk) }), leaf = new THREE.MeshLambertMaterial({ vertexColors: true }), barkD = bark.clone(), leafD = new THREE.MeshLambertMaterial({ vertexColors: true, color: new THREE.Color(0.6, 0.62, 0.68) });
       barkD.color.multiplyScalar(0.6); rs.mats.push(leaf, barkD, leafD);
       const taken = new Set(room.deco.map((dd) => Math.floor(dd.y) * w + Math.floor(dd.x)));
+      const cliffN = !cave && room.doors.n && room.doors.n.cave; // 北面的出口是洞口
       // 每格离最近的空地有几格远：贴着空地的一圈种整棵的树，往里两圈用简化的树，再深处只放一团团树冠（大图里林子很厚，不能棵棵都画全）
       const far = new Uint8Array(w * h).fill(99), qu = [];
       for (let i = 0; i < w * h; i++) if (tiles[i] !== 1) { far[i] = 0; qu.push(i); }
@@ -307,6 +308,10 @@
         let edgeT = false;
         for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const xx = x + i, yy = y + j; if (xx >= 0 && yy >= 0 && xx < w && yy < h && tiles[yy * w + xx] !== 1) edgeT = true; }
         const r1 = U.hash(x, y, sd + 60), r2 = U.hash(x, y, sd + 61), px = x + 0.5 + (U.hash(x, y, sd + 62) - 0.5) * 0.5, pz = y + 0.5 + (U.hash(x, y, sd + 63) - 0.5) * 0.5, north = y < h * 0.42, south = y > h * 0.66;
+        if (cliffN && y <= 3) { // 洞口两侧：一整面岩壁，越靠北越高 —— 山洞的外景
+          const top = 3.3 - y * 0.55 + r1 * 0.9; crag(px, pz, top); if (y >= 2 && r2 < 0.3) treeOn(px, top, pz, treeKind(r1), 0.8);
+          continue;
+        }
         if (cave) {
           const top = Math.max(0.35, (edgeT ? 0.85 : 1.7) + r1 * (north ? 1.4 : south ? 0.3 : 0.8) - (south ? 0.45 : 0)); crag(px, pz, top);
           if (edgeT && !south && r2 < 0.2) rk(px + 0.3, top + 0.5 + r2 * 4, pz + 0.2, 0.2, 3.6, x * 37 + y); // 石笋
@@ -407,9 +412,13 @@
       } else if (d === 'n') {
         const ag = Mo.archGate(ti); ag.g.position.set(cx, 0, 0.9); g.add(ag.g); rs.mats.push(...ag.mats); rs.tex.push(...ag.tex); // 青铜环门
       } else {
-        const ph = d === 's' ? 0.8 : 1.3;
-        if (ns) for (const sx of [-1.5, 1.5]) mesh(postM, cx + sx * 1.0, ph / 2, cz, 0.3, ph, 0.3);
-        else for (const sz of [-1.5, 1.5]) mesh(postM, cx, ph / 2, cz + sz * 1.0, 0.3, ph, 0.3);
+        if (d === 's') { for (const sx of [-1.78, 1.78]) kit.tower(cx + sx, cz, 0.62, 0.52); } // 南门：两只带攒尖顶的门墩，不挡视线
+        else { // 东西两侧：门楼 —— 两根立柱托着一道横在门上的屋顶（燕翎堡是城门：石过梁上压垛口）
+          for (const sz of [-1.72, 1.72]) kit.column(cx, cz + sz, 1.55, 0.13, ti === 3);
+          mesh(postM, cx, 1.5, cz, 0.2, 0.16, 3.7);
+          if (ti === 2) { mesh(postM, cx, 1.66, cz, 0.9, 0.2, 3.9); for (let i = -1; i <= 1; i++) kit.crenel(cx, 1.74, cz + i * 1.3, 0.9, 0.6); }
+          else kit.roofZ(cx, cz - 2.05, 4.1, 1.58, 1.3, 0.36);
+        }
       }
       const bm = new THREE.MeshBasicMaterial({ color: 0xff5050, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
       const barrier = new THREE.Mesh(boxG, bm); barrier.position.set(cx, 0.66, cz); barrier.scale.set(ns ? 2.9 : 0.16, 1.3, ns ? 0.16 : 2.9); g.add(barrier);
