@@ -53,14 +53,17 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px; b
 #hud.show { display: block; }
 #hud-tl { position: absolute; left: calc(16px + var(--sl)); top: calc(14px + var(--st)); width: 270px; }
 #realm { font-family: var(--kai); font-size: 20px; letter-spacing: 2px; color: var(--gold); text-shadow: 0 1px 3px #000, 0 0 10px rgba(0, 0, 0, 0.8); margin-bottom: 5px; }
-.bar { position: relative; height: 16px; border: 1px solid rgba(0, 0, 0, 0.75); border-radius: 3px; background: rgba(8, 10, 14, 0.72); overflow: hidden; margin-bottom: 4px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07); }
+/* 血条、法力条是一笔刷出来的墨痕：起笔钝、收笔飞白，没有方框 */
+.bar { position: relative; height: 16px; background: rgba(8, 10, 14, 0.74); overflow: hidden; margin-bottom: 4px;
+  clip-path: polygon(0 22%, 1.2% 4%, 3% 0, 95.5% 0, 97% 16%, 98.2% 6%, 100% 12%, 98.9% 44%, 100% 58%, 98.3% 74%, 99.3% 100%, 96.4% 88%, 95% 100%, 2.6% 100%, 0.8% 84%, 1.6% 60%, 0 46%); }
+.bar i::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0 1px, rgba(255, 255, 255, 0.05) 1px 2px, transparent 2px 5px); }
 .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transition: width 0.12s; }
 .bar span { position: absolute; inset: 0; font-size: 11px; line-height: 15px; text-align: center; color: #fff; text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; }
-.bar.hp i#hp-fill { background: linear-gradient(180deg, #ee6a5e, #b22a2e); }
+.bar.hp i#hp-fill { background: linear-gradient(180deg, #d9584a, #9c2a2a); }
 .bar.hp i#sh-fill { background: rgba(200, 225, 255, 0.75); width: 0; height: 4px; top: auto; }
 .bar.mp { height: 13px; width: 86%; } .bar.mp span { line-height: 12px; font-size: 10px; }
-.bar.mp i { background: linear-gradient(180deg, #5aa8f0, #2456b4); }
-.bar.xp { height: 5px; width: 86%; } .bar.xp i { background: linear-gradient(90deg, #c9a84e, #ffe9a0); }
+.bar.mp i { background: linear-gradient(180deg, #5a9ee0, #2a559f); }
+.bar.xp { height: 5px; width: 86%; clip-path: polygon(0 30%, 2% 0, 97% 0, 100% 50%, 97% 100%, 1% 100%); } .bar.xp i { background: linear-gradient(90deg, #c9a84e, #ffe9a0); } .bar.xp i::after { display: none; }
 #gongfa { font-family: var(--kai); font-size: 13px; letter-spacing: 1px; color: #b8ffd2; text-shadow: 0 1px 3px #000; margin: -2px 0 5px; min-height: 16px; }
 #gongfa b { color: #e8ffb0; font-weight: 400; }
 #res { display: flex; gap: 14px; margin-top: 7px; font-size: 14px; text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; }
