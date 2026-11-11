@@ -267,10 +267,11 @@
         const rar = U.weighted(G.RARITY, (r) => r.w), v = Math.round(u.v * rar.mul);
         return { name: u.name, glyph: u.glyph, tag: '感悟 · ' + rar.name, desc: u.desc(v), cls: rar.cls, pick: () => { u.apply(p, v); p.cdr = Math.min(0.6, p.cdr); p.armor = Math.min(0.6, p.armor); } };
       });
-      // 已修炼青元剑诀且未大成：有机会参悟下一层
-      if (p.qy >= 1 && p.qy < G.Qingyuan.length && U.chance(0.6)) {
-        const L = G.Qingyuan[p.qy];
-        cards[U.randi(0, 2)] = { name: '青元剑诀', glyph: '元', sch: 'sword', tag: `功法 · 第${G.CN_NUM[p.qy + 1]}层【${L.name}】`, desc: L.desc, cls: 'r3', pick: () => this.gainQingyuan() };
+      // 主修功法尚未大成：有机会参悟下一层
+      const M = G.Mains[p.main], mlv = this.mainLv();
+      if (M && mlv >= 1 && mlv < M.lv.length && U.chance(0.6)) {
+        const L = M.lv[mlv];
+        cards[U.randi(0, 2)] = { name: M.name, glyph: M.glyph, sch: M.sch, tag: `功法 · 第${G.CN_NUM[mlv + 1]}层【${L.name}】`, desc: L.desc, cls: 'r3', pick: () => this.gainMain() };
       }
       G.UI.choice({ title: '修为精进', sub: E.realmName(p) + ' —— 择一感悟', cards, done: () => { p.pendingLv--; } });
     },
@@ -286,8 +287,10 @@
       for (let i = 0; i < n; i++) E.dropPickup('stone', p.x + U.rand(-60, 60), p.y + U.rand(-60, 60), Math.round(U.randi(2, 4) * (1 + room.chapter * 0.25)));
       if (p.craft.dan && p.potions < G.POTION_MAX && U.chance(0.1 * p.craft.dan)) { p.potions++; this.toast('炼丹术：就地开炉，炼成一枚丹药'); }
       if (room.type === 'elite') {
-        room.interact.push({ kind: 'chest', x: (room.w / 2) * T, y: (room.h / 2) * T, r: 46, label: '开启精英宝匣', elite: true });
-        FX.ring((room.w / 2) * T, (room.h / 2) * T, 10, 90, '255,220,130', 0.5, 5);
+        let bx = (room.w / 2) * T, by = (room.h / 2) * T; // 场中若是台地的坡，宝匣挪到旁边的空地上
+        if (room.tiles[Math.floor(by / T) * room.w + Math.floor(bx / T)] !== 0) { const q = W.randomFloorNear(room, bx, by, 150); bx = q.x; by = q.y; }
+        room.interact.push({ kind: 'chest', x: bx, y: by, r: 46, label: '开启精英宝匣', elite: true });
+        FX.ring(bx, by, 10, 90, '255,220,130', 0.5, 5);
       }
       Au.sfx('door'); G.UI.mapDirty = true;
     },
@@ -309,31 +312,42 @@
           const b = ch.breakthrough;
           this.applyBreakthrough(room.chapter);
           Au.sfx('break');
-          G.UI.breakthrough(b.title, b.desc, () => {
-            this.openLootChoice('首领遗物', '择一而取', 2, () => {
+          G.UI.breakthrough(b.title, typeof b.desc === 'function' ? b.desc(p) : b.desc, () => {
+            const loot = () => this.openLootChoice('首领遗物', '择一而取', 2, () => {
               room.interact.push({ kind: 'portal', x: (room.w / 2) * T, y: (room.h / 2) * T, r: 50, label: '踏入传送阵 · 前往下一章' });
               this.toast('传送阵已开启'); Au.sfx('portal');
             }, true);
+            if (p.realm >= 1 && !p.main) this.chooseMain(loot); else loot(); // 筑基之后先择主修功法，再取遗物
           });
         });
       });
     },
 
-    gainQingyuan(quiet) {
-      const p = this.player, L = G.Qingyuan[p.qy];
-      if (!L) return;
-      L.apply(p); p.qy++;
-      if (!quiet) this.toast(`青元剑诀 · 第${G.CN_NUM[p.qy]}层【${L.name}】`);
+    /* 主修功法：筑基时择一门（青元剑诀 / 墨氏毒经），之后一层层参悟 */
+    mainLv() { const p = this.player; return p.main === 'du' ? p.du : p.main === 'qy' ? p.qy : 0; },
+    gainMain(quiet) {
+      const p = this.player, M = G.Mains[p.main]; if (!M) return;
+      const L = M.lv[this.mainLv()]; if (!L) return;
+      L.apply(p); if (p.main === 'du') p.du++; else p.qy++;
+      if (!quiet) this.toast(`${M.name} · 第${G.CN_NUM[this.mainLv()]}层【${L.name}】`);
       Au.sfx('break');
+    },
+    gainQingyuan(quiet) { this.player.main = 'qy'; this.gainMain(quiet); },
+    chooseMain(done) {
+      const p = this.player;
+      const cards = Object.keys(G.Mains).map((id) => { const M = G.Mains[id]; return { name: M.name, glyph: M.glyph, sch: M.sch, cls: 'r3', tag: `主修功法 · 第一层【${M.lv[0].name}】`, desc: M.intro + '　第一层：' + M.lv[0].desc + '。', pick: () => { p.main = id; this.gainMain(true); G.UI.skillDirty = true; } }; });
+      G.UI.choice({ title: '择一门主修功法', sub: '筑基已成 —— 一经选定，此生只修这一门', cards, done });
     },
 
     applyBreakthrough(i) {
       const p = this.player;
       if (i === 0) { p.maxHp += 25; p.dmgMul += 0.12; }
-      if (i === 1) { p.realm = 1; p.realmLv = 1; p.maxHp += 40; p.maxMp += 30; p.dmgMul += 0.2; if (p.qy === 0) this.gainQingyuan(true); }
-      if (i === 2) { // 结丹：炼成本命法宝青竹蜂云剑
+      if (i === 1) { p.realm = 1; p.realmLv = 1; p.maxHp += 40; p.maxMp += 30; p.dmgMul += 0.2; } // 筑基：主修功法随后由玩家自己选（chooseMain）
+      if (i === 2) { // 结丹：炼成本命法宝——剑修是青竹蜂云剑，毒修是万毒幡
         p.realm = 2; p.realmLv = 1; p.maxHp += 50; p.maxMp += 40; p.dmgMul += 0.22; p.cdr = Math.min(0.6, p.cdr + 0.08);
-        if (!p.fy) { p.fy = 1; p.sp = 100; p.flags.thunder = (p.flags.thunder || 0) + 1; G.UI.skillDirty = true; }
+        if (!p.main) { p.main = 'qy'; this.gainMain(true); }
+        if (p.main === 'du') { if (!p.wd) { p.wd = 1; p.sp = 100; G.UI.skillDirty = true; } }
+        else if (!p.fy) { p.fy = 1; p.sp = 100; p.flags.thunder = (p.flags.thunder || 0) + 1; G.UI.skillDirty = true; }
       }
       p.hp = p.maxHp; p.mp = p.maxMp; p.potions = Math.min(G.POTION_MAX, p.potions + 1);
       FX.ring(p.x, p.y, 10, 300, '255,230,150', 0.8, 8); FX.petals(p.x, p.y, 16, 50, '255,230,150', { s0: 60, s1: 320, l1: 2.0, g: -20 });

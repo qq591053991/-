@@ -66,6 +66,7 @@
   Cloud.prototype.push = function (x, y, z, c, a, size) {
     if (this.n >= this.max) return;
     const i = this.n++;
+    if (curRoom && curRoom.hc) y += hW(x, z);
     this.pos[i * 3] = x; this.pos[i * 3 + 1] = y; this.pos[i * 3 + 2] = z;
     this.colr[i * 4] = c[0]; this.colr[i * 4 + 1] = c[1]; this.colr[i * 4 + 2] = c[2]; this.colr[i * 4 + 3] = a;
     this.size[i] = size;
@@ -96,6 +97,7 @@
   }
   function trail(o, x, y, z, c, width, gain) {
     let h = o._tr; if (!h) h = o._tr = [];
+    if (curRoom && curRoom.hc) y += hW(x, z);
     const n0 = h.length;
     if (!n0 || Math.abs(h[n0 - 3] - x) + Math.abs(h[n0 - 2] - y) + Math.abs(h[n0 - 1] - z) > 0.004) { h.push(x, y, z); if (h.length > TR_PTS * 3) h.splice(0, 3); }
     const n = h.length / 3; if (n < 2) return;
@@ -225,11 +227,13 @@
   R.toWorld = function (cx, cy) {
     if (!this.ok) return { x: 0, y: 0 };
     v3.set((cx / W) * 2 - 1, -(cy / H) * 2 + 1, 0.5).unproject(camera).sub(camera.position);
-    const k = -camera.position.y / (v3.y || -1e-6);
+    let k = -camera.position.y / (v3.y || -1e-6);
+    const gh = hW(camera.position.x + v3.x * k, camera.position.z + v3.z * k); // 指着台地时，落点按台面的高度再算一次
+    if (gh) k = (gh - camera.position.y) / (v3.y || -1e-6);
     return { x: (camera.position.x + v3.x * k) * T, y: (camera.position.z + v3.z * k) * T };
   };
   /* 游戏坐标 → 屏幕坐标（CSS 像素） */
-  function proj(x, y, z) { v3.set(x * S, (z || 0) * S, y * S).project(camera); return { x: (v3.x * 0.5 + 0.5) * W, y: (-v3.y * 0.5 + 0.5) * H }; }
+  function proj(x, y, z) { v3.set(x * S, (z || 0) * S + hW(x * S, y * S), y * S).project(camera); return { x: (v3.x * 0.5 + 0.5) * W, y: (-v3.y * 0.5 + 0.5) * H }; }
   R.toScreen = (x, y, z) => proj(x, y, z);
   R.updateCam = function (dt, snap) { if (snap) camSnap = true; };
 
@@ -337,19 +341,32 @@
       if (ti === 1) { for (let i = 0; i < len; i++) { const top = 1.25 + U.hash(x0 + i, 1, sd) * 0.75; crag(x0 + i + 0.5, 0.5, top); if (U.hash(x0 + i, 2, sd) < 0.2) treeOn(x0 + i + 0.5, top, 0.4, 'round', 1.15); } return; }
       wallBox(x0, 0, len, 1, HN, tx(ctex(Tx.wallFace(ti, x0, len, room.gx * 7 + room.gy))));
       kit.slab(x0 + len / 2, 0.07, 1.1, len, 0.14, 0.22, 'stone'); kit.slab(x0 + len / 2, 0.03, 1.27, len, 0.06, 0.16, 'dark'); // 墙根的台基：两级石条
+      // 墙面上的立体构件要让开立轴和壁灯
+      const dnF = room.doors.n ? room.doors.n.cells[1] : null, dcF = dnF ? dnF[0] + 0.5 : w / 2;
+      const clear = (x, hw) => Math.abs(x - (dcF - 3.5)) > hw + 0.45 && Math.abs(x - (dcF + 3.5)) > hw + 0.45 && !room.lights.some((L) => L.sconce && Math.abs(L.x * S - x) < hw + 0.35);
       if (ti === 0) {
         kit.roofX(x0, len, 0.5, HN, 1.9, 0.52);
-        for (let cx = x0 + 0.45; cx <= x0 + len - 0.4; cx += 3.05) kit.column(cx, 1.12, HN, 0.1);
+        kit.slab(x0 + len / 2, HN - 0.2, 1.05, len, 0.13, 0.1, 'wood');   // 檐下的额枋
+        kit.slab(x0 + len / 2, 0.36, 1.03, len, 0.44, 0.06, 'stone');     // 青石墙裙
+        for (let cx = x0 + 0.45; cx <= x0 + len - 0.4; cx += 3.05) {
+          kit.column(cx, 1.12, HN, 0.1);
+          if (cx + 3.05 <= x0 + len - 0.4 && clear(cx + 1.525, 0.34)) kit.lattice(cx + 1.525, HN * 0.62, 1.02, 0.3); // 两柱之间开一扇漏窗
+        }
         return;
       }
       const cap = lm({ map: topT(len, 1.3) });
       mesh(cap, x0 + len / 2, HN + 0.07, 0.56, len + 0.12, 0.14, 1.3);
       if (ti === 3) {
         mesh(lm({ color: new THREE.Color('#d9b45a') }), x0 + len / 2, HN + 0.2, 0.5, len + 0.04, 0.12, 0.22);
-        for (let cx = x0 + 0.5; cx <= x0 + len - 0.4; cx += 3.05) kit.column(cx, 1.16, HN + 0.14, 0.14, true);
+        for (let cx = x0 + 0.5; cx <= x0 + len - 0.4; cx += 3.05) {
+          kit.column(cx, 1.16, HN + 0.14, 0.14, true);
+          if (cx + 3.05 <= x0 + len - 0.4 && clear(cx + 1.525, 1.1)) kit.panel(cx + 1.525, HN * 0.56, 1.02, 2.2, HN * 0.5); // 两柱之间一方鎏金的玉板
+        }
       } else {
         for (let i = 0; i < len; i++) kit.crenel(x0 + i + 0.5, HN + 0.14, 0.6, 0.5, 1.05);
-        for (let cx = x0 + 1.5; cx <= x0 + len - 1; cx += 4) kit.buttress(cx, 1.0, HN);
+        kit.slab(x0 + len / 2, HN * 0.5, 1.03, len, 0.1, 0.07, 'stone'); // 腰线
+        for (let cx = x0 + 1.5; cx <= x0 + len - 1; cx += 4) { kit.buttress(cx, 1.0, HN); if (cx + 4 <= x0 + len - 1 && clear(cx + 2, 0.2)) kit.slit(cx + 2, HN * 0.74, 1.02); }
+        for (let i = 0; i < len; i++) { const hv2 = U.hash(x0 + i, 5, sd); if (hv2 < 0.55) kit.slab(x0 + i + 0.25 + hv2 * 0.6, HN * (hv2 < 0.28 ? 0.28 : 0.86) - hv2 * 0.1, 1.025, 0.44, 0.19, 0.06, hv2 < 0.2 ? 'dark' : 'stone'); } // 几块凸出墙面的城砖
       }
     });
     // 南墙。七玄门、虚天殿：石栏杆（看得见栏外的山石）；血色禁地：矮岩；燕翎堡：矮城墙
@@ -389,6 +406,38 @@
       if (ti === 0 && U.hash(x, y, sd + 3) < 0.22) treeOn(x + 0.5, top, y + 0.5, 'pine', 0.55);
     }
     } // 院落的墙到此为止
+
+    // 台地：从格点高度生成一张起伏的面（贴图沿用地面那张，所以铺地的纹样一直铺上台去），坡面压暗；
+    // 院落里台沿压一圈石条、四角立望柱、台阶是三级石踏步；山野里是土坡，坡上散几块石头
+    if (room.hc) {
+      const hc = room.hc, w1 = w + 1, pos = [], uv = [], colr = [], cH = (x, y) => hc[y * w1 + x];
+      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        const a = cH(x, y), b = cH(x + 1, y), c2 = cH(x, y + 1), d = cH(x + 1, y + 1);
+        if (!(a || b || c2 || d)) continue;
+        const k = at(x, y) === 5 ? (open ? 0.6 : 0.56) : a === b && b === c2 && c2 === d ? 1 : 0.9; // 坡压暗，台阶略暗，台面原色
+        const V = [[x, a, y], [x + 1, b, y], [x, c2, y + 1], [x + 1, d, y + 1]];
+        for (const j of a + d >= b + c2 ? [0, 2, 1, 1, 2, 3] : [0, 2, 3, 0, 3, 1]) { const q = V[j]; pos.push(q[0], q[1] + 0.004, q[2]); uv.push(q[0] / w, 1 - q[2] / h); colr.push(k, k, k * (open ? 0.94 : 1.04)); }
+      }
+      const tg = new THREE.BufferGeometry(); rs.geos.push(tg);
+      tg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); tg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); tg.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3)); tg.computeVertexNormals();
+      const tm = new THREE.Mesh(tg, lm({ map: floor.material.map, vertexColors: true })); tm.receiveShadow = true; tm.castShadow = true; g.add(tm);
+      for (const tr of room.terr || []) {
+        const H = tr.H;
+        if (open) { // 土台：坡上散石
+          for (let y = tr.y0 - 1; y <= tr.y1 + 1; y++) for (let x = tr.x0 - 1; x <= tr.x1 + 1; x++) if (at(x, y) === 5 && U.hash(x, y, sd + 71) < 0.45) crag(x + 0.5 + (U.hash(x, y, sd + 72) - 0.5) * 0.4, y + 0.5 + (U.hash(x, y, sd + 73) - 0.5) * 0.4, H * 0.5 + 0.12 + U.hash(x, y, sd + 74) * 0.2);
+          continue;
+        }
+        for (let y = tr.y0; y <= tr.y1; y++) for (let x = tr.x0; x <= tr.x1; x++) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (at(x + dx, y + dy) !== 5) continue; // 邻格是台阶：不压石条
+          kit.slab(x + 0.5 + dx * 0.5, H + 0.03, y + 0.5 + dy * 0.5, dx ? 0.16 : 1.02, 0.12, dx ? 1.02 : 0.16, 'stone');
+        }
+        for (const [px2, pz2] of [[tr.x0, tr.y0], [tr.x1 + 1, tr.y0], [tr.x0, tr.y1 + 1], [tr.x1 + 1, tr.y1 + 1]]) { kit.slab(px2, H + 0.22, pz2, 0.18, 0.44, 0.18, 'stone'); kit.slab(px2, H + 0.47, pz2, 0.24, 0.07, 0.24, 'dark'); } // 四角的望柱
+      }
+      if (!open) for (const rp of room.ramps || []) { // 台阶：三级石踏步
+        const H = hRoom(room, rp.x + 0.5 + rp.dx * 0.49, rp.y + 0.5 + rp.dy * 0.49);
+        for (let k = 0; k < 3; k++) { const t2 = (k + 0.5) / 3 - 0.5, sh = H / 3 + 0.03, top = (H * (k + 1)) / 3 + 0.01; kit.slab(rp.x + 0.5 + rp.dx * t2, top - sh / 2, rp.y + 0.5 + rp.dy * t2, rp.dx ? 0.34 : 1.0, sh, rp.dx ? 1.0 : 0.34, k % 2 ? 'stone' : 'dark'); }
+      }
+    }
 
     // 门：门楼 / 门柱 / 禁制 / 通路微光
     const postM = lm({ color: new THREE.Color(ti === 3 ? '#d9b45a' : ti === 1 ? '#3a2622' : ti === 2 ? '#3c3a47' : '#5a3d2c') });
@@ -450,7 +499,7 @@
     const propRoot = new THREE.Group(); g.add(propRoot);
     for (const pp of room.props) {
       const m = Mo.prop(pp.kind, pp.v, ti);
-      m.g.position.set(pp.tx + 0.5, 0, pp.ty + 0.5);
+      m.g.position.set(pp.tx + 0.5, hRoom(room, pp.tx + 0.5, pp.ty + 0.5), pp.ty + 0.5);
       if (!['lantern', 'banner', 'pillar', 'statue', 'brazier', 'brazier2'].includes(pp.kind)) m.g.rotation.y = U.hash(pp.tx, pp.ty, 9) * TAU;
       propRoot.add(m.g); rs.mats.push(...m.mats); if (m.anim) rs.anims.push(m.anim);
     }
@@ -458,8 +507,8 @@
     rs.flames = []; rs.candles = [];
     const candle = (x, z, v) => {
       if (at(Math.floor(x), Math.floor(z)) !== 0) return;
-      const cd = Mo.candles(v, ti); cd.g.position.set(x, 0, z); propRoot.add(cd.g); rs.mats.push(...cd.mats);
-      rs.candles.push([x, z]); for (const f of cd.flames) rs.flames.push([x + f[0], f[1], z + f[2]]);
+      const cy0 = hRoom(room, x, z), cd = Mo.candles(v, ti); cd.g.position.set(x, cy0, z); propRoot.add(cd.g); rs.mats.push(...cd.mats);
+      rs.candles.push([x, z]); for (const f of cd.flames) rs.flames.push([x + f[0], f[1] + cy0, z + f[2]]);
     };
     candle(1.32, 1.36, 1); candle(w - 1.32, 1.36, 2); candle(1.32, h - 1.36, 3); candle(w - 1.32, h - 1.36, 4);
     if (room.doors.n) { const dc = room.doors.n.cells[1][0] + 0.5; candle(dc - 2.35, 1.3, 5); candle(dc + 2.35, 1.3, 6); }
@@ -732,13 +781,14 @@
     const x0 = halfW - 2.5, x1 = room.w - halfW + 2.5, z0 = north * 0.6 - 0.5, z1 = room.h - south * 0.72;
     tx = x0 > x1 ? room.w / 2 : U.clamp(tx, x0, x1);
     tz = z0 > z1 ? (z0 + z1) / 2 : U.clamp(tz, z0, z1);
-    if (camSnap) { camT.set(tx, 0, tz); camSnap = false; }
-    else { const q = 1 - Math.exp(-7 * dt); camT.x += (tx - camT.x) * q; camT.z += (tz - camT.z) * q; }
+    const ty = hW(px, pz);
+    if (camSnap) { camT.set(tx, ty, tz); camSnap = false; }
+    else { const q = 1 - Math.exp(-7 * dt); camT.x += (tx - camT.x) * q; camT.z += (tz - camT.z) * q; camT.y += (ty - camT.y) * q * 0.6; }
     const sx = shake ? U.rand(-shake, shake) * 0.02 : 0, sz = shake ? U.rand(-shake, shake) * 0.02 : 0;
     const dc = R.debugCam; // 仅供截图调试：拉近相机
     if (dc) { camera.position.set(dc.x, dc.dist * Math.sin(PITCH), dc.z + dc.dist * Math.cos(PITCH)); camera.lookAt(dc.x, 0.4, dc.z); camera.updateMatrixWorld(); return; }
-    camera.position.set(camT.x + sx, dist * Math.sin(PITCH), camT.z + dist * Math.cos(PITCH) + sz);
-    camera.lookAt(camT.x + sx, 0, camT.z + sz);
+    camera.position.set(camT.x + sx, camT.y + dist * Math.sin(PITCH), camT.z + dist * Math.cos(PITCH) + sz);
+    camera.lookAt(camT.x + sx, camT.y, camT.z + sz);
     camera.updateMatrixWorld();
   }
 
@@ -801,6 +851,27 @@
 
   /* ============================ 每帧同步：动态物体 ============================ */
   function place(o, x, y, z) { o.position.set(x * S, (z || 0) * S, y * S); }
+  /* 地面高度（世界单位）。有台地的房间里，所有动态的东西都要按脚下的高度抬起来：
+     - dyn 里的物体（角色、池子里的网格、交互物）在 liftDyn 里统一抬；
+     - 光点、拖尾、屏幕投影在各自的入口处抬；实例化的弹幕在 liftDyn 里改矩阵。
+     这样几十处"在某处画个东西"的代码都不用知道有高差这回事 */
+  function hRoom(room, x, z) {
+    const hc = room && room.hc; if (!hc || x < 0 || z < 0 || x >= room.w || z >= room.h) return 0;
+    const ix = x | 0, iz = z | 0, fx = x - ix, fz = z - iz, w1 = room.w + 1, i = iz * w1 + ix, a = hc[i], b = hc[i + 1], c = hc[i + w1], d = hc[i + w1 + 1];
+    return a || b || c || d ? (a + (b - a) * fx) * (1 - fz) + (c + (d - c) * fx) * fz : 0;
+  }
+  const hW = (x, z) => (curRoom && curRoom.hc ? hRoom(curRoom, x, z) : 0);
+  function liftDyn() {
+    const on = !!(curRoom && curRoom.hc);
+    for (const o of dyn.children) {
+      const u = o.userData;
+      if (u.ly !== undefined) { if (o.position.y === u.ly) o.position.y -= u.lh; u.ly = undefined; } // 上一帧抬过、之后没人重设位置：先还原
+      if (!on || !o.visible) continue;
+      const k = hRoom(curRoom, o.position.x, o.position.z);
+      if (k) { o.position.y += k; u.ly = o.position.y; u.lh = k; }
+    }
+    if (on) for (const m of [orbs, orbRims, shards, shardRims, fySw, bugs]) { const a = m.instanceMatrix.array; for (let i = 0, n = m.count; i < n; i++) { const q = i * 16; a[q + 13] += hRoom(curRoom, a[q + 12], a[q + 14]); } }
+  }
   function flatAt(pool, x, y, r, c, op, yy, order) {
     const m = pool.get(); m.position.set(x * S, yy, y * S); m.scale.set(r * S, r * S, 1); m.material.color.copy(c.col); m.material.opacity = op; m.renderOrder = order || 2; return m;
   }
@@ -938,6 +1009,13 @@
         flatAt(P.circ, x, y, 9, ec, 0.5 * f, 0.03, 4);
         glows.push(x * S, 0.3 + Math.sin(t * 3 + i) * 0.08, y * S, ec, 0.8 * f, 1.1); glows.push(x * S, 0.9, y * S, ec, 0.3 * f, 0.6);
       }
+    } else if (h.kind === 'miasma') { // 毒瘴：一片翻滚的黄绿雾气，边上一圈淡淡的线
+      flatAt(P.circ, h.x, h.y, r, c, 0.1 * f, 0.02, 2); flatAt(P.ring, h.x, h.y, r, c, 0.4 * f, 0.035, 4);
+      const n = Math.min(14, 6 + Math.round(h.r / 26)); // 雾要淡：瘴里的敌人和预警都得看得清
+      for (let i = 0; i < n; i++) {
+        const a = i * 2.4 + t * (0.25 + (i % 3) * 0.12), rr = r * (0.2 + ((i * 37) % 80) / 100), x = h.x + Math.cos(a) * rr, y = h.y + Math.sin(a) * rr;
+        glows.push(x * S, 0.25 + ((i * 13) % 5) * 0.1 + Math.sin(t * 1.7 + i) * 0.08, y * S, c, 0.11 * f, 1.3 + (i % 4) * 0.4);
+      }
     } else if (h.kind === 'tulao') { // 一圈石柱拔地而起
       const k = Math.min(1, h.t / 0.14) * Math.min(1, h.life / 0.25);
       flatAt(P.ring, h.x, h.y, h.r, c, 0.6 * f, 0.035, 4); flatAt(P.circ, h.x, h.y, h.r, c, 0.08 * f, 0.02, 2);
@@ -1064,6 +1142,7 @@
       m.setAlpha(alpha); m.g.visible = alpha > 0.03;
       if (e.elite) { const gc = rgb('255,200,80'); flatAt(P.ring, e.x, e.y, e.r * 1.6, gc, 0.6 + Math.sin(t * 5) * 0.2, 0.03, 4); flatAt(P.circ, e.x, e.y, e.r * 1.6, gc, 0.12, 0.02, 2); }
       if (e.slowT > 0) flatAt(P.ring, e.x, e.y, e.r * 1.25, rgb('140,220,255'), 0.7, 0.035, 4);
+      if (e.psn > 0) { const pc = rgb('154,200,50'); flatAt(P.circ, e.x, e.y, e.r * 1.15, pc, 0.1 + Math.min(0.2, e.psn * 0.02), 0.028, 3); if (((t * 9 + e.t * 3) | 0) % 3 === 0) glows.push(e.x * S + U.rand(-0.2, 0.2), e.z * S + U.rand(0.2, 0.9), e.y * S + U.rand(-0.15, 0.15), pc, 0.6, 0.5); } // 中毒：脚下一摊毒绿，身上冒泡
       if (alpha > 0.1) {
         const L = e.def.look, d = e.def.draw;
         if (e.boss) glows.push(e.x * S, 0.7, e.y * S, rgb(hexRgb(L.trim || L.belly || '#ff7878')), 0.16, 5);
@@ -1093,7 +1172,7 @@
       pLight.position.set(p.x * S, 1.9, p.y * S + 0.7);
       if (!p.dead) flatAt(P.ring, p.x, p.y, 17, rgb('127,224,192'), 0.4, 0.03, 4);
       if (p.fy && p.sp >= 100 && !p.dead) { flatAt(P.ring, p.x, p.y, 24 + Math.sin(t * 6) * 3, rgb('200,255,120'), 0.7, 0.035, 5); glows.push(p.x * S, 0.5, p.y * S, rgb('200,255,120'), 0.22, 2.4); }
-      const tier = p.fy ? 2 : p.qy ? 1 : 0, swPool = P['sw' + tier], swC = rgb(tier === 2 ? '170,255,110' : tier === 1 ? '110,255,170' : '150,255,220');
+      const tier = p.fy ? 2 : p.qy ? 1 : 0, swPool = P['sw' + tier], swC = rgb(p.du ? '186,226,84' : tier === 2 ? '170,255,110' : tier === 1 ? '110,255,170' : '150,255,220'); // 淬了毒的飞剑拖一道黄绿的光
       // 本命飞剑悬在身后，出剑时前指（身静器动）
       if (!p.dead) for (let i = 0, nh = Math.min(3, p.swords); i < nh; i++) {
         const off = (i - (nh - 1) / 2) * 30, fa = p.face, s = swPool.get();
@@ -1362,6 +1441,7 @@
     syncProjs(Gm, t);
     syncFx(t);
     endPools();
+    liftDyn();
     renderer.render(scene, camera);
     drawOverlay(Gm, room, p, t, true);
   };

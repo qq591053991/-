@@ -128,6 +128,7 @@
         res(x + dx * k + (dx ? 0 : j), y + dy * k + (dy ? 0 : j));
       }
     }
+    const doorRes = new Set(reserve); // 门前的三格：台地不许压上去（场中那九格只是不放障碍，垒台子不妨事）
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) res(cx + i, cy + j);
 
     if (big) {
@@ -204,13 +205,38 @@
       room.props.push({ tx: x, ty: y, kind, v: U.randi(0, 2) });
     };
     const pk = () => U.pick(th.props);
+    /* 台地：一块抬高的地面。台面能走；外面一圈是坡（格子类型 5，走不上去）；坡上留出的口子是台阶（能走）。
+       高度记在格点上：台面格的四个角都是 H，于是坡和台阶自然是从 0 到 H 的斜面 */
+    const terrace = (x0, y0, x1, y1, ramps, H = 0.45) => {
+      for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) if (x < 2 || y < 2 || x > w - 3 || y > h - 3 || tiles[y * w + x] !== 0 || doorRes.has(y * w + x)) return false;
+      for (const [rx, ry] of ramps) { const ox = rx < x0 ? rx - 1 : rx > x1 ? rx + 1 : rx, oy = ry < y0 ? ry - 1 : ry > y1 ? ry + 1 : ry; if (tiles[oy * w + ox] !== 0) return false; } // 台阶脚下得是空地
+      const hc = room.hc || (room.hc = new Float32Array((w + 1) * (h + 1)));
+      for (let y = y0; y <= y1 + 1; y++) for (let x = x0; x <= x1 + 1; x++) hc[y * (w + 1) + x] = H;
+      for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) { if (x < x0 || x > x1 || y < y0 || y > y1) tiles[y * w + x] = 5; res(x, y); }
+      room.ramps = room.ramps || []; room.terr = room.terr || [];
+      for (const [rx, ry] of ramps) {
+        tiles[ry * w + rx] = 0;
+        const dx = rx < x0 ? 1 : rx > x1 ? -1 : 0, dy = ry < y0 ? 1 : ry > y1 ? -1 : 0; // 上坡的方向
+        room.ramps.push({ x: rx, y: ry, dx, dy }); res(rx - dx, ry - dy);
+      }
+      room.terr.push({ x0, y0, x1, y1, H });
+      return true;
+    };
+    // 一座四面有台阶的台子：南北各三格宽，东西各一格
+    const dais = (mx, my, hw, hh) => terrace(mx - hw, my - hh, mx + hw, my + hh,
+      [[mx - 1, my + hh + 1], [mx, my + hh + 1], [mx + 1, my + hh + 1], [mx - 1, my - hh - 1], [mx, my - hh - 1], [mx + 1, my - hh - 1], [mx - hw - 1, my], [mx + hw + 1, my]]);
+    const flat = () => { room.hc = null; room.ramps = null; room.terr = null; };
 
     if (room.type === 'combat' || room.type === 'elite') {
       const snapshot = tiles.slice();
       for (let tryN = 0; tryN < 8; tryN++) {
-        tiles.set(snapshot); room.props.length = 0;
-        const pat = U.pick(['pillars', 'pond', 'scatter', 'scatter', 'blocks', 'twin', 'ring', 'mix']);
-        if (pat === 'pillars') {
+        tiles.set(snapshot); room.props.length = 0; flat();
+        const pat = U.pick(['pillars', 'pond', 'scatter', 'scatter', 'blocks', 'twin', 'ring', 'mix', 'terrace', 'terrace', 'terrace']);
+        if (big && room.zones && U.chance(0.8)) { const z = U.pick(room.zones); dais(Math.floor(z.x), Math.floor(z.y), 2, 1); } // 大图：挑一片空地垒一座土台
+        if (pat === 'terrace') { // 场中一座台地，四面有台阶：占住台子居高临下，或者绕着它周旋
+          dais(cx + U.randi(-2, 2), cy + U.randi(-1, 1), U.randi(2, 3), U.randi(1, 2));
+          for (let i = 0; i < 5; i++) prop(U.randi(2, w - 3), U.randi(2, h - 3), pk());
+        } else if (pat === 'pillars') {
           const ox = U.randi(3, 5), oy = U.randi(2, 3), k = pk();
           for (const [x, y] of [[ox, oy], [w - 1 - ox, oy], [ox, h - 1 - oy], [w - 1 - ox, h - 1 - oy]]) prop(x, y, k);
           if (w >= 21) { prop(cx, oy, pk()); prop(cx, h - 1 - oy, pk()); }
@@ -251,7 +277,7 @@
         }
         if (big) for (let i = 0, n = Math.round((w * h) / 60); i < n; i++) prop(U.randi(2, w - 3), U.randi(2, h - 3), pk()); // 大图：各片空地里再散些树石
         if (connected(room)) break;
-        if (tryN === 7) { tiles.set(snapshot); room.props.length = 0; }
+        if (tryN === 7) { tiles.set(snapshot); room.props.length = 0; flat(); }
       }
     } else if (room.type === 'boss') {
       const k = th.props[2];
@@ -265,6 +291,8 @@
         }
       }
     } else {
+      // 机缘、药园：东西供在一座台子上
+      if (room.type === 'treasure' || room.type === 'event' || room.type === 'garden') dais(cx, cy, 2, 1) || dais(cx, cy, 1, 1); // 屋子小就垒一座小的
       // 安全房：四角点缀
       const k1 = th.props[2], k2 = th.props[0];
       prop(2, 2, k1); prop(w - 3, 2, k1);
@@ -330,7 +358,7 @@
     if (t === 0) return false;
     if (t === 1) return true;
     if (t === 2) return mode !== 2;
-    if (t === 3) return mode === 0 || mode === 1;
+    if (t === 3 || t === 5) return mode === 0 || mode === 1; // 3 水，5 台地的坡：走不过去，飞得过去、打得过去
     if (t === 4) return mode === 0 ? room.locked : true;
     return false;
   };
@@ -402,6 +430,16 @@
     // 朝目标格中心走，避免蹭墙
     const gx = (tx + bx + 0.5) * T - x, gy = (ty + by + 0.5) * T - y, l = Math.hypot(gx, gy) || 1;
     return { x: gx / l, y: gy / l };
+  };
+
+  /* 地面的高度（世界单位）。台地的高度记在格点上（room.hc），格内双线性插值：
+     台面是平的，台阶和坡是斜的 */
+  W.heightAt = function (room, px, py) {
+    const hc = room && room.hc; if (!hc) return 0;
+    const x = px / T, y = py / T; if (x < 0 || y < 0 || x >= room.w || y >= room.h) return 0;
+    const ix = x | 0, iy = y | 0, fx = x - ix, fy = y - iy, w1 = room.w + 1, i = iy * w1 + ix;
+    const a = hc[i], b = hc[i + 1], c = hc[i + w1], d = hc[i + w1 + 1];
+    return a || b || c || d ? (a + (b - a) * fx) * (1 - fy) + (c + (d - c) * fx) * fy : 0;
   };
 
   W.randomFloor = function (room, awayX, awayY, minD) {

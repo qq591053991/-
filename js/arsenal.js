@@ -56,6 +56,20 @@
       if (h.tick <= 0) { h.tick = 0.5; if (h.dmg) inRange(h.x, h.y, h.r, (e) => E.dmgEnemy(e, h.dmg, { noCrit: true, c: '#e8d08a' })); }
     },
     tulao() {}, // 土牢：定身在施放时已经结算，这里只留着石柱
+    /* 毒瘴：瘴中敌人每半秒叠毒、受一点伤。万毒幡放出的那一片会跟着人走 */
+    miasma(h, dt, p) {
+      if (h.follow) { h.x = p.x; h.y = p.y; }
+      if (h.tick <= 0) { h.tick = 0.5; inRange(h.x, h.y, h.r, (e) => { E.poison(e, h.stacks || 1); if (h.dmg) E.dmgEnemy(e, h.dmg, { noCrit: true, c: '#b4e04a', dot: true }); }); }
+    },
+  };
+
+  /* 万毒幡 · 万毒瘴：毒瘴随身七秒 */
+  E.castWandu = function () {
+    const Gm = G.Game, p = Gm.player;
+    E.zone('miasma', p.x, p.y, 235, 7, { c: '154,200,50', dmg: E.swordDamage(p) * 0.5, stacks: 3, follow: true });
+    FX.ring(p.x, p.y, 10, 235, '154,200,50', 0.5, 7); FX.burst(p.x, p.y, 24, 40, { c: '180,224,74', s1: 320, l1: 0.8 });
+    FX.text(p.x, p.y, 70, '万毒瘴', '#d2f08a', 22); Au.sfx('roar'); Gm.shake(8);
+    return true;
   };
 
   E.castDageng = function () {
@@ -119,6 +133,19 @@
     FX.burst(sx, sy, 20, 18, { c: '232,48,90', s1: 200 }); FX.burst(tx, ty, 20, 12, { c: '255,120,150', s1: 160 });
     p.x = tx; p.y = ty; p.inv = Math.max(p.inv, 0.4);
     Au.sfx('dash');
+  };
+  SK.duzhang = function (p, ax, ay, lv) {
+    const a = U.ang(p.x, p.y, ax, ay), d = Math.min(300, U.dist(p.x, p.y, ax, ay)), x = p.x + Math.cos(a) * d, y = p.y + Math.sin(a) * d;
+    E.zone('miasma', x, y, 100 + lv * 8, 5, { c: '154,200,50', dmg: 5 * (1 + 0.3 * (lv - 1)) * p.spellMul * p.dmgMul, stacks: lv >= 3 ? 2 : 1 });
+    FX.ring(x, y, 8, 100, '154,200,50', 0.3); FX.burst(x, y, 20, 12, { c: '180,224,74', s1: 160, l1: 0.6 }); Au.sfx('spawn');
+  };
+  SK.shigu = function (p, ax, ay, lv) {
+    const a0 = U.ang(p.x, p.y, ax, ay), n = 4 + lv;
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (i - (n - 1) / 2) * 0.13;
+      E.shootP(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, a, { kind: 'drill', spd: 700, life: 0.6, dmg: 14 * (1 + 0.3 * (lv - 1)) * p.spellMul * p.dmgMul, pierce: 2, psn: 3, r: 6, c: '180,224,74', tc: '#d2f08a' });
+    }
+    FX.ring(p.x, p.y, 8, 40, '154,200,50', 0.22); Au.sfx('sword');
   };
   SK.xuezuan = function (p, ax, ay, lv) {
     const a = U.ang(p.x, p.y, ax, ay);

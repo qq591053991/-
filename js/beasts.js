@@ -86,12 +86,10 @@
     }, 1, 1);
     const legF = sculpt(k + ':legF', (put) => { put(cyl(0.5, 0.34, 5), dark, [0, -0.11, 0], [0.09, 0.24, 0.09]); put(box(), paw, [0, -0.235, 0.025], [0.085, 0.05, 0.13]); });
     const legH = sculpt(k + ':legH', (put) => { put(ico(0), fur, [0, -0.01, 0], [0.13, 0.2, 0.18]); put(cyl(0.5, 0.34, 5), dark, [0, -0.14, -0.02], [0.075, 0.2, 0.075]); put(box(), paw, [0, -0.235, 0.01], [0.085, 0.05, 0.13]); });
-    const tailG = sculpt(k + ':tail', (put) => { // 蓬尾：三团毛由粗到细向后上方翘，末梢一个尖
-      const tip = L.tip || lite;
-      put(ico(0), fur, [0, 0.03 * ts, -0.08 * ts], [0.15 * ts, 0.14 * ts, 0.2 * ts], [-0.4, 0, 0]);
-      put(ico(0), fur, [0, 0.1 * ts, -0.2 * ts], [0.17 * ts, 0.16 * ts, 0.2 * ts], [-0.6, 0.6, 0]);
-      put(ico(0), tip, [0, 0.18 * ts, -0.3 * ts], [0.13 * ts, 0.13 * ts, 0.16 * ts], [-0.8, 0, 0]);
-      put(cone(4), tip, [0, 0.25 * ts, -0.37 * ts], [0.08 * ts, 0.14 * ts, 0.08 * ts], [-0.9, 0, 0]);
+    const tailG = sculpt(k + ':tail', (put) => { // 蓬尾：一整条向后上方翘起的毛刷，根细、中段最粗、末梢收成一个尖
+      const tip = L.tip || lite, a = [0, 0, 0.02], m = [0, 0.13 * ts, -0.3 * ts], e = [0, 0.2 * ts, -0.5 * ts];
+      span(put, ico(1), fur, a, m, 0.17 * ts, 0.19 * ts);
+      span(put, cone(5), tip, [0, 0.085 * ts, -0.2 * ts], e, 0.16 * ts, 0.17 * ts);
     });
     const body = c.grp([0, 0.3, 0]); part(bodyG, skin, body);
     const head = c.grp([0, 0.12, 0.34], body); part(headG, skin, head); part(eyeG, glo, head, null, false);
@@ -302,6 +300,49 @@
       arms[0].rotation.x = wk * 0.9 - a * 1.6; arms[1].rotation.x = -wk * 0.9 - a * 1.6;
       head.rotation.x = -a * 0.35 + Math.sin(t * 1.7) * 0.04; head.rotation.z = Math.sin(t * 1.1) * 0.06;
       tail.rotation.y = Math.sin(t * 3) * 0.35;
+    });
+  };
+
+  /* ============================ 火灵 ============================
+     三层削面的焰：外焰、内焰、焰心，各带一两条窜起的火舌；两道黑眼缝 */
+  Mo.flame = function (L, o = {}) {
+    const c = ctx(), g = c.g, k = 'flame:' + sig(L);
+    const m1 = glowOf(c, { transparent: true, opacity: 0.82, depthWrite: false }), m2 = glowOf(c), m3 = glowOf(c);
+    const layer = (kk, col2, w, hgt, seed) => sculpt(k + kk, (put) => {
+      put(ico(0), col2, [0, w * 0.34, 0], [w, w * 0.72, w]);
+      put(cone(5), col2, [0, w * 0.5 + hgt / 2, 0], [w * 0.86, hgt, w * 0.86]);
+      for (let i = 0; i < 3; i++) { const a = seed + i * 2.2, r = w * 0.3; span(put, cone(4), col2, [Math.cos(a) * r, w * 0.4, Math.sin(a) * r], [Math.cos(a) * r * 2.1, w * 0.5 + hgt * (0.45 + i * 0.12), Math.sin(a) * r * 2.1], w * 0.34); }
+    }, 1, 1);
+    const b = c.grp([0, 0.08, 0]);
+    const l1 = part(layer(':o', L.dark, 0.48, 0.62, 0.3), m1, b, null, false), l2 = part(layer(':m', L.body, 0.36, 0.46, 1.4), m2, b, [0, 0.01, 0.02], false), l3 = part(layer(':c', L.core, 0.21, 0.3, 2.6), m3, b, [0, 0.02, 0.05], false);
+    part(sculpt('flame:eyes', (put) => { for (const sx of [-1, 1]) put(box(), '#3a1408', [sx * 0.07, 0.2, 0.185], [0.05, 0.085, 0.02], [0, 0, -sx * 0.3]); }, 1, 1), m3, b, null, false);
+    if (o.scale) g.scale.setScalar(o.scale);
+    return finish(c, 0.85 * (o.scale || 1), function (e) {
+      const t = e.t || 0, hot = Math.min(1, e.wind || 0), sp = 9 + hot * 30;
+      const q = 1 + hot * 0.35 + Math.sin(t * sp) * 0.05; b.scale.set(q, q, q);
+      l1.scale.y = 1 + Math.sin(t * 11) * 0.1; l2.scale.y = 1 + Math.sin(t * 13 + 1) * 0.1; l3.scale.y = 1 + Math.sin(t * 15 + 2) * 0.12;
+      l1.rotation.y = t * 1.6; l2.rotation.y = -t * 2.1; l1.rotation.z = Math.sin(t * 7) * 0.08;
+    }, { light: true });
+  };
+
+  /* ============================ 玄冰傀儡（炮台） ============================
+     一根六棱的主冰柱，四周斜出几根小冰锥，底下压着碎冰；柱心悬一枚发光的核 */
+  Mo.crystal = function (L, o = {}) {
+    const c = ctx(), g = c.g, k = 'crystal:' + sig(L);
+    const ice = skinOf(c, { transparent: true, opacity: 0.9, emissive: new THREE.Color(L.dark).multiplyScalar(0.3), shininess: 80 }), glo = glowOf(c);
+    const shard = (put, col2, a, b2, w) => { const mid = [a[0] + (b2[0] - a[0]) * 0.7, a[1] + (b2[1] - a[1]) * 0.7, a[2] + (b2[2] - a[2]) * 0.7]; span(put, cyl(0.5, 0.36, 6), col2, a, mid, w); span(put, cone(6), col2, mid, b2, w); };
+    const bodyG = sculpt(k + ':body', (put) => {
+      shard(put, L.body, [0, 0, 0], [0, 1.0, 0], 0.34);
+      shard(put, L.dark, [-0.12, 0, 0.04], [-0.42, 0.56, 0.1], 0.2); shard(put, L.dark, [0.12, 0, -0.03], [0.44, 0.66, -0.08], 0.2);
+      shard(put, L.dark, [0.02, 0, 0.12], [0.1, 0.46, 0.4], 0.17); shard(put, L.body, [-0.04, 0, -0.14], [-0.12, 0.5, -0.36], 0.16);
+      for (let i = 0; i < 5; i++) { const a = i * 1.26 + 0.4; put(ico(0), i % 2 ? L.dark : L.body, [Math.cos(a) * 0.3, 0.04, Math.sin(a) * 0.26], [0.16, 0.1, 0.14], [i, i * 2, 0]); } // 碎冰
+    }, 0.55, 1.25);
+    part(bodyG, ice, g, null, false);
+    const core = part(sculpt(k + ':core', (put) => put(oct(), L.core, [0, 0, 0], 1), 1, 1), glo, g, [0, 0.74, 0.02], false); core.scale.setScalar(0.16);
+    if (o.scale) g.scale.setScalar(o.scale);
+    return finish(c, 1.0 * (o.scale || 1), function (e) {
+      const t = e.t || 0, w = Math.min(1, e.wind || 0);
+      core.position.set(0, 0.8 + Math.sin(t * 2.4) * 0.04, 0.2); core.rotation.y = t * 2; core.scale.setScalar(0.16 + w * 0.12);
     });
   };
 

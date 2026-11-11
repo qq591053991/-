@@ -702,6 +702,18 @@
         if (e.burnTick <= 0) { e.burnTick = 0.5; E.dmgEnemy(e, 4 * p.dmgMul, { noCrit: true, c: '#ff9a4a' }); if (e.dead) continue; }
         if (Math.random() < 0.3) FX.p(e.x + U.rand(-8, 8), e.y, U.rand(8, 30), { c: '120,200,255', life: 0.35, size: 3, vz: 50 });
       }
+      if (e.rootCd > 0) e.rootCd -= dt;
+      if (e.psn > 0) { // 毒：每层每秒 3 点，半秒结算一次
+        e.psnT -= dt; e.psnTick = (e.psnTick || 0) - dt;
+        if (e.psnTick <= 0) {
+          e.psnTick = 0.5;
+          let d = e.psn * 1.5 * p.dmgMul * p.psnMul;
+          if (p.flags.psnRot && e.psn >= p.psnCap) d += e.maxHp * (e.boss ? 0.002 : 0.005);
+          E.dmgEnemy(e, d, { noCrit: true, c: '#b4e04a', dot: true }); if (e.dead) continue;
+        }
+        if (Math.random() < 0.1 + e.psn * 0.03) FX.p(e.x + U.rand(-e.r, e.r), e.y + U.rand(-4, 4), U.rand(6, e.r * 2), { c: '154,200,50', life: 0.5, size: U.rand(2, 4), vz: 34 });
+        if (e.psnT <= 0) e.psn = 0;
+      }
       if (e.st === 'intro') continue;
       if (e.st === 'spawn') {
         e.stT -= dt;
@@ -709,7 +721,7 @@
         continue;
       }
       if (e.stunT > 0) { e.stunT -= dt; e.moving = false; continue; }
-      const sm = e.slowT > 0 ? 0.5 : 1;
+      const sm = (e.slowT > 0 ? 0.5 : 1) * (e.psn > 0 && p.flags.psnSlow ? 0.7 : 1);
       if (e.slowT > 0) e.slowT -= dt;
       if (e.boss) bossUpdate(e, dt, p, room);
       else {

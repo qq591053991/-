@@ -189,7 +189,7 @@
     { tile: '#8ea4b4', ridge: '#d9b45a', wood: '#d2e0ec', stone: '#b4c6d6', dark: '#7e96ae', gold: '#d9b45a' },  // 寒玉、鎏金
   ];
   Mo.archKit = function (root, ti) {
-    const K = KIT[ti], mats = {}, M = (n) => mats[n] || (mats[n] = lam(K[n]));
+    const K = KIT[ti], mats = {}, M = (n) => mats[n] || (mats[n] = lam(K[n] || n)); // 名字不在色表里时，当作颜色直接用
     const box = Mo.geo.box(), gable = gableGeo(), pyr = Mo.geo.cone(4), con = Mo.geo.cone(6);
     const col8 = gg('col8', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 8)), hex = gg('hex6', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 6));
     const put = (geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; root.add(m); return m; };
@@ -268,6 +268,23 @@
         put(gg('bowl', () => new THREE.CylinderGeometry(0.5, 0.3, 1, 8)), M('dark'), x, 0.58, z, 0.52, 0.2, 0.52);
         put(hex, M('gold'), x, 0.69, z, 0.56, 0.04, 0.56);
         return [x, 0.84, z, 0.34];
+      },
+      /* 北墙墙面上的立体构件：漏窗、箭孔、鎏金框。墙面不再只是一张贴图 */
+      lattice(x, y, z, r) { // 七玄门的漏窗：一圈木框、深色的窗洞、米字棂
+        const d = put(gg('oct8', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 8)), M('#262a33'), x, y, z, r * 2, 0.05, r * 2); d.rotation.x = PI / 2; d.rotation.y = PI / 8; d.castShadow = false;
+        put(Mo.geo.tor(0.06), M('wood'), x, y, z + 0.03, r * 2.12, r * 2.12, 1.3);
+        put(box, M('wood'), x, y, z + 0.035, r * 2, 0.045, 0.04); put(box, M('wood'), x, y, z + 0.035, 0.045, r * 2, 0.04);
+        for (const s of [-1, 1]) put(box, M('wood'), x, y, z + 0.03, r * 1.9, 0.03, 0.03).rotation.z = (s * PI) / 4;
+      },
+      slit(x, y, z) { // 燕翎堡的箭孔：一道竖缝，上下各压一块条石
+        put(box, M('#15131c'), x, y, z, 0.13, 0.52, 0.05).castShadow = false;
+        put(box, M('stone'), x, y + 0.31, z + 0.015, 0.34, 0.09, 0.09); put(box, M('stone'), x, y - 0.31, z + 0.015, 0.34, 0.09, 0.09);
+      },
+      panel(x, y, z, pw, ph) { // 虚天殿的玉墙：一方凸起的玉板，四边鎏金，板心一枚菱花
+        put(box, M('wood'), x, y, z, pw - 0.1, ph - 0.1, 0.05);
+        for (const s of [-1, 1]) { put(box, M('gold'), x, y + (s * ph) / 2, z + 0.02, pw, 0.05, 0.08); put(box, M('gold'), x + (s * pw) / 2, y, z + 0.02, 0.05, ph + 0.05, 0.08); }
+        put(Mo.geo.oct(), M('gold'), x, y, z + 0.03, 0.34, 0.34, 0.07);
+        for (const s of [-1, 1]) put(Mo.geo.oct(), M('gold'), x + s * pw * 0.3, y, z + 0.03, 0.14, 0.14, 0.05);
       },
       /* 石条：台阶、台基、水沿都用它 */
       slab(x, y, z, sx, sy, sz, m) { return put(box, M(m || 'stone'), x, y, z, sx, sy, sz); },

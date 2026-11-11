@@ -413,12 +413,7 @@
       if (ti === 0) {
         c.fillStyle = th.base; c.fillRect(px, hgt - 10, 48.5, 10);
         c.fillStyle = 'rgba(255,255,255,0.07)'; c.fillRect(px, hgt - 10, 48.5, 1.5);
-        if (x % 4 === 1) { c.fillStyle = '#5a3d2c'; c.fillRect(px + 21, 4, 6, hgt - 14); }
-        if (x % 4 === 3) { // 漏窗
-          c.fillStyle = '#2a2c34'; c.beginPath(); c.arc(px + 24, 22, 10, 0, TAU); c.fill();
-          c.strokeStyle = '#8a8272'; c.lineWidth = 1.6; c.beginPath(); c.arc(px + 24, 22, 10, 0, TAU);
-          c.moveTo(px + 14, 22); c.lineTo(px + 34, 22); c.moveTo(px + 24, 12); c.lineTo(px + 24, 32); c.stroke();
-        }
+        // 柱、漏窗、墙裙现在是立体构件（scenery.js 的 archKit），贴图里只留粉墙和水渍
         if (hh(1) < 0.4) { c.fillStyle = 'rgba(60,70,60,0.18)'; ell(c, px + hh(2) * 48, 14 + hh(3) * 20, 10, 14); }
       } else if (ti === 1) {
         c.strokeStyle = 'rgba(20,10,10,0.45)'; c.lineWidth = 1.4;
@@ -442,12 +437,7 @@
       } else {
         c.fillStyle = '#d9b45a'; c.fillRect(px, 5, 48.5, 2); c.fillRect(px, hgt - 9, 48.5, 2);
         c.fillStyle = th.base; c.fillRect(px, hgt - 7, 48.5, 7);
-        if (x % 2 === 0) { // 云纹
-          c.strokeStyle = 'rgba(217,180,90,0.75)'; c.lineWidth = 1.5; const cx = px + 24, cy = hgt / 2 - 1;
-          c.beginPath(); c.arc(cx - 6, cy, 6, Math.PI * 0.2, Math.PI * 1.9); c.arc(cx + 6, cy + 1, 6, Math.PI * 1.2, Math.PI * 2.9); c.stroke();
-        } else {
-          c.strokeStyle = 'rgba(120,200,255,0.5)'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(px + 24, 12); c.lineTo(px + 24, hgt - 14); c.stroke();
-        }
+        if (x % 2) { c.strokeStyle = 'rgba(120,200,255,0.3)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(px + 24, 12); c.lineTo(px + 24, hgt - 14); c.stroke(); } // 玉的纹理；鎏金的框是立体构件
       }
     }
     return cv;
