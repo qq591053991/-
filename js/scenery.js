@@ -14,10 +14,11 @@
   // 四章的石、盖、木、叶、花
   const PAL = (Mo.PAL = [
     // capK：顶面有几成覆着"盖"。苔与枯苔只是零星几片，雪盖得满
-    { rock: '#99a2ad', dark: '#353c48', cap: '#4c7650', cap2: '#648f5c', capK: 0.38, trunk: '#4b392e', leaf: '#629c62', leafD: '#214a36', bloom: '#f2ccd8', bloomD: '#b9708f' }, // 青石、苔、松、桃
-    { rock: '#93766a', dark: '#2e1e1c', cap: '#5c5a38', cap2: '#77703f', capK: 0.3, trunk: '#231818', leaf: '#6c3038', leafD: '#2a1016', bloom: '#a86458', bloomD: '#6a2830' },  // 赭石、枯苔、血枫
-    { rock: '#6c6a84', dark: '#222030', cap: '#3a3848', cap2: '#48465a', capK: 0.5, trunk: '#1e1c24', leaf: '#4c485a', leafD: '#22202a', bloom: '#9affc0', bloomD: '#2a7a50' },  // 玄石、灰
-    { rock: '#9ab2c8', dark: '#3f5678', cap: '#e6f1fa', cap2: '#ffffff', capK: 0.85, trunk: '#3c4a60', leaf: '#d4ecfa', leafD: '#6490b6', bloom: '#eef8ff', bloomD: '#9ccaea' }, // 寒石、雪
+    // 631 的"三"：每一章的山石、树、屋宇都在同一个辅色族里（黛蓝 / 暗枫红 / 玄紫 / 玄青），饱和度压住，不和要紧的东西抢
+    { rock: '#8a96a2', dark: '#3a4452', cap: '#5c7a6c', cap2: '#6c8c7a', capK: 0.34, trunk: '#3a3c44', leaf: '#4a7268', leafD: '#24403a', bloom: '#a4aeb8', bloomD: '#7a8694' }, // 青石、苔、松、白梅
+    { rock: '#8c7870', dark: '#3a2c2a', cap: '#6a6250', cap2: '#7a705a', capK: 0.3, trunk: '#2a2022', leaf: '#5e2e34', leafD: '#2e1418', bloom: '#7c544e', bloomD: '#4e2a2e' },  // 赭石、枯苔、血枫（暗下去：亮的红只留给敌人）
+    { rock: '#7a7490', dark: '#2c2838', cap: '#5a5668', cap2: '#666278', capK: 0.5, trunk: '#1e1a24', leaf: '#464058', leafD: '#221e2c', bloom: '#8a84a0', bloomD: '#4a4460' },  // 玄石、灰
+    { rock: '#a2b4c6', dark: '#44587a', cap: '#dfe9f1', cap2: '#f4f8fc', capK: 0.85, trunk: '#34405a', leaf: '#c9d8e4', leafD: '#5a7a98', bloom: '#e6eef6', bloomD: '#94b4d0' }, // 寒石、雪
   ]);
 
   const n3 = (x, y, z, s) => U.hash(Math.round(x * 997) + s * 57, Math.round(y * 991) + Math.round(z * 983) * 3, s);
@@ -117,10 +118,10 @@
 
   /* 青铜环门：立在北门上的半环，环身满布云雷纹，两脚落在山石上 */
   const ARCH = [
-    { base: '#2c5650', hi: '#4c887e', line: '#dcbe6c' }, // 绿锈青铜 + 旧金
-    { base: '#463028', hi: '#6c4a3c', line: '#cfae7c' }, // 沁色古铜
-    { base: '#2e2c3a', hi: '#4a4862', line: '#93bea4' }, // 玄铁
-    { base: '#b89444', hi: '#ecd28a', line: '#fff4c8' }, // 鎏金
+    { base: '#3a4a5a', hi: '#56687c', line: '#9aa8b4' }, // 黛蓝的旧铜
+    { base: '#463630', hi: '#64504a', line: '#a8968a' },
+    { base: '#2e2a3c', hi: '#4a4460', line: '#8e88a4' },
+    { base: '#62788e', hi: '#8ea2b4', line: '#cfdbe6' },
   ];
   function archCanvas(ti) {
     const A = ARCH[ti], cv = document.createElement('canvas'); cv.width = 512; cv.height = 64;
@@ -183,10 +184,10 @@
     g.computeVertexNormals(); return g;
   });
   const KIT = [
-    { tile: '#353c4a', ridge: '#566174', wood: '#5a3d2c', stone: '#8f959d', dark: '#5b616b', gold: '#b99a58' },  // 黛瓦、朱木、青石
-    { tile: '#3a2a26', ridge: '#54403a', wood: '#6a4c3a', stone: '#8a7468', dark: '#3a2a24', gold: '#b08a60' },
-    { tile: '#2b2934', ridge: '#474456', wood: '#262230', stone: '#5c5a6a', dark: '#3a3846', gold: '#6f9a84' },  // 玄瓦、黑铁、城砖
-    { tile: '#8ea4b4', ridge: '#d9b45a', wood: '#d2e0ec', stone: '#b4c6d6', dark: '#7e96ae', gold: '#d9b45a' },  // 寒玉、鎏金
+    { tile: '#2f3b4e', ridge: '#4a5b72', wood: '#4c4a52', stone: '#8b949c', dark: '#59626c', gold: '#a8946a' },  // 黛瓦、乌木、青石；"金"是旧铜，不亮
+    { tile: '#3a2c28', ridge: '#54423c', wood: '#5e4a40', stone: '#84746c', dark: '#3a2c28', gold: '#9a8468' },
+    { tile: '#2a2636', ridge: '#453e58', wood: '#241f2e', stone: '#5a5468', dark: '#383246', gold: '#8a8aa0' },  // 玄瓦、黑铁、城砖
+    { tile: '#6f8498', ridge: '#93a0aa', wood: '#b8c6d4', stone: '#9aabb9', dark: '#62788e', gold: '#a3a394' },  // 寒玉；金只剩一点旧铜色
   ];
   Mo.archKit = function (root, ti) {
     const K = KIT[ti], mats = {}, M = (n) => mats[n] || (mats[n] = lam(K[n] || n)); // 名字不在色表里时，当作颜色直接用
@@ -295,7 +296,7 @@
   };
 
   /* 一簇蜡烛：高矮不一的几支，底下一摊蜡泪。烛身会被合并进静态网格，火苗的位置记在 flames 里，由渲染层画成光点 */
-  const WAX = ['#e6dcc4', '#8c2a2e', '#3a3648', '#cfe0ee'];
+  const WAX = ['#d8d4c8', '#b8a89c', '#8a8498', '#cfdae4'];
   Mo.candles = function (v, ti) {
     const g = new THREE.Group(), wax = lam(WAX[ti]), flames = [], cyl = gg('hex6', () => new THREE.CylinderGeometry(0.5, 0.5, 1, 6)), h = (i) => U.hash(v * 9 + i, i * 3 + 1, ti + 21);
     const n = 3 + Math.floor(h(0) * 3);
@@ -332,8 +333,8 @@
   /* 一丛竹：每竿三截、节上一圈深色的箍，越往上越向外弯；叶是一片片下垂的扁叶团 */
   Mo.bamboo = function (v, ti) {
     const g = new THREE.Group(), h = (i) => U.hash(v * 9 + i, i * 3 + 2, ti + 23), add = adder(g);
-    const s1 = lam('#5f9c5a'), s2 = lam('#47804d'), nd = lam('#29503a'), leaf = vcol(), rk = vcol();
-    const lg = (k) => lump('bleaf' + k, 71 + k * 13, { rough: 0.3, top: 0.4, flat: 0.5, bot: 0.3, sy: 0.3, dark: '#2c6238', lite: '#9bd476', byNormal: true });
+    const s1 = lam('#527f72'), s2 = lam('#3f6a5f'), nd = lam('#284a44'), leaf = vcol(), rk = vcol();
+    const lg = (k) => lump('bleaf' + k, 71 + k * 13, { rough: 0.3, top: 0.4, flat: 0.5, bot: 0.3, sy: 0.3, dark: '#2a5248', lite: '#7fae9a', byNormal: true });
     const n = 5 + ((h(0) * 2) | 0);
     for (let i = 0; i < n; i++) {
       const a = h(i + 1) * TAU, r = 0.07 + h(i + 11) * 0.27, H = 1.45 + h(i + 21) * 1.0, bend = 0.1 + h(i + 31) * 0.26, mat = i % 2 ? s1 : s2;
@@ -376,7 +377,7 @@
   /* 鼎式火盆：三足撑着一只束腰的铜盆，盆沿一圈金，两只立耳；火是两片削面的焰。blue：虚天殿的寒焰 */
   Mo.cauldron = function (v, ti, blue) {
     const g = new THREE.Group(), K = KIT[ti], add = adder(g), dk = lam(ti === 3 ? '#4f6076' : K.dark), gd = lam(K.gold), st = lam(K.stone);
-    const fc = blue ? [0x5ab8ff, 0xe0f6ff] : [0x3aff8a, 0xd8ffe0];
+    const fc = blue ? [0xa8c8e4, 0xeaf4fc] : [0xb4a8dc, 0xece6fa]; // 场景里的火是淡的冷焰：鲜艳的颜色不给摆设
     const m1 = new THREE.MeshBasicMaterial({ color: fc[0], transparent: true, opacity: 0.88, depthWrite: false }), m2 = new THREE.MeshBasicMaterial({ color: fc[1] });
     const bowl = gg('bowl', () => new THREE.CylinderGeometry(0.5, 0.3, 1, 8)), flame = gg('flame5', () => new THREE.ConeGeometry(0.5, 1, 5));
     add(HEX(), st, 0, 0.05, 0, 0.84, 0.1, 0.84);

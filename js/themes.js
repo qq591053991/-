@@ -22,42 +22,46 @@
   G.Themes = [
     { // 0 神手谷 —— 月夜山谷庭院
       void: '#070b18', mist: '120,150,210',
-      floor: '#5b6a61', floor2: '#52625a', line: 'rgba(14,22,22,0.42)', moss: '#3f6c47', grass: '#6aa860',
-      face: '#cfc8b4', faceDark: '#a59d8a', base: '#67635c', top: '#343a47', topHi: '#505a6b',
-      water: '#25546a', waterHi: '#86c8d4',
-      bg: 0x0a1430, fog: [0x2c4476, 21.5, 54], cloudShadow: [0.24, 15], dark: 0.5, ink: 0x0a121c, hemi: [0x9fc6f2, 0x24384a, 0.95], sun: [0xd4e0ff, 1.0],
-      sea: [0xa8c4f4, 0.85, 0x5674b8, 0.9], shaft: [0xcfe0ff, 0.2], // 云海 [近层色, 近层浓度, 远层色, 远层浓度]；光柱 [色, 强度]
+      dom: '#7c8682', // 主色（六成）：青灰的石与草，近乎中性
+      floor: '#7c8682', floor2: '#757f7b', line: 'rgba(14,22,22,0.3)', moss: '#66786c', grass: '#7e9484',
+      face: '#a9b3bd', faceDark: '#8a95a2', base: '#56606e', top: '#2f3b4e', topHi: '#46566c', // 辅色（三成）：黛蓝——墙、瓦、山石、松
+      water: '#2c4a5c', waterHi: '#8fb6c4',
+      bg: 0x0a1430, fog: [0x2c4476, 21.5, 54], cloudShadow: [0.24, 15], dark: 0.5, ink: 0x1a2430, hemi: [0xc8d4e6, 0x2a343e, 0.95], sun: [0xe4e9f4, 1.0],
+      sea: [0xa8b8d4, 0.8, 0x5a6c94, 0.88], shaft: [0xdfe8f8, 0.16], // 云海 [近层色, 近层浓度, 远层色, 远层浓度]；光柱 [色, 强度]
       lamp: '255,214,150', lampHex: 0xffd696,
       props: ['rock', 'bamboo', 'lantern', 'pine', 'bamboo', 'rock'], mote: 'firefly',
     },
     { // 1 血色禁地 —— 赤雾密林
       void: '#0d0507', mist: '200,70,80',
-      floor: '#62533f', floor2: '#6d5c46', line: 'rgba(20,8,8,0.0)', moss: '#55633a', grass: '#c24a52',
-      face: '#7a5a4c', faceDark: '#503a32', base: '#30221e', top: '#574236', topHi: '#8a5246',
-      water: '#47131f', waterHi: '#d86878',
-      bg: 0x1a080c, fog: [0x54222a, 21.5, 52], cloudShadow: [0.4, 6.5], dark: 0.52, ink: 0x1a0a0c, hemi: [0xffb0a0, 0x3a201c, 1.06], sun: [0xffcabc, 1.1],
-      sea: [0xc85c68, 0.78, 0x74242e, 0.88], shaft: [0xffa696, 0.17],
-      lamp: '255,150,130', lampHex: 0xff8a8a,
+      dom: '#69645f', // 主色：赭灰的泥土
+      floor: '#69645f', floor2: '#625d58', line: 'rgba(20,8,8,0.0)', moss: '#5e5c4c', grass: '#7c5c56',
+      face: '#6c5852', faceDark: '#483a36', base: '#2c2220', top: '#4c3c36', topHi: '#6c4c46', // 辅色：暗枫红——血枫、赭石
+      water: '#3a1a22', waterHi: '#a8626a',
+      bg: 0x1a080c, fog: [0x4a2a2e, 21.5, 52], cloudShadow: [0.4, 6.5], dark: 0.52, ink: 0x2a1418, hemi: [0xecdcd6, 0x30241f, 1.06], sun: [0xfbe8e0, 1.1],
+      sea: [0xb07a80, 0.74, 0x6a3038, 0.86], shaft: [0xffd4c8, 0.13],
+      lamp: '255,200,150', lampHex: 0xffc896,
       props: ['deadtree', 'mushroom', 'rock', 'bones', 'deadtree', 'mushroom'], mote: 'spore',
     },
     { // 2 燕翎堡 —— 魔焰围城
       void: '#07050d', mist: '120,90,190',
-      floor: '#55525f', floor2: '#4a4755', line: 'rgba(8,6,12,0.5)', moss: '#22202a', grass: '#5c1c26',
-      face: '#575463', faceDark: '#3c3a47', base: '#292732', top: '#302e3a', topHi: '#4c4959',
-      water: '#0a0812', waterHi: '#5a3a8a',
-      bg: 0x0e0a20, fog: [0x2c2458, 21.5, 52], cloudShadow: [0.26, 12], dark: 0.52, ink: 0x0a0812, hemi: [0xb8a6ff, 0x241c36, 1.12], sun: [0xd4c8ff, 1.18],
-      sea: [0x8e7cdc, 0.74, 0x40348a, 0.86], shaft: null,
-      lamp: '130,255,170', lampHex: 0x82ffaa,
+      dom: '#6c6a72', // 主色：铁灰的城砖与焦土
+      floor: '#6c6a72', floor2: '#63616a', line: 'rgba(8,6,12,0.34)', moss: '#56535f', grass: '#5c4c58',
+      face: '#4c465c', faceDark: '#352f44', base: '#262232', top: '#2c2838', topHi: '#463f58', // 辅色：玄紫——城墙、焦木、玄石
+      water: '#0e0a18', waterHi: '#5a4a8a',
+      bg: 0x0e0a20, fog: [0x2c2458, 21.5, 52], cloudShadow: [0.26, 12], dark: 0.52, ink: 0x16121e, hemi: [0xdedae8, 0x26222e, 1.08], sun: [0xeeeaf8, 1.12],
+      sea: [0x8a80b8, 0.7, 0x443c78, 0.84], shaft: null,
+      lamp: '255,214,150', lampHex: 0xffd696,
       props: ['brazier', 'barricade', 'banner', 'rubble', 'barricade', 'rubble'], mote: 'ash',
     },
     { // 3 虚天殿 —— 冰火古殿
       void: '#040913', mist: '120,190,255',
-      floor: '#62788a', floor2: '#586e80', line: 'rgba(214,180,90,0.6)', moss: '#d8f0ff', grass: '#e8f8ff',
-      face: '#2b4162', faceDark: '#1c2c47', base: '#131f38', top: '#8ea4b4', topHi: '#b6cad6',
-      water: '#b83a0c', waterHi: '#ffd27a',
-      bg: 0x0a1630, fog: [0x2c4e88, 21.5, 58], cloudShadow: [0.16, 16], dark: 0.46, ink: 0x14244a, hemi: [0xc8dcff, 0x2c3c5e, 0.66], sun: [0xf0f6ff, 0.62], glowK: 0.85,
-      sea: [0xc8e4ff, 0.85, 0x5e90d0, 0.9], shaft: [0xdff0ff, 0.19],
-      lamp: '150,220,255', lampHex: 0x96dcff,
+      dom: '#93a0aa', // 主色：霜白的玉砖与雪
+      floor: '#93a0aa', floor2: '#8a98a2', line: 'rgba(60,84,110,0.34)', moss: '#c4d2dc', grass: '#d0dce6',
+      face: '#33486a', faceDark: '#22324e', base: '#18243c', top: '#6f8498', topHi: '#8ea2b4', // 辅色：玄青——殿墙、寒石、雪松
+      water: '#1c3450', waterHi: '#7aa6cc',
+      bg: 0x0a1630, fog: [0x2c4e88, 21.5, 58], cloudShadow: [0.16, 16], dark: 0.46, ink: 0x14244a, hemi: [0xd8e2f2, 0x2c384c, 0.66], sun: [0xf4f8ff, 0.62], glowK: 0.85,
+      sea: [0xc8dcf0, 0.85, 0x6a8cc0, 0.9], shaft: [0xe6f0fa, 0.15],
+      lamp: '255,220,160', lampHex: 0xffdca0,
       props: ['icecrystal', 'pillar', 'brazier2', 'statue', 'icecrystal', 'pillar'], mote: 'snow',
     },
   ];
@@ -65,7 +69,7 @@
   /* 会发光的场景物件：z 高度(像素) / r 光照半径(像素) / c 颜色 */
   G.PROP_LIGHT = {
     lantern: { z: 40, r: 300, c: 0xffd696 }, mushroom: { z: 22, r: 190, c: 0xff7896 },
-    brazier: { z: 46, r: 320, c: 0x82ffaa }, brazier2: { z: 46, r: 320, c: 0x8cd2ff }, icecrystal: { z: 34, r: 210, c: 0x96dcff },
+    brazier: { z: 46, r: 320, c: 0xd8d0f0 }, brazier2: { z: 46, r: 320, c: 0xcfe4f4 }, icecrystal: { z: 34, r: 210, c: 0xbcd8ec }, // 场景里的火只是淡淡的冷光：鲜艳的颜色留给要紧的东西
   };
 
   /* ============================ 地面贴图 ============================ */
@@ -159,16 +163,16 @@
   /* 青铜地台：嵌在地面里的大圆盘 —— 外圈云雷纹，内圈如意云头，中心一章一字（虚天殿是北斗星图）。
      凡俗的地面上，只有这一块是"上古留下的东西"：战斗、机缘、首领都发生在它上面。 */
   const MED = [
-    // 地台是凡尘之物：低饱和、不发光；纹线一律用旧金 / 骨色，绝不用朱砂（朱砂只属于预警）
-    { base: '#2b4643', hi: '#3f6660', line: '#c9ab62', glyph: '玄' }, // 青铜绿锈 + 旧金
-    { base: '#3a2b26', hi: '#54403a', line: '#c2a276', glyph: '禁' }, // 沁色古石 + 骨色
-    { base: '#2a2836', hi: '#3c394c', line: '#8fb89e', glyph: '燕' }, // 玄铁 + 褪了色的铜绿
-    { base: '#38526a', hi: '#587890', line: '#ecca72', glyph: '' },   // 寒玉 + 鎏金星图
+    // 地台是刻在地上的浅纹：和地面同一个色系，只比地面浅一点。金色不给它——金只留给"该去的地方"和"能拿的东西"
+    { base: '#737d79', hi: '#838e8a', line: '#b4bfba', glyph: '玄' },
+    { base: '#625a53', hi: '#726a62', line: '#a89f93', glyph: '禁' },
+    { base: '#62606a', hi: '#72707a', line: '#a6a4b2', glyph: '燕' },
+    { base: '#87959f', hi: '#9aa8b2', line: '#d2dce4', glyph: '' },
   ];
   function medallion(c, cx, cy, R, ti, worn, seed, boss) {
     const M = MED[ti], th = G.Themes[ti], hh = (i) => U.hash(seed, i, 11);
     c.save(); c.translate(cx, cy);
-    c.fillStyle = 'rgba(0,0,0,0.38)'; circ(c, 0, 0, R * 1.045); // 陷进地面的一圈暗影
+    c.fillStyle = 'rgba(0,0,0,0.16)'; circ(c, 0, 0, R * 1.03); // 陷进地面的一圈浅影
     const g = c.createRadialGradient(0, 0, R * 0.1, 0, 0, R); g.addColorStop(0, M.hi); g.addColorStop(1, M.base);
     c.fillStyle = g; circ(c, 0, 0, R);
     c.strokeStyle = M.line; c.lineCap = 'round'; c.lineJoin = 'round';
@@ -257,7 +261,7 @@
   }
   // 各类房间的地台大小（格）；寻常险地只有三成有，而且残破
   const MED_R = { boss: 5.2, elite: 3.2, start: 2.8, treasure: 2.5, shop: 2.5, garden: 2.5, event: 2.5 };
-  const LITTER = [['#f0c8d6', '#e8a8c0', '#f8e4ea'], ['#6a2a2a', '#8a3a30', '#4a2420'], ['#1c1a22', '#3a2a2a', '#5a3a20'], ['#eaf6ff', '#cfe6f6', '#ffffff']]; // 落英 / 枯叶 / 余烬 / 霜花
+  const LITTER = [['#8f9a95', '#69736f', '#a3aea9'], ['#544c46', '#7e756c', '#4a423c'], ['#4e4c54', '#7c7a84', '#56545e'], ['#b4c0ca', '#a4b2bc', '#c8d2da']]; // 落叶 / 碎屑：只比地面深一点或浅一点
 
   Tx.floor = function (room) {
     const ti = room.theme, th = G.Themes[ti], FS = room.w > 28 ? 1 : Tx.FS; // 大图的贴图精度降一档，免得太大
@@ -290,12 +294,18 @@
         g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(sx - T * 1.1, sy - T * 1.1, T * 2.2, T * 2.2);
       }
     }
-    // 青铜地台
+    // 主色罩染（631 的"六"）：石缝、苔痕、土色的深浅都还在，但罩上一层主色之后只剩同色系里淡淡的起伏，
+    // 整片地面读成"一种颜色"，上面站着什么一眼就看得见
+    c.globalAlpha = 0.56; c.fillStyle = th.dom;
+    if (open) c.fillRect(0, 0, w * T, h * T);
+    else for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const t = at(x, y); if (t !== 1 && t !== 3) c.fillRect(x * T, y * T, T + 0.5, T + 0.5); }
+    c.globalAlpha = 1;
+    // 地台
     const seed = (room.gx || 0) * 7 + (room.gy || 0) * 13 + ti * 31;
     let mr = MED_R[room.type] || (U.hash(seed, 3, 9) < 0.34 ? 2.6 : 0);
     if (mr) { mr = Math.min(mr, Math.min(w, h) / 2 - 1.6); medallion(c, (w / 2) * T, (h / 2) * T, mr * T, ti, !MED_R[room.type], seed, room.type === 'boss'); }
     // 散落物：成簇的落英 / 枯叶 / 余烬 / 霜花，让地面不那么"干净"
-    const nL = Math.round(w * h * (ti === 2 ? 0.5 : 0.9)), LC = LITTER[ti];
+    const nL = Math.round(w * h * (ti === 2 ? 0.2 : 0.34)), LC = LITTER[ti];
     for (let i = 0; i < nL; i++) {
       const k = (i / 7) | 0, lx = U.hash(k, 3, seed) * w * T + (U.hash(i, 7, seed) - 0.5) * 76, ly = U.hash(k, 5, seed) * h * T + (U.hash(i, 9, seed) - 0.5) * 54;
       const t = at(Math.floor(lx / T), Math.floor(ly / T)); if (t !== 0 && t !== 2) continue;
@@ -336,7 +346,7 @@
     // 层次：灯下一圈暖光、物件脚下的接地影、四周压暗 —— 视线自然落在场中
     for (const L of room.lights || []) {
       const lc = `${(L.c >> 16) & 255},${(L.c >> 8) & 255},${L.c & 255}`, g = c.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.r * 0.62);
-      g.addColorStop(0, `rgba(${lc},0.22)`); g.addColorStop(0.5, `rgba(${lc},0.08)`); g.addColorStop(1, `rgba(${lc},0)`);
+      g.addColorStop(0, `rgba(${lc},0.13)`); g.addColorStop(0.5, `rgba(${lc},0.05)`); g.addColorStop(1, `rgba(${lc},0)`);
       c.fillStyle = g; c.fillRect(L.x - L.r, L.y - L.r, L.r * 2, L.r * 2);
     }
     for (const p of room.props || []) {
@@ -435,7 +445,7 @@
         c.fillStyle = th.base; c.fillRect(px, hgt - 5, 48.5, 5);
         if (hh(1) < 0.2) { c.fillStyle = 'rgba(90,20,30,0.4)'; ell(c, px + hh(2) * 48, 20 + hh(3) * 20, 8, 12); }
       } else {
-        c.fillStyle = '#d9b45a'; c.fillRect(px, 5, 48.5, 2); c.fillRect(px, hgt - 9, 48.5, 2);
+        c.fillStyle = '#9a9478'; c.fillRect(px, 5, 48.5, 1.5); c.fillRect(px, hgt - 9, 48.5, 1.5); // 旧鎏金：只是一道细线，不亮
         c.fillStyle = th.base; c.fillRect(px, hgt - 7, 48.5, 7);
         if (x % 2) { c.strokeStyle = 'rgba(120,200,255,0.3)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(px + 24, 12); c.lineTo(px + 24, hgt - 14); c.stroke(); } // 玉的纹理；鎏金的框是立体构件
       }
@@ -473,7 +483,7 @@
     c.fillStyle = g; c.fillRect(0, 0, 64, 64);
     c.fillStyle = th.base; c.fillRect(0, 52, 64, 12);
     if (ti === 2) { c.strokeStyle = 'rgba(10,8,14,0.45)'; c.lineWidth = 1.5; for (let r = 0; r < 4; r++) { c.beginPath(); c.moveTo(0, r * 16); c.lineTo(64, r * 16); c.moveTo(r % 2 ? 32 : 0.5, r * 16); c.lineTo(r % 2 ? 32 : 0.5, r * 16 + 16); c.stroke(); } }
-    if (ti === 3) { c.fillStyle = '#d9b45a'; c.fillRect(0, 6, 64, 2.5); }
+    if (ti === 3) { c.fillStyle = '#8f9690'; c.fillRect(0, 6, 64, 2); }
     if (ti === 1) { c.strokeStyle = 'rgba(20,10,10,0.4)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 20); c.quadraticCurveTo(32, 28, 64, 20); c.moveTo(0, 40); c.quadraticCurveTo(32, 34, 64, 40); c.stroke(); }
     return cv;
   };
