@@ -55,6 +55,7 @@
   // 叶团：松是扁的云片，花树是圆的团
   const padGeo = (vr, ti, kind) => { const p = PAL[ti], bl = kind === 'bloom'; return lump(`pad${vr % 3}_${ti}_${kind}`, (vr % 3) * 29 + ti + 3, { rough: 0.36, top: 0.5, flat: 0.7, bot: 0.22, sy: kind === 'pine' ? 0.5 : 0.8, dark: bl ? p.bloomD : p.leafD, lite: bl ? p.bloom : p.leaf, byNormal: true }); };
 
+  Mo.padGeo = padGeo;
   function stick(parent, a, b, r, mat) { // 一截上细下粗的枝干，从 a 到 b
     const m = new THREE.Mesh(gg('stk', () => new THREE.CylinderGeometry(0.38, 0.5, 1, 6)), mat);
     D.subVectors(b, a); const len = D.length();

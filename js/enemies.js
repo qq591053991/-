@@ -40,7 +40,11 @@
     const ch = G.Chapters[room.chapter], pool = ch.pool;
     let budget = [6.5, 9, 11, 12.5][room.chapter] + room.depth * 0.5;
     if (room.type === 'elite') budget *= 1.1;
-    const nW = budget > 6.5 ? (U.chance(0.4) ? 3 : 2) : U.chance(0.55) ? 2 : 1;
+    let nW = budget > 6.5 ? (U.chance(0.4) ? 3 : 2) : U.chance(0.55) ? 2 : 1;
+    if (room.zones) { // 大图：至多四片空地里有埋伏，其余的是安静的；敌人总数相应增加
+      nW = Math.min(4, room.zones.length); budget *= 1 + 0.22 * (nW - 2);
+      const quiet = U.shuffle(room.zones.slice()).slice(nW); for (const z of quiet) z.done = true;
+    }
     const waves = [];
     for (let i = 0; i < nW; i++) {
       let b = (budget / nW) * (i === nW - 1 ? 1.15 : 0.95);
@@ -62,11 +66,11 @@
     room.waves = waves; room.waveI = 0;
   };
 
-  E.spawnWave = function (room) {
+  E.spawnWave = function (room, zone) { // zone：这一波埋伏在哪片空地（大图）
     const p = G.Game.player, w = room.waves[room.waveI++];
     if (!w) return;
     for (const s of w) {
-      const pos = W.randomFloor(room, p.x, p.y, 210);
+      const pos = zone ? W.randomFloorNear(room, zone.x * T, zone.y * T, Math.max(zone.rx, zone.ry) * T, p.x, p.y, 170) : room.zones ? W.randomFloorNear(room, p.x, p.y, 420, p.x, p.y, 200) : W.randomFloor(room, p.x, p.y, 210);
       E.spawnEnemy(s.key, pos.x, pos.y, { elite: s.elite });
     }
     Au.sfx('spawn');

@@ -129,7 +129,7 @@
 
   E.hurtPlayer = function (d, sx, sy) {
     const Gm = G.Game, p = Gm.player;
-    if (p.dead || p.inv > 0 || p.dashing > 0 || Gm.god) return false;
+    if (p.dead || p.inv > 0 || p.dashing > 0 || Gm.god || Gm.transit) return false; // 换图途中不受伤
     if (p.flags.autoShield && p.autoShieldT <= 0) {
       p.autoShieldT = 12; p.inv = 0.4;
       FX.ring(p.x, p.y, 10, 60, '200,220,255', 0.3, 4); FX.text(p.x, p.y, 50, '飞天盾', '#c9d4e8', 14); Au.sfx('block');

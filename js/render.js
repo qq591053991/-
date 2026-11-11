@@ -291,8 +291,17 @@
       const bark = lm({ color: new THREE.Color(Mo.PAL[ti].trunk) }), leaf = new THREE.MeshLambertMaterial({ vertexColors: true }), barkD = bark.clone(), leafD = new THREE.MeshLambertMaterial({ vertexColors: true, color: new THREE.Color(0.6, 0.62, 0.68) });
       barkD.color.multiplyScalar(0.6); rs.mats.push(leaf, barkD, leafD);
       const taken = new Set(room.deco.map((dd) => Math.floor(dd.y) * w + Math.floor(dd.x)));
+      // 每格离最近的空地有几格远：贴着空地的一圈种整棵的树，往里两圈用简化的树，再深处只放一团团树冠（大图里林子很厚，不能棵棵都画全）
+      const far = new Uint8Array(w * h).fill(99), qu = [];
+      for (let i = 0; i < w * h; i++) if (tiles[i] !== 1) { far[i] = 0; qu.push(i); }
+      for (let qi = 0; qi < qu.length; qi++) { const i = qu[qi], x0 = i % w, y0 = (i / w) | 0; for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x0 + ax, yy = y0 + ay; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const k = yy * w + xx; if (far[k] > far[i] + 1) { far[k] = far[i] + 1; qu.push(k); } } }
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         if (at(x, y) !== 1 || taken.has(y * w + x)) continue;
+        if (!cave && far[y * w + x] > 3) { // 林子深处：隔一格放一团压暗的树冠
+          if ((x + y) % 2) continue;
+          const cm = new THREE.Mesh(Mo.padGeo(x + y, ti, ti === 1 ? 'round' : 'pine'), leafD), cs = 1.25 + U.hash(x, y, sd + 64) * 0.6;
+          cm.position.set(x + 0.5, 1.0 + U.hash(x, y, sd + 65) * 0.7, y + 0.5); cm.scale.set(cs, cs * 0.8, cs); cm.rotation.y = x * 1.3 + y; scn.add(cm); continue;
+        }
         let edgeT = false;
         for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const xx = x + i, yy = y + j; if (xx >= 0 && yy >= 0 && xx < w && yy < h && tiles[yy * w + xx] !== 1) edgeT = true; }
         const r1 = U.hash(x, y, sd + 60), r2 = U.hash(x, y, sd + 61), px = x + 0.5 + (U.hash(x, y, sd + 62) - 0.5) * 0.5, pz = y + 0.5 + (U.hash(x, y, sd + 63) - 0.5) * 0.5, north = y < h * 0.42, south = y > h * 0.66;
@@ -307,8 +316,9 @@
         if (below && r1 > 0.42) { if (r1 < 0.7) crag(px, pz, 0.25 + r2 * 0.3); continue; }
         if (r1 < (edgeT ? 0.24 : 0.1)) { crag(px, pz, (south ? 0.3 : 0.5) + r2 * (south ? 0.3 : 0.8)); continue; }
         if (r1 > (edgeT ? 0.95 : 0.64)) continue; // 林间留一点缝
-        const fg = south || below > 0;
-        const tr = Mo.tree(x * 31 + y * 17 + sd, ti, ti === 1 ? 'round' : r2 < 0.12 ? 'bloom' : 'pine', (below ? 0.6 : south ? 0.8 : north ? 1.25 : 1.05) + r2 * (below ? 0.2 : 0.35), { lite: !edgeT || fg, bark: fg ? barkD : bark, leaf: fg ? leafD : leaf });
+        const fg = (south && w <= 28) || below > 0;
+        const big = w > 28; // 大图里"南北"是相对空地而言的：只有紧挨空地南沿的才算前景
+        const tr = Mo.tree(x * 31 + y * 17 + sd, ti, ti === 1 ? 'round' : r2 < 0.12 ? 'bloom' : 'pine', (below ? 0.6 : fg && !big ? 0.8 : north || big ? 1.2 : 1.05) + r2 * (below ? 0.2 : 0.35), { lite: !edgeT || fg, bark: fg ? barkD : bark, leaf: fg ? leafD : leaf });
         tr.g.position.set(px, -0.04, pz); tr.g.rotation.y = r2 * TAU; scn.add(tr.g);
       }
       // 路口的火盆
@@ -1179,6 +1189,21 @@
         c.strokeText(b.text, s.x, s.y - (1 - k) * 10); c.fillStyle = '#ffd8c0'; c.fillText(b.text, s.x, s.y - (1 - k) * 10);
       }
       c.globalAlpha = 1;
+    }
+    if (world && p && room.zones && room.locked && room.waves && room.waveI < room.waves.length && !room.enemies.some((e) => !e.dead)) {
+      // 大图：下一波埋伏在哪片空地。在画面里就画一圈墨晕，在画面外就在边上指个方向
+      let z = null, bd = 1e9; for (const q of room.zones) { if (q.done) continue; const d = U.dist(p.x, p.y, q.x * T, q.y * T); if (d < bd) { bd = d; z = q; } }
+      if (z) {
+        const s = proj(z.x * T, z.y * T, 0), ps = proj(p.x, p.y, 0), m = 70, inside = s.x > m && s.x < W - m && s.y > m && s.y < H - m, pulse = 0.55 + Math.sin(t * 4) * 0.25;
+        c.save(); c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `20px ${FONT}`;
+        if (inside) { c.strokeStyle = `rgba(190,60,60,${pulse * 0.7})`; c.lineWidth = 2; c.beginPath(); c.ellipse(s.x, s.y, 46 + Math.sin(t * 4) * 5, 26 + Math.sin(t * 4) * 3, 0, 0, TAU); c.stroke(); c.fillStyle = `rgba(230,170,160,${pulse})`; c.fillText('妖气', s.x, s.y); }
+        else {
+          const a = Math.atan2(s.y - ps.y, s.x - ps.x), ex = U.clamp(s.x, m, W - m), ey = U.clamp(s.y, m + 30, H - m - 40);
+          c.translate(ex, ey); c.fillStyle = `rgba(230,170,160,${pulse})`; c.fillText('妖气', 0, -22);
+          c.rotate(a); c.fillStyle = `rgba(200,70,70,${pulse})`; c.beginPath(); c.moveTo(16, 0); c.lineTo(-8, -10); c.lineTo(-3, 0); c.lineTo(-8, 10); c.closePath(); c.fill();
+        }
+        c.restore();
+      }
     }
     if (world && p && room.theme !== undefined) { // 黑暗里的一圈光：离主角越远越暗
       const dk = Math.min(0.86, G.Themes[room.theme].dark * (room.terrain === 'cave' ? 1.35 : 1)), s = proj(p.x, p.y, 24), g = c.createRadialGradient(s.x, s.y, H * 0.3, s.x, s.y, Math.max(W, H) * 0.8);

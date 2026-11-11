@@ -209,7 +209,7 @@
   const LITTER = [['#f0c8d6', '#e8a8c0', '#f8e4ea'], ['#6a2a2a', '#8a3a30', '#4a2420'], ['#1c1a22', '#3a2a2a', '#5a3a20'], ['#eaf6ff', '#cfe6f6', '#ffffff']]; // 落英 / 枯叶 / 余烬 / 霜花
 
   Tx.floor = function (room) {
-    const ti = room.theme, th = G.Themes[ti], FS = Tx.FS;
+    const ti = room.theme, th = G.Themes[ti], FS = room.w > 28 ? 1 : Tx.FS; // 大图的贴图精度降一档，免得太大
     const w = room.w, h = room.h, tiles = room.tiles;
     const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 1 : tiles[y * w + x]);
     const cv = document.createElement('canvas'); cv.width = Math.round(w * T * FS); cv.height = Math.round(h * T * FS);
@@ -224,9 +224,13 @@
       // 土路：从每个出口踩向空地中央的一条小径 —— 地图之间靠路连着，而不是靠门
       const trail = ti === 0 ? '112,104,84' : ti === 1 ? '64,46,38' : '70,70,80', mx = (w / 2) * T, my = (h / 2) * T;
       c.lineCap = 'round';
-      for (const d in room.doors || {}) {
+      const stroke = (ax, ay, bx, by, ex, ey) => { for (const [lw, a] of [[T * 2.3, 0.2], [T * 1.6, 0.3], [T * 0.9, 0.3]]) { c.strokeStyle = `rgba(${trail},${a})`; c.lineWidth = lw; c.beginPath(); c.moveTo(ax, ay); c.quadraticCurveTo(bx, by, ex, ey); c.stroke(); } };
+      if (room.paths) { // 大图：小径就是连接各片空地的那几条路
+        for (const q of room.paths) stroke(q[0] * T, q[1] * T, q[2] * T, q[3] * T, q[4] * T, q[5] * T);
+        for (const d in room.doors || {}) { const [dx0, dy0] = room.doors[d].cells[1], o = G.World.DIRS[G.World.OPP[d]]; stroke((dx0 + 0.5) * T, (dy0 + 0.5) * T, (dx0 + 0.5 + o[0]) * T, (dy0 + 0.5 + o[1]) * T, (dx0 + 0.5 + o[0] * 2) * T, (dy0 + 0.5 + o[1] * 2) * T); }
+      } else for (const d in room.doors || {}) {
         const [dx0, dy0] = room.doors[d].cells[1], sx = (dx0 + 0.5) * T, sy = (dy0 + 0.5) * T, bx = (sx + mx) / 2 + (U.hash(dx0, dy0, 5) - 0.5) * 90, by = (sy + my) / 2 + (U.hash(dx0, dy0, 6) - 0.5) * 70;
-        for (const [lw, a] of [[T * 2.3, 0.2], [T * 1.6, 0.3], [T * 0.9, 0.3]]) { c.strokeStyle = `rgba(${trail},${a})`; c.lineWidth = lw; c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(bx, by, mx, my); c.stroke(); }
+        stroke(sx, sy, bx, by, mx, my);
       }
       // 林下 / 岩壁下的暗：一团一团的，边缘是软的
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {

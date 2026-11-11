@@ -52,7 +52,7 @@
       this.player = E.makePlayer({ body: m.body, root: m.root, wit: m.wit, bag: m.bag, luck: m.luck, vial: m.vial });
       this.stats = { kills: 0, dmg: 0, taken: 0, casts: 0, rooms: 0, time: 0, bosses: 0 };
       this.meta.runs++; this.saveMeta();
-      this.timers.length = 0; this.slowT = 0; this.combo = 0; this.comboT = 0;
+      this.timers.length = 0; this.slowT = 0; this.combo = 0; this.comboT = 0; this.transit = null;
       G.UI.hideMenu();
       G.UI.story(G.Story.intro, () => this.enterChapter(0));
     },
@@ -377,6 +377,23 @@
       if (this.chapter + 1 < G.Chapters.length) this.enterChapter(this.chapter + 1);
     },
 
+    /* 换图的过渡：沿着出口的方向走出去（上桥 / 进洞 / 出门），画面渐暗；到了下一张图，从对面的入口走进来。
+       两张图的出入口是成对的 —— 从东边的桥离开，就从下一张图西边的桥上来 */
+    stepTransit(raw) {
+      const tr = this.transit, p = this.player, o = W.DIRS[tr.d];
+      tr.t += raw; p.t += raw; p.moving = true; p.face = Math.atan2(o[1], o[0]);
+      p.x += o[0] * 250 * raw; p.y += o[1] * 250 * raw;
+      if (tr.ph === 0) {
+        this.fade = Math.min(1, tr.t / 0.4);
+        if (tr.t >= 0.4) {
+          this.enterRoom(tr.to, W.OPP[tr.d]);
+          const c = this.room.doors[W.OPP[tr.d]].cells[1]; // 落在入口外侧（桥上 / 洞里），再往里走
+          p.x = (c[0] + 0.5 - o[0] * 1.5) * T; p.y = (c[1] + 0.5 - o[1] * 1.5) * T;
+          tr.ph = 1; tr.t = 0; R.updateCam(0, true);
+        }
+      } else if (tr.t >= 0.56) { this.transit = null; p.moving = false; }
+    },
+
     /* ---------------- 交互 ---------------- */
     nearInteract() {
       const p = this.player, room = this.room; let best = null, bd = 1e9;
@@ -456,7 +473,7 @@
       if (this.state === 'play') {
         this.stats.time += raw;
         this.updateTarget();
-        E.updatePlayer(dt);
+        if (this.transit) this.stepTransit(raw); else E.updatePlayer(dt);
       } else this.target = null;
       E.updateEnemies(dt);
       E.updateProjs(dt);
@@ -474,24 +491,29 @@
       // 波次与清场
       if (room.locked && room.type !== 'boss') {
         if (room.enemies.length === 0) {
-          if (room.waveI < room.waves.length) { room.waveT -= dt; if (room.waveT <= 0) { E.spawnWave(room); room.waveT = 0.7; } }
-          else this.onRoomCleared();
+          if (room.waveI < room.waves.length) {
+            if (room.zones) { // 大图：敌人按空地埋伏，走进一片还没惊动过的空地，才引出下一波
+              let z = room.zones.find((q) => !q.done && Math.abs(p.x / T - q.x) < q.rx + 0.6 && Math.abs(p.y / T - q.y) < q.ry + 0.6);
+              if (!z && room.zones.every((q) => q.done)) z = room.zones[0];
+              if (z) { room.waveT -= dt; if (room.waveT <= 0) { z.done = true; E.spawnWave(room, z); room.waveT = 0.7; } }
+            } else { room.waveT -= dt; if (room.waveT <= 0) { E.spawnWave(room); room.waveT = 0.7; } }
+          } else this.onRoomCleared();
         }
       }
       // 待处理的感悟
       if (!room.locked && p.pendingLv > 0 && !p.dead) { this.openLevelChoice(); return; }
 
-      // 过门
-      if (!room.locked) {
+      // 过门（正在过渡时不检测：进来时会踩过入口那几格）
+      if (!room.locked && !this.transit) {
         const tx = Math.floor(p.x / T), ty = Math.floor(p.y / T);
         if (tx >= 0 && ty >= 0 && tx < room.w && ty < room.h && room.tiles[ty * room.w + tx] === 4) {
           for (const d in room.doors) {
-            if (room.doors[d].cells.some(([x, y]) => x === tx && y === ty)) { this.enterRoom(room.doors[d].to, W.OPP[d]); return; }
+            if (room.doors[d].cells.some(([x, y]) => x === tx && y === ty)) { this.transit = { d, to: room.doors[d].to, ph: 0, t: 0 }; return; }
           }
         }
       }
       // 交互
-      const it = this.nearInteract();
+      const it = this.transit ? null : this.nearInteract();
       G.UI.prompt(it ? it.label : null);
       if (it && (I.hit('KeyF') || I.hit('act'))) this.interact(it);
     },

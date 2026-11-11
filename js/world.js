@@ -78,6 +78,7 @@
     start: [[15, 11]], treasure: [[13, 9]], shop: [[15, 9]], garden: [[15, 11]], event: [[13, 9]],
     combat: [[17, 11], [19, 13], [21, 13], [21, 15], [23, 13], [19, 15]],
     elite: [[21, 15], [23, 15]], boss: [[27, 19]],
+    big: [[33, 19], [37, 17], [29, 23], [39, 19], [35, 21], [31, 21]], // 山野的大图：两到三屏
   };
 
   W.buildRoom = function (room) {
@@ -89,8 +90,9 @@
        血色禁地整章是山野，墨蛟的巢穴是洞窟；七玄门是院落与山谷相间 */
     const ch = room.chapter || 0, fight = room.type === 'combat' || room.type === 'elite';
     room.terrain = ch === 1 ? (room.type === 'boss' ? 'cave' : 'wild') : ch === 0 && (room.type === 'garden' || (fight && U.chance(0.6))) ? 'wild' : 'court';
-    let [w, h] = U.pick(SIZES[room.type]);
-    if (room.terrain !== 'court' && room.type !== 'boss') { w += 4; h += 2; } // 边界会吃掉一圈，山野的图整体放大，空地才够打
+    const big = room.terrain === 'wild' && fight; // 山野里的险地是大图：几片空地由小径连着，要走上两三屏
+    let [w, h] = U.pick(big ? SIZES.big : SIZES[room.type]);
+    if (room.terrain !== 'court' && room.type !== 'boss' && !big) { w += 4; h += 2; } // 边界会吃掉一圈，山野的小图也放大一点
     room.w = w; room.h = h;
     const tiles = (room.tiles = new Uint8Array(w * h));
     for (let x = 0; x < w; x++) { tiles[x] = 1; tiles[(h - 1) * w + x] = 1; }
@@ -122,11 +124,47 @@
     }
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) res(cx + i, cy + j);
 
+    if (big) {
+      // 大图：先全填成林子，再挖出几片空地，用小径把它们连起来
+      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) tiles[y * w + x] = 1;
+      const open = (x, y) => { if (x >= 1 && y >= 1 && x <= w - 2 && y <= h - 2) tiles[y * w + x] = 0; };
+      // 布局：中央一片，四周环绕四五片，铺满整张图
+      const zones = (room.zones = [{ x: cx + 0.5, y: cy + 0.5, rx: U.rand(4.6, 5.8), ry: U.rand(3.4, 4.2) }]);
+      for (let n = U.randi(5, 6), i = 0, a0 = U.rand(G.TAU); i < n; i++) {
+        const a = a0 + (i / n) * G.TAU + U.rand(-0.2, 0.2), rx = U.rand(4.0, 5.4), ry = U.rand(3.0, 4.0);
+        zones.push({ x: U.clamp(cx + 0.5 + Math.cos(a) * w * 0.34, rx + 1.6, w - rx - 1.6), y: U.clamp(cy + 0.5 + Math.sin(a) * h * 0.3, ry + 1.6, h - ry - 1.6), rx, ry });
+      }
+      for (const z of zones) { // 空地：边缘起伏的椭圆
+        const ph = [U.rand(G.TAU), U.rand(G.TAU)];
+        for (let y = Math.floor(z.y - z.ry - 1); y <= z.y + z.ry + 1; y++) for (let x = Math.floor(z.x - z.rx - 1); x <= z.x + z.rx + 1; x++) {
+          const nx = (x + 0.5 - z.x) / z.rx, ny = (y + 0.5 - z.y) / z.ry, a = Math.atan2(ny, nx);
+          if (Math.hypot(nx, ny) < 0.88 + 0.12 * (Math.sin(a * 3 + ph[0]) * 0.6 + Math.sin(a * 5 + ph[1]) * 0.4)) open(x, y);
+        }
+      }
+      room.paths = [];
+      const path = (ax, ay, bx, by) => { // 小径：一条略弯的线，沿线挖出三格宽
+        const l = Math.hypot(bx - ax, by - ay) || 1, k = U.rand(-0.22, 0.22) * l, mx = (ax + bx) / 2 - ((by - ay) / l) * k, my = (ay + by) / 2 + ((bx - ax) / l) * k;
+        room.paths.push([ax, ay, mx, my, bx, by]);
+        for (let t = 0; t <= 1.001; t += 0.4 / l) {
+          const u = 1 - t, px = u * u * ax + 2 * u * t * mx + t * t * bx, py = u * u * ay + 2 * u * t * my + t * t * by;
+          for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) open(Math.floor(px) + i, Math.floor(py) + j);
+        }
+      };
+      for (let i = 1; i < zones.length; i++) { // 每片都连到中央；相邻的两片之间有六成也连上，形成可以兜圈的环路
+        path(zones[i].x, zones[i].y, zones[0].x, zones[0].y);
+        const nx2 = zones[i === zones.length - 1 ? 1 : i + 1]; if (U.chance(0.6)) path(zones[i].x, zones[i].y, nx2.x, nx2.y);
+      }
+      for (const d in room.doors) { // 每个出口连到离它最近的那片空地
+        const [mx, my] = room.doors[d].cells[1], [dx, dy] = DIRS[OPP[d]], sx = mx + 0.5 + dx * 2, sy = my + 0.5 + dy * 2;
+        let b = zones[0]; for (const z of zones) if (Math.hypot(z.x - sx, z.y - sy) < Math.hypot(b.x - sx, b.y - sy)) b = z;
+        path(sx, sy, b.x, b.y);
+      }
+    }
     if (room.terrain !== 'court') {
       // 空地的边界：一圈起伏的曲线（超椭圆 × 随方向变化的半径），线外都是林木 / 岩壁
       const ph = [U.rand(G.TAU), U.rand(G.TAU), U.rand(G.TAU)], amp = room.type === 'boss' ? 0.06 : 0.11;
       const edge = (a) => 0.97 - amp + amp * (Math.sin(a * 2 + ph[0]) * 0.5 + Math.sin(a * 3 + ph[1]) * 0.3 + Math.sin(a * 5 + ph[2]) * 0.2);
-      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      if (!big) for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
         const nx = (x + 0.5 - w / 2) / (w / 2 - 1), ny = (y + 0.5 - h / 2) / (h / 2 - 1);
         if (Math.pow(Math.pow(Math.abs(nx), 2.6) + Math.pow(Math.abs(ny), 2.6), 1 / 2.6) > edge(Math.atan2(ny, nx))) tiles[y * w + x] = 1;
       }
@@ -205,6 +243,7 @@
           for (let y = py - 1; y <= py; y++) for (let x = px - 1; x <= px + 1; x++) put(x, y, 3);
           put(U.randi(3, w - 4), U.randi(3, h - 4), 1);
         }
+        if (big) for (let i = 0, n = Math.round((w * h) / 60); i < n; i++) prop(U.randi(2, w - 3), U.randi(2, h - 3), pk()); // 大图：各片空地里再散些树石
         if (connected(room)) break;
         if (tryN === 7) { tiles.set(snapshot); room.props.length = 0; }
       }
@@ -360,6 +399,18 @@
   };
 
   /* 进门位置 */
+  /* 在 (cx, cy) 周围 rad 像素内找一格空地；找不到就退回全图随机 */
+  W.randomFloorNear = function (room, cx, cy, rad, awayX, awayY, minD) {
+    for (let i = 0; i < 60; i++) {
+      const a = U.rand(G.TAU), r = Math.sqrt(Math.random()) * rad, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.75, tx = Math.floor(x / T), ty = Math.floor(y / T);
+      if (tx < 1 || ty < 1 || tx > room.w - 2 || ty > room.h - 2 || room.tiles[ty * room.w + tx] !== 0) continue;
+      const gx = (tx + 0.5) * T, gy = (ty + 0.5) * T; // 落在格子正中，免得半个身子嵌进林子里动不了
+      if (U.dist(gx, gy, awayX, awayY) < minD) continue;
+      return { x: gx, y: gy };
+    }
+    return W.randomFloor(room, awayX, awayY, minD);
+  };
+
   W.entryPos = function (room, fromDir) {
     const d = room.doors[fromDir];
     if (!d) return { x: (room.w / 2) * T, y: (room.h / 2) * T };
