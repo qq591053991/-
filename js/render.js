@@ -1160,7 +1160,7 @@
       let m = inters.get(it);
       if (!m) {
         m = it.kind === 'chest' ? Mo.chest() : it.kind === 'garden' ? Mo.herbField() : it.kind === 'event' ? Mo.shrine() : it.kind === 'shop' ? Mo.shop() : Mo.portal(th.lampHex);
-        place(m.g, it.x, it.y, 0); dyn.add(m.g); inters.set(it, m);
+        place(m.g, it.x, it.y, 0); dyn.add(m.g); inters.set(it, m); if (it.kind !== 'portal') inkActor(m); // 宝匣、药园、石碑、摊子也描墨线
       }
       m.update(it, t);
       const lc = rgb(th.lamp);

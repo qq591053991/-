@@ -49,6 +49,7 @@
     Dv.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const len = Dv.length(); Qs.setFromUnitVectors(UPv, Dv.normalize()); Es.setFromQuaternion(Qs);
     put(geo, color, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], [w, len, d === undefined ? w : d], [Es.x, Es.y, Es.z]);
   }
+  Mo.sculpt = sculpt; Mo.span = span; // 场景物件（scenery.js）也用
   const skinOf = (c, o) => c.flat('#ffffff', Object.assign({ vertexColors: true, shininess: 5 }, o));
   const glowOf = (c, o) => c.glow('#ffffff', Object.assign({ vertexColors: true }, o));
   const part = (geo, mat, parent, p, shadow) => { const m = new THREE.Mesh(geo, mat); m.castShadow = shadow !== false; if (p) m.position.set(p[0], p[1], p[2]); parent.add(m); return m; };
@@ -450,6 +451,96 @@
     });
     m.world = true; // 自带世界坐标，不随实体整体平移
     return m;
+  };
+
+  /* ============================ 交互物 ============================
+     宝匣、药园、石碑、坊市的摊子：同样是雕塑出来的削面体，同样描墨线 */
+  /* 宝匣：包金角的木匣，盝顶的盖，盖顶嵌一颗发光的珠 */
+  Mo.chest = function () {
+    const c = ctx(), g = c.g, skin = skinOf(c, { shininess: 22 }), glo = glowOf(c);
+    const wood = '#6a4326', woodL = '#8a5a34', gold = '#d2aa52', dk = '#3a2414';
+    const baseG = sculpt('chest:base', (put) => {
+      put(box(), dk, [0, 0.03, 0], [0.7, 0.06, 0.5]);
+      put(box(), wood, [0, 0.19, 0], [0.64, 0.3, 0.44]);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(box(), gold, [sx * 0.3, 0.19, sz * 0.2], [0.07, 0.32, 0.07]);   // 包金的四角
+      put(box(), gold, [0, 0.33, 0], [0.67, 0.035, 0.47]);                                                                       // 口沿
+      put(cyl(0.5, 0.5, 6), gold, [0, 0.21, 0.225], [0.15, 0.03, 0.15], [PI / 2, 0, 0]); put(box(), dk, [0, 0.2, 0.245], [0.03, 0.07, 0.02]); // 锁牌
+    }, 0.68, 1.08);
+    const lidG = sculpt('chest:lid', (put) => {
+      put(cyl(0.36, 0.5, 4), woodL, [0, 0.1, 0.22], [0.92, 0.18, 0.63], [0, PI / 4, 0]);                                         // 盝顶
+      put(box(), gold, [0, 0.195, 0.22], [0.48, 0.03, 0.33]);
+      put(box(), gold, [0, 0.015, 0.22], [0.67, 0.03, 0.47]);
+      for (const sx of [-1, 1]) put(box(), gold, [sx * 0.2, 0.11, 0.22], [0.04, 0.17, 0.5], [0, 0, -sx * 0.5]);                 // 两道箍
+    }, 0.72, 1.1);
+    const gemG = sculpt('chest:gem', (put) => put(oct(), '#ffe9a0', [0, 0, 0], [1, 1.3, 1]), 1, 1);
+    part(baseG, skin, g);
+    const lid = c.grp([0, 0.345, -0.22]); part(lidG, skin, lid);
+    const gem = part(gemG, glo, lid, [0, 0.27, 0.22], false);
+    return { g, mats: c.mats, update(it, t) { lid.rotation.x = it.used ? -1.9 : 0; gem.visible = !it.used; gem.scale.setScalar(0.1 + Math.sin(t * 4) * 0.015); gem.rotation.y = t * 1.5; } };
+  };
+
+  /* 药园：一畦土，四周围一圈卵石；灵药是带尖叶的茎，顶上一枚发光的蕾 */
+  Mo.herbField = function () {
+    const c = ctx(), g = c.g, skin = skinOf(c), glo = glowOf(c);
+    const bedG = sculpt('herb:bed', (put) => {
+      put(cyl(0.5, 0.52, 8), '#3b2a1e', [0, 0.045, 0], [1.46, 0.09, 1.06]);
+      put(cyl(0.5, 0.5, 8), '#4d3826', [0, 0.085, 0], [1.22, 0.05, 0.86]);
+      for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU + 0.2, q = 0.12 + U.hash(i, 3, 5) * 0.08; put(ico(0), i % 3 ? '#7d848c' : '#69727e', [Math.cos(a) * 0.74, 0.04, Math.sin(a) * 0.54], [q * 1.3, q, q * 1.1], [U.hash(i, 1, 5), U.hash(i, 2, 5) * 3, 0]); } // 一圈卵石
+      for (let i = 0; i < 4; i++) { const a = i * 1.7 + 0.4; put(ico(0), '#4b7a4c', [Math.cos(a) * 0.76, 0.1, Math.sin(a) * 0.55], [0.13, 0.05, 0.1]); }  // 石上的苔
+    }, 0.7, 1.1);
+    const herbG = sculpt('herb:plant', (put) => {
+      span(put, cyl(0.3, 0.5, 5), '#4f9a58', [0, 0, 0], [0.01, 0.3, 0], 0.04);
+      for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.3; span(put, cone(4), i % 2 ? '#62b46c' : '#3f8a50', [0, 0.05 + i * 0.05, 0], [Math.cos(a) * 0.18, 0.15 + i * 0.06, Math.sin(a) * 0.18], 0.08, 0.025); }
+    }, 0.75, 1.1);
+    const cols = ['#7fe0a0', '#e07ad0', '#ffd45e', '#7ad0ff', '#ff8a6a'], herbs = [], buds = [];
+    part(bedG, skin, g);
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * TAU, r = i === 0 ? 0 : 0.36, sgrp = c.grp([Math.cos(a) * r * 1.2, 0.1, Math.sin(a) * r * 0.85]); sgrp.rotation.y = i * 1.3;
+      part(herbG, skin, sgrp);
+      buds.push(part(sculpt('herb:bud' + (i % 5), (put) => put(oct(), cols[i % 5], [0, 0.35, 0], [0.09, 0.14, 0.09]), 1, 1), glo, sgrp, null, false)); herbs.push(sgrp);
+    }
+    return { g, mats: c.mats, update(it, t) { herbs.forEach((h, i) => { h.rotation.z = Math.sin(t * 2 + i) * 0.1; h.scale.y = it.used ? 0.5 : 1; }); buds.forEach((b) => (b.visible = !it.used)); } };
+  };
+
+  /* 机缘石碑：两级石座上一方尖首的碑，碑脚生苔；碑面的字是发光的 */
+  Mo.shrine = function () {
+    const c = ctx(), g = c.g, skin = skinOf(c);
+    const st = '#868c96', dk = '#646a74';
+    const stoneG = sculpt('shrine', (put) => {
+      put(cyl(0.42, 0.5, 6), dk, [0, 0.08, 0], [0.96, 0.16, 0.62]);
+      put(box(), st, [0, 0.2, 0], [0.58, 0.08, 0.28]);
+      put(box(), st, [0, 0.7, 0], [0.44, 0.94, 0.14]);
+      put(cone(4), st, [0, 1.27, 0], [0.62, 0.2, 0.2], [0, PI / 4, 0]);                                    // 尖首
+      for (const sx of [-1, 1]) put(box(), dk, [sx * 0.2, 0.7, 0.01], [0.045, 0.94, 0.16]);                // 碑侧的边框
+      put(ico(0), '#4b7a4c', [-0.26, 0.17, 0.12], [0.2, 0.07, 0.14]); put(ico(0), '#4b7a4c', [0.2, 0.25, -0.02], [0.14, 0.05, 0.12]); // 苔
+      put(ico(0), dk, [0.36, 0.07, 0.2], [0.16, 0.12, 0.14]); put(ico(0), st, [-0.4, 0.05, 0.16], [0.12, 0.09, 0.11]);               // 碑脚的碎石
+    }, 0.68, 1.1);
+    part(stoneG, skin, g);
+    const tex = new THREE.CanvasTexture(G.Tex.glyph('缘', '#ffe696')); tex.encoding = THREE.sRGBEncoding;
+    const gm = new THREE.MeshBasicMaterial({ map: tex, transparent: true }); c.mats.push(gm);
+    const gl = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), gm); gl.position.set(0, 0.72, 0.076); gl.scale.setScalar(0.38); g.add(gl);
+    return { g, mats: c.mats, update(it, t) { gm.opacity = it.used ? 0.25 : 0.75 + Math.sin(t * 3) * 0.25; } };
+  };
+
+  /* 坊市的摊子：木柜前垂一幅靛蓝布，棚顶是靛蓝与赭黄相间的布条，檐口垂着一排布角 */
+  Mo.shop = function () {
+    const c = ctx(), g = c.g, skin = skinOf(c), glo = glowOf(c);
+    const wood = '#5a3d2c', woodD = '#3c2a1e', indigo = '#2f4a6a', ochre = '#b8924e';
+    const stallG = sculpt('shop:stall', (put) => {
+      put(box(), woodD, [0, 0.03, 0.2], [1.96, 0.06, 0.56]);
+      put(box(), wood, [0, 0.27, 0.2], [1.9, 0.5, 0.5]);
+      put(box(), indigo, [0, 0.3, 0.46], [1.94, 0.4, 0.03]); put(box(), '#c9a85a', [0, 0.49, 0.47], [1.94, 0.03, 0.035]);     // 柜前的布与金边
+      put(box(), '#7a5a3c', [0, 0.545, 0.2], [2.0, 0.05, 0.62]);                                                                 // 台面
+      for (const sx of [-1, 1]) { put(cyl(0.5, 0.5, 6), woodD, [sx * 0.96, 0.92, -0.38], [0.07, 1.84, 0.07]); put(cyl(0.5, 0.5, 6), woodD, [sx * 0.96, 0.8, 0.5], [0.06, 1.6, 0.06]); }
+      for (let i = 0; i < 7; i++) { const x = -0.9 + i * 0.3, col2 = i % 2 ? ochre : indigo; put(box(), col2, [x, 1.74, 0.06], [0.3, 0.05, 0.98], [0.26, 0, 0]); put(cone(4), col2, [x, 1.54, 0.535], [0.3, 0.15, 0.04], [PI, 0, 0]); }
+      put(box(), woodD, [0, 1.88, -0.4], [2.12, 0.06, 0.07]);
+    }, 0.62, 1.1);
+    part(stallG, skin, g);
+    const cols = ['#7dffb0', '#ffd45e', '#7ad0ff', '#ff8a6a', '#d0a0ff'], wares = [];
+    for (let i = 0; i < 5; i++) wares.push(part(sculpt('shop:ware' + i, (put) => put(i % 2 ? oct() : ico(0), cols[i], [0, 0, 0], 0.14), 1, 1), glo, g, [-0.64 + i * 0.32, 0.66, 0.22], false));
+    const keeper = G.Assets.makeRig('shopkeeper', {}) || (G.Assets.ready && G.Assets.make('shopkeeper', { show: ['Rogue_Cape'] })) || Mo.human({ robe: '#8a6a3a', trim: '#f0d890', skin: '#f0d0b0', hat: 'bamboo', weapon: 'none' });
+    keeper.g.position.set(0, 0, -0.26); g.add(keeper.g);
+    return { g, mats: c.mats.concat(keeper.mats), update(it, t) { wares.forEach((w, i) => { w.position.y = 0.66 + Math.sin(t * 2 + i) * 0.03; w.rotation.y = t + i; }); keeper.update({ t, moving: false }); } };
   };
 
   /* ============================ 灵宠的形象 ============================ */

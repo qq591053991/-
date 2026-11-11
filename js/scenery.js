@@ -444,7 +444,38 @@
     return { g, mats: [ice, rk], anim: null };
   };
 
-  /* 接管场景物件：山石、松（偶尔是一树桃花）、血枫、石灯、瓦砾、残柱、竹、灵菇、火盆、战幡、石像、冰晶 */
+  /* 骸骨与拒马：用妖兽那套"雕塑"做，一样一个几何体 */
+  const carved = (geo) => { const g = new THREE.Group(), m = new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 5 }), o = new THREE.Mesh(geo, m); o.castShadow = true; g.add(o); return { g, mats: [m], anim: null }; };
+  /* 骸骨：一副肋骨拱在地上，旁边滚着颅骨和一根腿骨 */
+  Mo.bones = function (v) {
+    const c4 = Mo.geo.cyl(0.5, 0.5, 4), k4 = Mo.geo.cone(4), B = '#d6ccba', D = '#a89c88';
+    return carved(Mo.sculpt('bones' + (v % 2), (put) => {
+      Mo.span(put, c4, D, [-0.38, 0.05, 0], [0.2, 0.05, 0], 0.055);
+      for (let i = 0; i < 5; i++) { const x = -0.32 + i * 0.12, h = 0.31 - Math.abs(i - 2) * 0.045; for (const sz of [-1, 1]) { Mo.span(put, c4, B, [x, 0.05, 0], [x, h * 0.82, sz * 0.17], 0.038); Mo.span(put, k4, B, [x, h * 0.82, sz * 0.17], [x, h, sz * 0.04], 0.038); } }
+      const sx0 = v % 2 ? -1 : 1;
+      put(Mo.geo.ico(1), B, [0.38, 0.12, 0.14 * sx0], [0.26, 0.24, 0.28], [0, 0.5 * sx0, 0.2]); put(Mo.geo.box(), D, [0.42, 0.035, 0.2 * sx0], [0.16, 0.06, 0.14], [0, 0.5 * sx0, 0]);
+      for (const e of [-1, 1]) put(Mo.geo.ico(0), '#1c1416', [0.44 + e * 0.05, 0.15, (0.14 + 0.11) * sx0 - e * 0.03 * sx0], 0.085);
+      Mo.span(put, c4, D, [-0.14, 0.035, -0.32 * sx0], [0.2, 0.035, -0.4 * sx0], 0.05); put(Mo.geo.ico(0), B, [-0.14, 0.04, -0.32 * sx0], 0.09); put(Mo.geo.ico(0), B, [0.2, 0.04, -0.4 * sx0], 0.09);
+    }, 0.7, 1.08));
+  };
+  /* 拒马：一根横木上交叉绑着几对削尖的木桩，尖上包铁 */
+  Mo.barricade = function () {
+    const c6 = Mo.geo.cyl(0.5, 0.5, 6), k5 = Mo.geo.cone(5), W1 = '#5c4636', W2 = '#4a382c', FE = '#aeb2ba';
+    return carved(Mo.sculpt('barricade', (put) => {
+      Mo.span(put, c6, W2, [-0.48, 0.17, 0.02], [0.48, 0.17, 0.02], 0.12);
+      for (let i = 0; i < 4; i++) {
+        const x = -0.36 + i * 0.24;
+        for (const sz of [-1, 1]) {
+          const a = [x + sz * 0.03, 0, -sz * 0.26], b = [x + sz * 0.03, 0.66, sz * 0.34];
+          Mo.span(put, k5, i % 2 ? W1 : W2, a, b, 0.1);
+          Mo.span(put, k5, FE, [a[0], 0.5, a[2] + (b[2] - a[2]) * 0.76], [b[0], 0.7, b[2] + sz * 0.02], 0.055);
+        }
+        put(Mo.geo.box(), '#2c2218', [x, 0.2, 0.02], [0.09, 0.09, 0.14]); // 绑绳
+      }
+    }, 0.7, 1.08));
+  };
+
+  /* 接管场景物件：山石、松（偶尔是一树桃花）、血枫、石灯、瓦砾、残柱、竹、灵菇、火盆、战幡、石像、冰晶、骸骨、拒马 */
   const prop0 = Mo.prop;
   Mo.prop = function (kind, v, ti) {
     if (kind === 'rock') return Mo.crag(v + ti * 5, ti);
@@ -459,6 +490,8 @@
     if (kind === 'banner') return Mo.warBanner(v, ti);
     if (kind === 'statue') return Mo.guardian(v, ti);
     if (kind === 'icecrystal') return Mo.iceCluster(v, ti);
+    if (kind === 'bones') return Mo.bones(v);
+    if (kind === 'barricade') return Mo.barricade();
     return prop0(kind, v, ti);
   };
 })();
