@@ -16,7 +16,8 @@
   let renderer, scene, camera, hemi, sun, pLight, dyn, ov, octx, W = 1, H = 1, dpr = 1;
   let cur = null, curRoom = null, frame = 0, camSnap = true, maxAniso = 1;
   const camT = new THREE.Vector3(), built = new Set();
-  const roomLights = [], mists = [], motes = [];
+  const roomLights = [], mists = [], motes = [], seas = [], shafts = [], wisps = [];
+  let cshadow = null;
   const actors = new Map(), inters = new Map(), allyM = new Map(), petM = new Map();
   let heroM = null, heroOwner = null, menuRoom = null, menuHero = null;
   let vignette = null, glowTex = null, webTex = null, glyphTex = null;
@@ -146,9 +147,25 @@
     for (let i = 0; i < 12; i++) {
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, opacity: 0.16, depthWrite: false, fog: false }));
       s.userData = { a: Math.random() * TAU, r: 14 + Math.random() * 16, y: -3 - Math.random() * 5, sp: (0.01 + Math.random() * 0.02) * (i % 2 ? 1 : -1) };
-      s.scale.set(26 + Math.random() * 18, 9 + Math.random() * 6, 1); s.renderOrder = -5;
+      s.scale.set(26 + Math.random() * 18, 9 + Math.random() * 6, 1); s.renderOrder = -4;
       scene.add(s); mists.push(s);
     }
+    // 云海：两层缓慢流动的云，一远一近。房间、山台、石柱都从云里露出来 —— 远景因此是亮的，近处的山石成了剪影
+    for (let i = 0; i < 2; i++) {
+      const tex = ctex(Tx.clouds(i ? 9 : 3, i ? 120 : 90, 256, 1.5), true); tex.repeat.set(i ? 5 : 3, i ? 5 : 3);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(230, 230), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
+      m.rotation.x = -PI / 2; m.renderOrder = -6 + i; m.frustumCulled = false; scene.add(m); seas.push(m);
+    }
+    // 云影：贴着地面缓缓移动的暗斑
+    { const tex = ctex(Tx.clouds(21, 24), true);
+      cshadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, color: 0x02040c, transparent: true, opacity: 0.24, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+      cshadow.rotation.x = -PI / 2; cshadow.renderOrder = 1; scene.add(cshadow); }
+    // 光柱：顺着月光方向斜插进场内的几道光
+    { const tex = ctex(Tx.shaft()), yv = new THREE.Vector3(-0.405, 0.867, 0.289), cam = new THREE.Vector3(0, Math.sin(PITCH), Math.cos(PITCH));
+      const zv = cam.clone().addScaledVector(yv, -cam.dot(yv)).normalize(), xv = new THREE.Vector3().crossVectors(yv, zv), q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xv, yv, zv));
+      for (let i = 0; i < 4; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide })); m.quaternion.copy(q); m.renderOrder = 28; scene.add(m); shafts.push(m); } }
+    // 近地的薄雾：飘在场内墙根处，隔在镜头与地面之间
+    for (let i = 0; i < 5; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, opacity: 0.07, depthWrite: false, fog: false })); s.scale.set(9 + i * 1.5, 2.6, 1); s.renderOrder = 8; s.userData = { ph: i * 1.7, v: 0.05 + i * 0.012 }; scene.add(s); wisps.push(s); }
     for (let i = 0; i < 54; i++) motes.push({ x: Math.random(), y: Math.random(), z: Math.random(), ph: Math.random() * TAU, v: 0.5 + Math.random() });
 
     glows = new Cloud(2600, true); dusts = new Cloud(700, false);
@@ -243,8 +260,9 @@
     const rockM = new THREE.MeshLambertMaterial({ vertexColors: true }); rs.mats.push(rockM);
     const sd = (room.gx || 0) * 31 + (room.gy || 0) * 17 + ti * 7;
     // rk：放一块山石，top 是它顶面的高度
-    const rk = (x, top, z, s, sy, k) => {
-      const geo = Mo.rockGeo((k + sd) % 4, ti), m = new THREE.Mesh(geo, rockM);
+    const rockFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: new THREE.Color(0.4, 0.44, 0.54) }); rs.mats.push(rockFg); // 前景的山石压暗成剪影
+    const rk = (x, top, z, s, sy, k, fg) => {
+      const geo = Mo.rockGeo((k + sd) % 4, ti), m = new THREE.Mesh(geo, fg ? rockFg : rockM);
       m.position.set(x, top - geo.userData.h * s * sy, z); m.scale.set(s, s * sy, s * (0.8 + U.hash(k, 3, sd) * 0.4)); m.rotation.y = U.hash(k, 7, sd) * TAU; scn.add(m); return m;
     };
     // 建筑构件（瓦顶、立柱、栏杆、角楼）：同样合并成一个网格
@@ -371,9 +389,40 @@
     const dz = (d) => (room.doors[d] ? room.doors[d].cells[1] : null), nearDoor = (d, val, axis) => { const c = dz(d); return c && Math.abs(c[axis] + 0.5 - val) < 2.3; };
     let kk = 0; const rv = (i) => U.hash(kk, i, sd);
     // 南缘：贴着矮墙外侧的一排矮石，把浮台的直边裹住
-    for (let x = -0.3; x < w + 0.5; x += 1.45) { kk++; if (nearDoor('s', x, 0)) continue; rk(x + rv(1) * 0.5, -0.5 + rv(2) * 0.3, h + 0.55 + rv(3) * 0.35, 0.9 + rv(4) * 0.45, 1.6 + rv(5) * 0.7, kk); }
+    for (let x = -0.3; x < w + 0.5; x += 1.45) { kk++; if (nearDoor('s', x, 0)) continue; rk(x + rv(1) * 0.5, -0.5 + rv(2) * 0.3, h + 0.55 + rv(3) * 0.35, 0.9 + rv(4) * 0.45, 1.6 + rv(5) * 0.7, kk, true); }
     // 东西两缘
     for (let z = 0.4; z < h; z += 1.55) for (const e of [0, 1]) { kk++; if (nearDoor(e ? 'e' : 'w', z, 1)) continue; rk(e ? w + 0.55 + rv(1) * 0.3 : -0.55 - rv(1) * 0.3, 0.2 + rv(2) * 0.55, z + rv(3) * 0.5, 1.0 + rv(4) * 0.6, 1.7 + rv(5) * 0.7, kk); }
+    const plant = (x, top, z, kind, sc, seed, dark) => { const tr = Mo.tree(seed + sd, ti, kind, sc); if (dark) for (const m of tr.mats) m.color.multiplyScalar(dark); tr.g.position.set(x, top - 0.1, z); tr.g.rotation.y = U.hash(seed, 17, sd) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); };
+    // 山台：比岛缘更低、更远的一圈石台，一级一级降进云里，台上偶尔有树
+    for (let i = 0; i < 11; i++) {
+      kk++; const side = i % 3, u = rv(1); // 0 南 / 1 西 / 2 东
+      const tx2 = side === 0 ? -1.5 + u * (w + 3) : side === 1 ? -2.3 - rv(2) * 1.9 : w + 2.3 + rv(2) * 1.9;
+      const tz2 = side === 0 ? h + 2.1 + rv(2) * 2.2 : 0.5 + u * (h + 1.5), top = -1.2 - rv(3) * 2.4;
+      rk(tx2, top, tz2, 1.5 + rv(4) * 1.1, 1.9 + rv(5) * 0.7, kk, side === 0);
+      if (ti < 2 && rv(6) < 0.45) plant(tx2, top, tz2, ti === 1 ? 'round' : rv(7) < 0.35 ? 'bloom' : 'pine', 1.15, kk, side === 0 ? 0.6 : 0);
+    }
+    // 前景：南面两角各立一座高石，石上的树探进画面；镜头一动，它和场内就错开了
+    [[-1.4, h + 0.75], [w + 1.4, h + 0.75]].forEach(([fx, fz], i) => {
+      kk++; const top = 0.45 + rv(1) * 0.5;
+      rk(fx, top, fz, 1.25, 2.4, kk, true); rk(fx + (i ? 1 : -1), top - 0.8, fz + 0.5, 0.9, 2.2, kk + 50, true);
+      if (ti < 2) plant(fx, top, fz, ti === 1 ? 'round' : i ? 'bloom' : 'pine', 1.75, kk, 0.55);
+      else rk(fx, top + 1.3 + rv(2) * 0.9, fz, 0.42, 3.6, kk + 80, true); // 围城与古殿没有树：立一根石笋 / 冰笋
+    });
+    // 贴地的小物：墙根、石根处的草丛（枯草 / 碎砾 / 冰凌），补上最细的一层
+    { const bladeG = Mo.geo.cone(4), bm = [lm({ color: new THREE.Color(Mo.PAL[ti].cap) }), lm({ color: new THREE.Color(Mo.PAL[ti].cap2) })], fm = ti === 0 ? lm({ color: new THREE.Color('#f2d6e0') }) : null;
+      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        if (at(x, y) !== 0 || U.hash(x, y, sd + 40) > 0.6) continue;
+        const nb = [[0, -1], [1, 0], [0, 1], [-1, 0]].filter(([dx, dy]) => { const tt = at(x + dx, y + dy); return tt === 1 || tt === 2; });
+        if (!nb.length) continue;
+        const [dx, dy] = nb[Math.floor(U.hash(x, y, sd + 41) * nb.length)], bx = x + 0.5 + dx * 0.38, bz = y + 0.5 + dy * 0.38;
+        for (let k = 0; k < 4; k++) {
+          const hgt = (ti === 2 ? 0.07 : 0.14) + U.hash(x * 5 + k, y, sd + 42) * (ti === 2 ? 0.08 : 0.2), b = new THREE.Mesh(bladeG, bm[k % 2]);
+          b.position.set(bx + (U.hash(x * 5 + k, y, sd + 43) - 0.5) * (dy ? 0.5 : 0.16), hgt / 2, bz + (U.hash(x * 5 + k, y, sd + 44) - 0.5) * (dx ? 0.5 : 0.16));
+          b.scale.set(ti === 2 ? 0.14 : 0.06, hgt, ti === 2 ? 0.12 : 0.06); b.rotation.set((U.hash(x * 5 + k, y, sd + 45) - 0.5) * 0.5, U.hash(x * 5 + k, y, sd + 46) * 3, (U.hash(x * 5 + k, y, sd + 47) - 0.5) * 0.5); scn.add(b);
+        }
+        if (fm && U.hash(x, y, sd + 48) < 0.3) { const f = new THREE.Mesh(Mo.geo.sph(6), fm); f.position.set(bx + 0.08, 0.12, bz - 0.06); f.scale.setScalar(0.07); scn.add(f); }
+      }
+    }
     // 北面：高出墙头的一道山脊，脊上有树
     for (let x = -0.9; x < w + 1; x += 1.8) {
       kk++; if (nearDoor('n', x, 0)) continue;
@@ -487,6 +536,15 @@
     glows.mat.uniforms.uK.value = th.glowK || 1;
     const mc = rgb(th.mist).col;
     for (const s of mists) s.material.color.copy(mc);
+    for (const s of wisps) s.material.color.copy(mc);
+    seas[0].material.color.setHex(th.sea[2]); seas[0].material.opacity = th.sea[3]; seas[0].position.set(w / 2, -11, h / 2);
+    seas[1].material.color.setHex(th.sea[0]); seas[1].material.opacity = th.sea[1]; seas[1].position.set(w / 2, -6.5, h / 2);
+    cshadow.position.set(w / 2, 0.012, h / 2); cshadow.scale.set(w - 1.2, h - 1.2, 1); cshadow.material.opacity = th.cloudShadow[0]; cshadow.material.map.repeat.set(w / th.cloudShadow[1], h / th.cloudShadow[1]);
+    shafts.forEach((m, i) => {
+      m.visible = !!th.shaft; if (!th.shaft) return;
+      m.material.color.setHex(th.shaft[0]); m.userData.o = th.shaft[1];
+      m.position.set(w * [0.2, 0.47, 0.72, 0.93][i], 4, h * [0.45, 0.28, 0.58, 0.3][i]); m.scale.set(2.2 + (i % 2) * 1.2, 16, 1);
+    });
     camSnap = true;
   }
 
@@ -527,6 +585,10 @@
     for (let i = 0; i < MAX_LIGHTS; i++) if (cur.lights[i]) roomLights[i].intensity = 1.05 + Math.sin(t * 9 + i * 2.1) * 0.07;
     // 云海
     for (const s of mists) { const u = s.userData; u.a += u.sp * 0.016; s.position.set(room.w / 2 + Math.cos(u.a) * (u.r + room.w * 0.35), u.y, room.h / 2 + Math.sin(u.a) * (u.r * 0.6 + room.h * 0.35)); }
+    seas[0].material.map.offset.set(t * 0.0016, t * 0.0007); seas[1].material.map.offset.set(-t * 0.004, t * 0.0022);
+    cshadow.material.map.offset.set(t * 0.006, t * 0.0035);
+    shafts.forEach((m, i) => { if (m.visible) m.material.opacity = m.userData.o * (0.75 + Math.sin(t * 0.6 + i * 1.9) * 0.25); });
+    wisps.forEach((s, i) => { const u = s.userData, k = (t * u.v + u.ph) % 1; s.position.set(-2 + k * (room.w + 4), 0.45 + (i % 2) * 0.35, i < 3 ? 1.6 + i * 0.5 : room.h - 2 - (i - 3) * 0.6); s.material.opacity = 0.085 * Math.sin(k * PI); });
     // 氛围微粒
     const kind = th.mote, w = room.w, h = room.h;
     for (const m of motes) {

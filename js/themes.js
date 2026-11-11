@@ -24,7 +24,8 @@
       floor: '#5b6a61', floor2: '#52625a', line: 'rgba(14,22,22,0.42)', moss: '#3f6c47', grass: '#6aa860',
       face: '#cfc8b4', faceDark: '#a59d8a', base: '#67635c', top: '#343a47', topHi: '#505a6b',
       water: '#25546a', waterHi: '#86c8d4',
-      bg: 0x050b17, fog: [0x09152a, 26, 70], hemi: [0x9fc6f2, 0x24384a, 0.95], sun: [0xd4e0ff, 1.0],
+      bg: 0x0a1430, fog: [0x2c4476, 21.5, 54], cloudShadow: [0.24, 15], hemi: [0x9fc6f2, 0x24384a, 0.95], sun: [0xd4e0ff, 1.0],
+      sea: [0xa8c4f4, 0.85, 0x5674b8, 0.9], shaft: [0xcfe0ff, 0.2], // 云海 [近层色, 近层浓度, 远层色, 远层浓度]；光柱 [色, 强度]
       lamp: '255,214,150', lampHex: 0xffd696,
       props: ['rock', 'bamboo', 'lantern', 'pine', 'bamboo', 'rock'], mote: 'firefly',
     },
@@ -33,7 +34,8 @@
       floor: '#62533f', floor2: '#6d5c46', line: 'rgba(20,8,8,0.0)', moss: '#55633a', grass: '#c24a52',
       face: '#7a5a4c', faceDark: '#503a32', base: '#30221e', top: '#574236', topHi: '#8a5246',
       water: '#47131f', waterHi: '#d86878',
-      bg: 0x0d0507, fog: [0x1c080c, 24, 64], hemi: [0xffb0a0, 0x3a201c, 0.9], sun: [0xffcabc, 0.95],
+      bg: 0x1a080c, fog: [0x54222a, 21.5, 52], cloudShadow: [0.4, 6.5], hemi: [0xffb0a0, 0x3a201c, 0.9], sun: [0xffcabc, 0.95],
+      sea: [0xc85c68, 0.78, 0x74242e, 0.88], shaft: [0xffa696, 0.17],
       lamp: '255,150,130', lampHex: 0xff8a8a,
       props: ['deadtree', 'mushroom', 'rock', 'bones', 'deadtree', 'mushroom'], mote: 'spore',
     },
@@ -42,7 +44,8 @@
       floor: '#55525f', floor2: '#4a4755', line: 'rgba(8,6,12,0.5)', moss: '#22202a', grass: '#5c1c26',
       face: '#575463', faceDark: '#3c3a47', base: '#292732', top: '#302e3a', topHi: '#4c4959',
       water: '#0a0812', waterHi: '#5a3a8a',
-      bg: 0x06040c, fog: [0x0d091a, 24, 64], hemi: [0xb8a6ff, 0x241c36, 0.9], sun: [0xd4c8ff, 0.95],
+      bg: 0x0e0a20, fog: [0x2c2458, 21.5, 52], cloudShadow: [0.26, 12], hemi: [0xb8a6ff, 0x241c36, 0.9], sun: [0xd4c8ff, 0.95],
+      sea: [0x8e7cdc, 0.74, 0x40348a, 0.86], shaft: null,
       lamp: '130,255,170', lampHex: 0x82ffaa,
       props: ['brazier', 'barricade', 'banner', 'rubble', 'barricade', 'rubble'], mote: 'ash',
     },
@@ -51,7 +54,8 @@
       floor: '#62788a', floor2: '#586e80', line: 'rgba(214,180,90,0.6)', moss: '#d8f0ff', grass: '#e8f8ff',
       face: '#2b4162', faceDark: '#1c2c47', base: '#131f38', top: '#8ea4b4', topHi: '#b6cad6',
       water: '#b83a0c', waterHi: '#ffd27a',
-      bg: 0x040913, fog: [0x0a1a34, 28, 76], hemi: [0xc8dcff, 0x2c3c5e, 0.66], sun: [0xf0f6ff, 0.62], glowK: 0.85,
+      bg: 0x0a1630, fog: [0x2c4e88, 21.5, 58], cloudShadow: [0.16, 16], hemi: [0xc8dcff, 0x2c3c5e, 0.66], sun: [0xf0f6ff, 0.62], glowK: 0.85,
+      sea: [0xc8e4ff, 0.85, 0x5e90d0, 0.9], shaft: [0xdff0ff, 0.19],
       lamp: '150,220,255', lampHex: 0x96dcff,
       props: ['icecrystal', 'pillar', 'brazier2', 'statue', 'icecrystal', 'pillar'], mote: 'snow',
     },
@@ -250,6 +254,18 @@
       }
       c.restore();
     }
+    // 层次：灯下一圈暖光、物件脚下的接地影、四周压暗 —— 视线自然落在场中
+    for (const L of room.lights || []) {
+      const lc = `${(L.c >> 16) & 255},${(L.c >> 8) & 255},${L.c & 255}`, g = c.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.r * 0.62);
+      g.addColorStop(0, `rgba(${lc},0.22)`); g.addColorStop(0.5, `rgba(${lc},0.08)`); g.addColorStop(1, `rgba(${lc},0)`);
+      c.fillStyle = g; c.fillRect(L.x - L.r, L.y - L.r, L.r * 2, L.r * 2);
+    }
+    for (const p of room.props || []) {
+      const sx = (p.tx + 0.5) * T, sy = (p.ty + 0.56) * T, g = c.createRadialGradient(sx, sy, 2, sx, sy, 34);
+      g.addColorStop(0, 'rgba(0,0,0,0.42)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(sx - 34, sy - 34, 68, 68);
+    }
+    { const cx = (w / 2) * T, cy = (h / 2) * T, g = c.createRadialGradient(cx, cy, Math.min(w, h) * T * 0.3, cx, cy, Math.hypot(w, h) * T * 0.56);
+      g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.36)'); c.fillStyle = g; c.fillRect(0, 0, w * T, h * T); }
     // 门口亮带 + 墙根阴影
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const t = at(x, y); if (t === 1) continue;
@@ -261,6 +277,28 @@
       if (at(x + 1, y) === 1) { const g = c.createLinearGradient(px + T, 0, px + T - 14, 0); g.addColorStop(0, 'rgba(0,0,0,0.3)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(px + T - 14, py, 14, T); }
       if (at(x, y + 1) === 1) { const g = c.createLinearGradient(0, py + T, 0, py + T - 10); g.addColorStop(0, 'rgba(0,0,0,0.25)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(px, py + T - 10, T, 10); }
     }
+    return cv;
+  };
+
+  /* 云：一张四方连续的云团图（白 + 透明度），云海、云影、近地的雾都用它 */
+  Tx.clouds = function (seed, n = 46, size = 256, aK = 1) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = size; const c = cv.getContext('2d');
+    for (let i = 0; i < n; i++) {
+      const x = U.hash(i, 1, seed) * size, y = U.hash(i, 2, seed) * size, r = size * (0.07 + U.hash(i, 3, seed) * 0.13), a = (0.16 + U.hash(i, 4, seed) * 0.3) * aK;
+      for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) {
+        if (x + ox + r < 0 || x + ox - r > size || y + oy + r < 0 || y + oy - r > size) continue;
+        const g = c.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r); g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+        c.fillStyle = g; c.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+      }
+    }
+    return cv;
+  };
+  /* 光柱：中间亮、两边淡，自上而下渐隐 */
+  Tx.shaft = function () {
+    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 256; const c = cv.getContext('2d');
+    let g = c.createLinearGradient(0, 0, 64, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, 64, 256);
+    c.globalCompositeOperation = 'destination-in';
+    g = c.createLinearGradient(0, 0, 0, 256); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.42, 'rgba(0,0,0,0.45)'); g.addColorStop(0.76, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, 64, 256); // 最亮处在落地之前
     return cv;
   };
 
