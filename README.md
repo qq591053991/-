@@ -131,7 +131,7 @@ assets/tripo.js   上述模型的 base64 打包，游戏实际加载的是它
 assets/models.js  社区角色模型数据（精简后的 GLB，base64 内嵌）
 assets/CREDITS.md 素材与第三方代码致谢
 docs/             art-philosophy.md：美术哲学（所有美术决定的依据）；art-palette.png：色板；codex.md：图鉴（全部神通、功法、法宝、灵宠、技艺、丹药）
-tools/            import-tripo.mjs：导入 Tripo 模型；tripo-prompts.md：各角色提示词；build-models.mjs：生成 KayKit 模型数据；make-palette.py：生成色板图；make-codex.mjs：由数据表生成图鉴
+tools/            import-tripo.mjs：导入 Tripo 模型；tripo-prompts.md：各角色提示词；build-models.mjs：生成 KayKit 模型数据；make-palette.py：生成色板图；make-codex.mjs：由数据表生成图鉴；playtest-bot.js：试玩机器人（回归与平衡）
 js/core.js        命名空间、工具函数、键鼠与触屏输入
 js/audio.js       WebAudio 合成的音效与五声音阶配乐
 js/data.js        剧情文案、章节、敌人、神通、功法、法宝、灵宠、技艺、丹药、感悟、灵药、奇遇
@@ -150,3 +150,12 @@ js/game.js        主循环、单局流程、房间推进、奖励与局外成�
 ```
 
 想调数值的话，绝大多数内容都在 `js/data.js`（名目与文案）和 `js/arsenal.js`（法宝、灵宠的伤害与间隔）；改完数据后运行 `node tools/make-codex.mjs` 重新生成图鉴；杂兵随章节的血量 / 伤害倍率在 `js/enemies.js` 顶部的 `HPM` / `DMGM`；相机俯角、视场角与距离在 `js/render.js` 顶部。
+
+改完数值想看平衡，可以用试玩机器人（开发工具，不是游戏的一部分；需要 Node 和 Playwright）：
+
+```
+python3 -m http.server 8765 &
+MAIN=du node tools/playtest-bot.js 5 40 0    # 用墨氏毒经打 5 局；MAIN 可取 qy / du / dy
+```
+
+它不开无敌、只跑逻辑不渲染，一局一分多钟，每局末尾打印一行汇总（通关与否、用时、受伤、主修层数……）。机器人的打法很朴素，通关率只能横向比较（改动前后、三门功法之间），不能当成真人的难度。
