@@ -4,6 +4,20 @@
 (function () {
   const G = window.G, U = G.U, TAU = G.TAU, PI = Math.PI;
   const Mo = (G.Models = {});
+  /* 绢本设色：画面是一张浅色的绢，发光的东西不能再"加亮"（加在浅底上看不出来），改成颜料——
+     把原本要加上去的颜色 A，换成它的补色去"减"：浅底上显出 A 的颜色，深底上只是压暗一点，像墨与颜料落在绢上 */
+  G.PAPER = true;
+  Mo.inkBlend = function (m) {
+    if (!G.PAPER) return m;
+    m.blending = THREE.SubtractiveBlending;
+    const ob = m.onBeforeCompile, ck = m.customProgramCacheKey;
+    m.onBeforeCompile = (sh, r) => {
+      if (ob) ob(sh, r);
+      sh.fragmentShader = sh.fragmentShader.replace(/}\s*$/, '  { vec3 A = gl_FragColor.rgb * gl_FragColor.a; float m = max(max(A.r, A.g), A.b); gl_FragColor = vec4(vec3(m) - A + m * 0.16, 1.0); }\n}');
+    };
+    m.customProgramCacheKey = () => (ck ? ck.call(m) : '') + '|paperink';
+    return m;
+  };
 
   /* ---------- 共享几何体 ---------- */
   const GEO = {};
@@ -672,7 +686,7 @@
       const r = add(tor(0.035), glow(hex, { transparent: true, opacity: 0.9 - i * 0.2 }), [0, 0.04 + i * 0.02, 0], 1.3 - i * 0.34, [PI / 2, 0, 0]);
       r.castShadow = false; rings.push(r);
     }
-    const beam = add(cyl(0.3, 0.5, 16), glow(hex, { transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), [0, 1.1, 0], [1.0, 2.2, 1.0]);
+    const beam = add(cyl(0.3, 0.5, 16), Mo.inkBlend(glow(hex, { transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })), [0, 1.1, 0], [1.0, 2.2, 1.0]);
     beam.castShadow = false;
     return { g, mats: c.mats, update(it, t) { rings.forEach((r, i) => { r.rotation.z = t * (0.8 + i * 0.5) * (i % 2 ? -1 : 1); r.position.y = 0.05 + i * 0.03 + Math.sin(t * 2 + i) * 0.03; }); beam.scale.x = beam.scale.z = 1 + Math.sin(t * 3) * 0.08; } };
   };
@@ -725,7 +739,7 @@
   }
   Mo.bladeGeo = bladeGeo;
   const basic = (c, o) => new THREE.MeshBasicMaterial(Object.assign({ color: c, side: THREE.DoubleSide }, o));
-  const aura = (c, op) => basic(c, { transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
+  const aura = (c, op) => Mo.inkBlend(basic(c, { transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false }));
 
   /* 三档飞剑，随功法进境换形：
      0 凡铁飞剑 —— 铁色剑身，只有一线微光
@@ -758,7 +772,7 @@
     const g = new THREE.Group(), mats = [];
     const mk = (c, o) => { const m = basic(c, Object.assign({ transparent: true }, o)); m.userData.o0 = (o && o.opacity) || 1; mats.push(m); return m; };
     const add = (geo, m, p, sc, down) => { const x = new THREE.Mesh(geo, m); x.position.set(p[0], p[1], p[2]); x.scale.set(sc[0], sc[1], sc[2]); if (down) x.rotation.x = PI / 2; g.add(x); return x; };
-    add(bladeGeo(), mk(0x5cffb0, { opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }), [0, 1.6, 0], [1.25, 0.34, 3.5], true);
+    add(bladeGeo(), Mo.inkBlend(mk(0x5cffb0, { opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false })), [0, 1.6, 0], [1.25, 0.34, 3.5], true);
     add(bladeGeo(), mk(0xeafff6), [0, 1.5, 0], [0.62, 0.12, 3.0], true);
     add(bladeGeo(), mk(0x9ff0cc), [0, 1.5, 0], [0.16, 0.14, 2.9], true);
     add(box(), mk(0xd9b45a), [0, 3.08, 0], [1.2, 0.16, 0.16]);

@@ -56,10 +56,10 @@
     g.setAttribute('acolor', new THREE.BufferAttribute(this.colr, 4).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('size', new THREE.BufferAttribute(this.size, 1).setUsage(THREE.DynamicDrawUsage));
     this.mat = new THREE.ShaderMaterial({
-      uniforms: { uScale: { value: 500 }, uSoft: { value: additive ? 1 : 0 }, uK: { value: 1 } },
+      uniforms: { uScale: { value: 500 }, uSoft: { value: additive ? 1 : 0 }, uK: { value: 1 }, uInk: { value: additive && G.PAPER ? 1 : 0 } },
       vertexShader: 'attribute vec4 acolor; attribute float size; varying vec4 vC; uniform float uScale; void main(){ vC = acolor; vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = min(240.0, size * uScale / max(0.1,-mv.z)); gl_Position = projectionMatrix * mv; }',
-      fragmentShader: 'varying vec4 vC; uniform float uSoft; uniform float uK; void main(){ float r = length(gl_PointCoord - 0.5) * 2.0; if (r > 1.0) discard; float a = mix(smoothstep(1.0, 0.7, r), (1.0 - r) * (1.0 - r) * 1.6, uSoft); gl_FragColor = vec4(vC.rgb, vC.a * min(1.0, a) * uK); }',
-      transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      fragmentShader: 'varying vec4 vC; uniform float uSoft; uniform float uK; uniform float uInk; void main(){ float r = length(gl_PointCoord - 0.5) * 2.0; if (r > 1.0) discard; float a = mix(smoothstep(1.0, 0.7, r), (1.0 - r) * (1.0 - r) * 1.6, uSoft); gl_FragColor = vec4(vC.rgb, vC.a * min(1.0, a) * uK); if (uInk > 0.5) { vec3 A = gl_FragColor.rgb * gl_FragColor.a; float m = max(max(A.r, A.g), A.b); gl_FragColor = vec4(vec3(m) - A + m * 0.16, 1.0); } }',
+      transparent: true, depthWrite: false, blending: additive ? (G.PAPER ? THREE.SubtractiveBlending : THREE.AdditiveBlending) : THREE.NormalBlending,
     });
     this.obj = new THREE.Points(g, this.mat); this.obj.frustumCulled = false; this.obj.renderOrder = additive ? 30 : 20;
   }
@@ -79,7 +79,8 @@
 
   let glows, dusts, orbs, shards, orbRims, shardRims, fySw, bugs, P = {};
   let trailMesh, trPos, trCol, trQ = 0, arrayTex = null, bugSeq = 0, fyN = 0, heroS0 = 1;
-  const ZHU = '255,74,50';       // 朱砂：一切危险区域的预警色
+  const ZHU = G.PAPER ? '222,52,30' : '255,74,50';       // 朱砂：敌人与危险（绢上用更沉的朱）
+  const QING = G.PAPER ? '20,150,118' : '127,224,192'; // 青：自己人
   const formTr = [], menuTr = [{}, {}, {}], hoverTr = [];
 
   /* 拖尾：我方飞剑共用一个网格，每帧重建。每条拖尾记下最近若干个位置，连成一条渐隐的带子 */
@@ -92,7 +93,7 @@
     g.setAttribute('position', new THREE.BufferAttribute(trPos, 3).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('color', new THREE.BufferAttribute(trCol, 3).setUsage(THREE.DynamicDrawUsage));
     g.setIndex(new THREE.BufferAttribute(idx, 1));
-    trailMesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    trailMesh = new THREE.Mesh(g, Mo.inkBlend(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })));
     trailMesh.frustumCulled = false; trailMesh.renderOrder = 25; scene.add(trailMesh);
   }
   function trail(o, x, y, z, c, width, gain) {
@@ -136,14 +137,14 @@
     const sm = R.lite ? 1024 : 2048;
     sun.shadow.mapSize.set(sm, sm); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.035;
     scene.add(sun); scene.add(sun.target);
-    pLight = new THREE.PointLight(0xfff0d8, 1.25, 10.5, 1.2); scene.add(pLight);
+    pLight = new THREE.PointLight(0xfff0d8, G.PAPER ? 0.35 : 1.25, 10.5, 1.2); scene.add(pLight);
     for (let i = 0; i < MAX_LIGHTS; i++) { const l = new THREE.PointLight(0xffffff, 0, 6, 1.4); scene.add(l); roomLights.push(l); }
     dyn = new THREE.Group(); scene.add(dyn);
 
     glowTex = ctex(Tx.radial(128, [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.5)'], [1, 'rgba(255,255,255,0)']]));
     webTex = ctex(Tx.web());
     glyphTex = ctex(Tx.glyph('禁', '#ffd0d0'));
-    vignette = Tx.radial(256, [[0, 'rgba(0,0,0,0)'], [0.62, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.6)']]);
+    vignette = G.PAPER ? Tx.radial(256, [[0, 'rgba(96,70,40,0)'], [0.66, 'rgba(96,70,40,0)'], [1, 'rgba(96,70,40,0.34)']]) : Tx.radial(256, [[0, 'rgba(0,0,0,0)'], [0.62, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.6)']]); // 绢本：四边是一圈旧绢的黄
 
     // 云海
     for (let i = 0; i < 12; i++) {
@@ -204,14 +205,14 @@
       return m;
     };
     const circG = new THREE.RingGeometry(0.0001, 1, 48, 8), ringG = new THREE.RingGeometry(0.93, 1, 64), thinG = new THREE.RingGeometry(0.86, 1, 64), planeG = new THREE.PlaneGeometry(1, 1, 12, 4);
-    const flat = (geo, o) => () => { const m = new THREE.Mesh(geo, flatMat(o)); m.rotation.x = -PI / 2; m.userData.drape = true; return m; };
+    const flat = (geo, o) => () => { const ink = o && o.ink; if (o) delete o.ink; const mt = flatMat(o); if (ink) Mo.inkBlend(mt); const m = new THREE.Mesh(geo, mt); m.rotation.x = -PI / 2; m.userData.drape = true; return m; };
     P.circ = new Pool(flat(circG)); P.ring = new Pool(flat(ringG)); P.band = new Pool(() => { const m = new THREE.Mesh(planeG, flatMat({ side: THREE.DoubleSide })); m.rotation.order = 'YXZ'; m.userData.drape = true; return m; });
-    P.fxring = new Pool(flat(thinG, { blending: THREE.AdditiveBlending }));
+    P.fxring = new Pool(flat(thinG, { blending: THREE.AdditiveBlending, ink: 1 }));
     P.web = new Pool(flat(circG, { map: webTex }));
     for (let i = 0; i < 3; i++) P['stain' + i] = new Pool(flat(planeG, { map: ctex(Tx.splat(i * 7 + 1)) })); // 战斗留在地上的墨渍
-    P.beam = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+    P.beam = new Pool(() => new THREE.Mesh(Mo.geo.box(), Mo.inkBlend(new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))));
     P.sw0 = new Pool(() => Mo.sword(0)); P.sw1 = new Pool(() => Mo.sword(1)); P.sw2 = new Pool(() => Mo.sword(2)); P.mini = new Pool(() => Mo.sword('mini'));
-    P.arr = new Pool(flat(circG, { map: arrayTex, blending: THREE.AdditiveBlending }));
+    P.arr = new Pool(flat(circG, { map: arrayTex, blending: THREE.AdditiveBlending, ink: 1 }));
     P.wing = new Pool(() => Mo.wings()); P.plate = new Pool(() => Mo.shieldPlate());
     P.gem = new Pool(() => { const m = new THREE.Mesh(Mo.geo.oct(), new THREE.MeshBasicMaterial({ color: 0x8affd8 })); m.scale.set(0.15, 0.24, 0.15); return m; });
     P.potion = new Pool(() => { const g = new THREE.Group(); const a = new THREE.Mesh(Mo.geo.sph(10), new THREE.MeshLambertMaterial({ color: 0xe0484a, emissive: 0x5a1012 })); a.scale.setScalar(0.24); const b = new THREE.Mesh(Mo.geo.cyl(0.5, 0.5, 8), new THREE.MeshLambertMaterial({ color: 0xd9b45a })); b.scale.set(0.09, 0.14, 0.09); b.position.y = 0.16; g.add(a, b); return g; });
@@ -222,7 +223,7 @@
     P.hill = new Pool(() => { const g = new THREE.Group(), a = new THREE.Mesh(Mo.geo.cone(6), new THREE.MeshPhongMaterial({ color: 0x5c6470, emissive: 0x2c2416, flatShading: true, shininess: 6 })), b = new THREE.Mesh(Mo.geo.cone(6), new THREE.MeshBasicMaterial({ color: 0xd0a858, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false })); b.scale.setScalar(1.14); g.add(a, b); return g; });
     P.bowl = new Pool(() => { const m = new THREE.Mesh(Mo.geo.dome(), new THREE.MeshLambertMaterial({ color: 0xd6a04e, emissive: 0x5a3a10, side: THREE.DoubleSide })); m.rotation.x = PI; return m; });
     P.rock = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshLambertMaterial({ color: 0x8e7650, emissive: 0x1c140a })));
-    P.shield = new Pool(() => new THREE.Mesh(Mo.geo.sph(14), new THREE.MeshBasicMaterial({ color: 0xbcd8ff, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending })));
+    P.shield = new Pool(() => new THREE.Mesh(Mo.geo.sph(14), Mo.inkBlend(new THREE.MeshBasicMaterial({ color: 0xbcd8ff, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }))));
 
     window.addEventListener('resize', () => this.resize());
     this.resize();
@@ -298,7 +299,7 @@
     const rockM = new THREE.MeshLambertMaterial({ vertexColors: true }); rs.mats.push(rockM);
     const sd = (room.gx || 0) * 31 + (room.gy || 0) * 17 + ti * 7;
     // rk：放一块山石，top 是它顶面的高度
-    const rockFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: new THREE.Color(0.4, 0.44, 0.54) }); rs.mats.push(rockFg); // 前景的山石压暗成剪影
+    const rockFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: G.PAPER ? new THREE.Color(0.62, 0.6, 0.56) : new THREE.Color(0.4, 0.44, 0.54) }); rs.mats.push(rockFg); // 前景的山石压暗成剪影
     const rk = (x, top, z, s, sy, k, fg) => {
       const geo = Mo.rockGeo((k + sd) % 4, ti), m = new THREE.Mesh(geo, fg ? rockFg : rockM);
       m.position.set(x, top - geo.userData.h * s * sy, z); m.scale.set(s, s * sy, s * (0.8 + U.hash(k, 3, sd) * 0.4)); m.rotation.y = U.hash(k, 7, sd) * TAU; scn.add(m); return m;
@@ -327,10 +328,10 @@
     const woods = (ti < 2 || open) && !cave, treeKind = (r) => (ti === 1 || ti === 2 ? 'round' : ti === 0 && r < 0.2 ? 'bloom' : 'pine'), padKind = ti === 1 || ti === 2 ? 'round' : 'pine';
     if (open) {
       // 山野 / 洞窟：墙格上不立墙。山野是树与山石围出的空地（南面的树矮而暗，是前景）；洞窟四壁都是岩石，越往外越高
-      const bark = lm({ color: new THREE.Color(Mo.PAL[ti].trunk) }), leaf = new THREE.MeshLambertMaterial({ vertexColors: true }), barkD = bark.clone(), leafD = new THREE.MeshLambertMaterial({ vertexColors: true, color: new THREE.Color(0.6, 0.62, 0.68) });
+      const bark = lm({ color: new THREE.Color(Mo.PAL[ti].trunk) }), leaf = new THREE.MeshLambertMaterial({ vertexColors: true }), barkD = bark.clone(), leafD = new THREE.MeshLambertMaterial({ vertexColors: true, color: G.PAPER ? new THREE.Color(0.84, 0.84, 0.8) : new THREE.Color(0.6, 0.62, 0.68) });
       barkD.color.multiplyScalar(0.6); rs.mats.push(leaf, barkD, leafD);
       // 前景：夹在镜头与场内之间的东西（它的北面几格之内就是空地）。一律压成暗影，不许比场内亮、不许比场内艳
-      const leafFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: new THREE.Color(0.3, 0.32, 0.4) }), barkFg = bark.clone(); barkFg.color.multiplyScalar(0.4); rs.mats.push(leafFg, barkFg);
+      const leafFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: G.PAPER ? new THREE.Color(0.5, 0.48, 0.45) : new THREE.Color(0.3, 0.32, 0.4) }), barkFg = bark.clone(); barkFg.color.multiplyScalar(G.PAPER ? 0.6 : 0.4); rs.mats.push(leafFg, barkFg);
       const northFloor = (x, y, n) => { for (let k = 1; k <= n; k++) if (y - k >= 0 && tiles[(y - k) * w + x] !== 1) return k; return 0; };
       const taken = new Set(room.deco.map((dd) => Math.floor(dd.y) * w + Math.floor(dd.x)));
       const cliffN = !cave && room.doors.n && room.doors.n.cave; // 北面的出口是洞口
@@ -526,7 +527,7 @@
       glyph.position.set(cx + (d === 'w' ? 0.1 : d === 'e' ? -0.1 : 0), 0.7, cz + (d === 'n' ? 0.1 : d === 's' ? 0.1 : 0));
       if (!ns) glyph.rotation.y = d === 'w' ? PI / 2 : -PI / 2;
       g.add(glyph);
-      const sm = new THREE.MeshBasicMaterial({ color: new THREE.Color(th.lampHex), transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending });
+      const sm = Mo.inkBlend(new THREE.MeshBasicMaterial({ color: new THREE.Color(th.lampHex), transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending }));
       const strip = new THREE.Mesh(new THREE.PlaneGeometry(ns ? 2.7 : 0.8, ns ? 0.8 : 2.7), sm); rs.geos.push(strip.geometry);
       strip.rotation.x = -PI / 2; strip.position.set(cx, 0.03, cz); g.add(strip);
       rs.mats.push(bm, gm, sm);
@@ -559,7 +560,7 @@
     if (merged) { g.add(merged); rs.geos.push(merged.geometry); rs.mats.push(merged.material); inkOutline(merged, 0.022, g, rs, th.ink); }
     // 灯光与光晕
     const glowSprite = (x, y, z, hex, s, op) => {
-      const sm = new THREE.SpriteMaterial({ map: glowTex, color: hex, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending });
+      const sm = Mo.inkBlend(new THREE.SpriteMaterial({ map: glowTex, color: hex, transparent: true, opacity: op * (G.PAPER ? 0.5 : 1), depthWrite: false, blending: THREE.AdditiveBlending }));
       const sp = new THREE.Sprite(sm); sp.position.set(x, y, z); sp.scale.set(s, s, 1); g.add(sp); rs.mats.push(sm); rs.sprites.push(sp); return sp;
     };
     const lampM = new THREE.MeshBasicMaterial({ color: new THREE.Color(th.lampHex) }); rs.mats.push(lampM);
@@ -646,7 +647,7 @@
       put(th.props[(i * 2 + 3) % th.props.length], i + 11, 1.5, -sc * 0.12, 0);
       if (i % 2 === 0) put(th.props[(i + 2) % th.props.length], i + 23, 1.1, sc * 0.24, sc * 0.1);
       if (FALL && i !== 1) { // 飞瀑
-        const wm = new THREE.MeshBasicMaterial({ color: FALL, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
+        const wm = new THREE.MeshBasicMaterial({ color: G.PAPER ? 0xffffff : FALL, transparent: true, opacity: G.PAPER ? 0.55 : 0.3, depthWrite: false, blending: G.PAPER ? THREE.NormalBlending : THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }); // 绢上的瀑布是留白
         const wf = new THREE.Mesh(new THREE.PlaneGeometry(0.34 + hv(5) * 0.3, 11), wm); wf.position.set(sc * 0.36, -5.7, sc * 0.3); isl.add(wf);
         rs.geos.push(wf.geometry); rs.mats.push(wm); rs.anims.push((t) => { wm.opacity = 0.26 + Math.sin(t * 6 + i * 2) * 0.05 + Math.sin(t * 13.7 + i) * 0.03; });
       }
@@ -666,10 +667,42 @@
     return rs;
   }
 
+  /* 笔触：绢本模式下，合并后的场景网格按每个顶点的 brush 加笔墨——
+     1 皴：顺着山势的细笔（披麻皴的意思），间杂一些擦笔与苔点；2 点叶：一粒一粒的墨点。
+     都是按世界坐标算的，所以相邻的山石、叶团笔触连得上，也不需要任何贴图 */
+  const BRUSH_GLSL = `
+    float bh(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+    float bn(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(bh(i), bh(i + vec3(1, 0, 0)), f.x), mix(bh(i + vec3(0, 1, 0)), bh(i + vec3(1, 1, 0)), f.x), f.y),
+                 mix(mix(bh(i + vec3(0, 0, 1)), bh(i + vec3(1, 0, 1)), f.x), mix(bh(i + vec3(0, 1, 1)), bh(i + vec3(1, 1, 1)), f.x), f.y), f.z); }`;
+  function brushMat(m) {
+    if (!G.PAPER) return m;
+    m.onBeforeCompile = (sh) => {
+      sh.vertexShader = 'attribute float brush;\nvarying float vBrush;\nvarying vec3 vWP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBrush = brush; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = 'varying float vBrush;\nvarying vec3 vWP;\n' + BRUSH_GLSL + '\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        if (vBrush > 0.5) {
+          vec3 P = vWP; float ink = 0.0;
+          if (vBrush < 1.5) {
+            // 披麻皴：顺着山势往下的短线（相位只随水平位置变，所以线是竖着的），被噪声截成一段一段
+            float n = bn(P * 1.8), m = smoothstep(0.3, 0.62, bn(P * 0.8 + 7.3));
+            float s = abs(sin((P.x * 0.9 + P.z * 0.6) * 7.5 + n * 4.0 + P.y * 0.7));
+            float dash = smoothstep(0.42, 0.62, bn(vec3(P.x * 3.0, P.y * 6.5, P.z * 3.0)));
+            ink = smoothstep(0.8, 0.97, s) * dash * m * 1.15 + smoothstep(0.7, 0.93, bn(P * 7.0)) * 0.35 * m; // 再点几处苔点
+          } else {
+            vec3 q = P * 8.0; vec3 f = fract(q) - 0.5;
+            ink = step(bh(floor(q)), 0.42) * smoothstep(0.27, 0.15, length(f)) * smoothstep(0.25, 0.55, bn(P * 1.6)); // 点叶聚成几簇，不是满身麻点
+          }
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.3, 0.28, 0.25), clamp(ink, 0.0, 1.0) * 0.8);
+        }`);
+    };
+    m.customProgramCacheKey = () => 'brush';
+    return m;
+  }
+
   /* 把一组静态网格烘焙成单个带顶点色的网格 */
   function mergeStatic(root) {
     root.updateMatrixWorld(true);
-    const pos = [], nor = [], colr = [], dead = [], v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
+    const pos = [], nor = [], colr = [], brush = [], dead = [], v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
     root.traverse((o) => {
       if (!o.isMesh) return;
       const m = o.material;
@@ -678,7 +711,9 @@
       if (m.flatShading) q.computeVertexNormals();
       const P2 = q.attributes.position, N2 = q.attributes.normal, C2 = m.vertexColors ? q.attributes.color : null; // 山石、叶团的颜色烘在顶点上
       nm.getNormalMatrix(o.matrixWorld);
+      const B = o.geometry.userData.brush || 0;
       for (let i = 0; i < P2.count; i++) {
+        brush.push(B);
         v.fromBufferAttribute(P2, i).applyMatrix4(o.matrixWorld); pos.push(v.x, v.y, v.z);
         n.fromBufferAttribute(N2, i).applyMatrix3(nm).normalize(); nor.push(n.x, n.y, n.z);
         if (C2) colr.push(m.color.r * C2.getX(i), m.color.g * C2.getY(i), m.color.b * C2.getZ(i)); else colr.push(m.color.r, m.color.g, m.color.b);
@@ -694,13 +729,19 @@
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
-    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    geo.setAttribute('brush', new THREE.Float32BufferAttribute(brush, 1));
+    const mesh = new THREE.Mesh(geo, brushMat(new THREE.MeshLambertMaterial({ vertexColors: true })));
     mesh.castShadow = mesh.receiveShadow = true;
     return mesh;
   }
 
   /* 墨线：把合并后的网格沿平滑法线外扩一圈、只画背面，轮廓处就露出一道墨色的边，像勾过线的画。
      削面网格每个面各有法线，直接外扩会裂开，所以先把位置相同的顶点的法线取平均 */
+  const vh = (x, y, z) => { const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return n - Math.floor(n); };
+  function vnoise(x, y, z) { // 三维值噪声，0..1
+    const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy), sz = fz * fz * (3 - 2 * fz), L = (a, b, t) => a + (b - a) * t;
+    return L(L(L(vh(ix, iy, iz), vh(ix + 1, iy, iz), sx), L(vh(ix, iy + 1, iz), vh(ix + 1, iy + 1, iz), sx), sy), L(L(vh(ix, iy, iz + 1), vh(ix + 1, iy, iz + 1), sx), L(vh(ix, iy + 1, iz + 1), vh(ix + 1, iy + 1, iz + 1), sx), sy), sz);
+  }
   function inkOutline(mesh, w, parent, rs, ink) {
     const P = mesh.geometry.attributes.position, N = mesh.geometry.attributes.normal, acc = new Map(), keys = new Array(P.count);
     for (let i = 0; i < P.count; i++) {
@@ -708,7 +749,11 @@
       let a = acc.get(k); if (!a) acc.set(k, (a = [0, 0, 0])); a[0] += N.getX(i); a[1] += N.getY(i); a[2] += N.getZ(i);
     }
     const out = new Float32Array(P.count * 3);
-    for (let i = 0; i < P.count; i++) { const a = acc.get(keys[i]), l = Math.hypot(a[0], a[1], a[2]) || 1; out[i * 3] = P.getX(i) + (a[0] / l) * w; out[i * 3 + 1] = P.getY(i) + (a[1] / l) * w; out[i * 3 + 2] = P.getZ(i) + (a[2] / l) * w; }
+    for (let i = 0; i < P.count; i++) {
+      const a = acc.get(keys[i]), l = Math.hypot(a[0], a[1], a[2]) || 1, x = P.getX(i), y = P.getY(i), z = P.getZ(i);
+      const ww = G.PAPER ? w * (0.25 + 1.6 * vnoise(x * 1.4, y * 1.4, z * 1.4)) : w; // 笔线有提按：粗细随位置起伏
+      out[i * 3] = x + (a[0] / l) * ww; out[i * 3 + 1] = y + (a[1] / l) * ww; out[i * 3 + 2] = z + (a[2] / l) * ww;
+    }
     const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.BufferAttribute(out, 3));
     const m2 = new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ color: ink, side: THREE.BackSide }));
     parent.add(m2); rs.geos.push(g2); rs.mats.push(m2.material);
@@ -719,7 +764,7 @@
      这样不管模型多大、带不带骨骼，线都一样粗 */
   /* 描边的颜色就是身份（631 的"一"）：敌人一圈朱红，能交互的东西一圈金，自己人是墨色。
      不用看清模型，只看那一圈线的颜色就知道它是什么 */
-  const INKS = { ink: [0x0a121c, 0.0062], foe: [0xe0452c, 0.0078], gold: [0xd8ac54, 0.007] }, actorInks = {};
+  const INKS = G.PAPER ? { ink: [0x2a2218, 0.0062], foe: [0xde341e, 0.0085], gold: [0xc8860c, 0.0078] } : { ink: [0x0a121c, 0.0062], foe: [0xe0452c, 0.0078], gold: [0xd8ac54, 0.007] }, actorInks = {};
   function inkMaterial(kind = 'ink') {
     if (actorInks[kind]) return actorInks[kind];
     const [hex, wid] = INKS[kind];
@@ -744,7 +789,7 @@
     m.g.traverse((o) => {
       if (!o.isMesh || !o.geometry || !o.geometry.attributes.normal || o.userData.ink) return;
       const mt = Array.isArray(o.material) ? o.material[0] : o.material;
-      if (!mt || mt.transparent || mt.blending === THREE.AdditiveBlending || mt.isMeshBasicMaterial || mt.side === THREE.DoubleSide) return; // 发光的、半透明的部件不描
+      if (!mt || mt.transparent || mt.blending === THREE.AdditiveBlending || mt.blending === THREE.SubtractiveBlending || mt.isMeshBasicMaterial || mt.side === THREE.DoubleSide) return; // 发光的、半透明的部件不描
       list.push(o);
     });
     m.inks = [];
@@ -795,7 +840,7 @@
     sc.left = -e; sc.right = e; sc.top = e; sc.bottom = -e; sc.near = 1; sc.far = 50; sc.updateProjectionMatrix();
     for (let i = 0; i < MAX_LIGHTS; i++) {
       const L = cur.lights[i], pl = roomLights[i];
-      if (L) { pl.color.set(L.c); pl.intensity = 1.05; pl.distance = L.r; pl.position.set(L.x, L.y, L.z); } else pl.intensity = 0;
+      if (L) { pl.color.set(L.c); pl.intensity = G.PAPER ? 0.35 : 1.05; pl.distance = L.r; pl.position.set(L.x, L.y, L.z); } else pl.intensity = 0;
     }
     glows.mat.uniforms.uK.value = th.glowK || 1;
     const mc = rgb(th.mist).col;
@@ -861,7 +906,7 @@
       if (locked) o.bm.opacity = 0.13 + Math.sin(t * 6) * 0.04; else o.sm.opacity = 0.16 + Math.sin(t * 3) * 0.08;
     }
     for (let i = 0; i < cur.sprites.length; i++) { const sp = cur.sprites[i]; sp.material.rotation = 0; sp.scale.x = sp.scale.y = sp.userData.s0 || (sp.userData.s0 = sp.scale.x); sp.scale.multiplyScalar(1 + Math.sin(t * 9 + i * 2.1) * 0.05); sp.scale.z = 1; }
-    for (let i = 0; i < MAX_LIGHTS; i++) if (cur.lights[i]) roomLights[i].intensity = 1.05 + Math.sin(t * 9 + i * 2.1) * 0.07;
+    for (let i = 0; i < MAX_LIGHTS; i++) if (cur.lights[i]) roomLights[i].intensity = (G.PAPER ? 0.35 : 1.05) + Math.sin(t * 9 + i * 2.1) * 0.03;
     // 云海
     for (const s of mists) { const u = s.userData; u.a += u.sp * 0.016; s.position.set(room.w / 2 + Math.cos(u.a) * (u.r + room.w * 0.35), u.y, room.h / 2 + Math.sin(u.a) * (u.r * 0.6 + room.h * 0.35)); }
     { const lc = rgb(th.lamp); // 烛火：每支一个跳动的光点，每簇一团暖晕
@@ -1198,7 +1243,7 @@
       if (e.invT > 0) alpha *= 0.6 + Math.sin(t * 30) * 0.3;
       m.setAlpha(alpha); m.g.visible = alpha > 0.03;
       if (e.elite) { const gc = rgb('255,200,80'); flatAt(P.ring, e.x, e.y, e.r * 1.6, gc, 0.6 + Math.sin(t * 5) * 0.2, 0.03, 4); flatAt(P.circ, e.x, e.y, e.r * 1.6, gc, 0.12, 0.02, 2); }
-      if (alpha > 0.3) flatAt(P.ring, e.x, e.y, e.r * 1.12 + 3, rgb(ZHU), 0.55, 0.03, 3); // 脚下一圈朱红：和主角脚下那圈青色对应，一眼分清敌我（鬼物、火灵这些不描边的也靠它）
+      if (alpha > 0.3) flatAt(P.ring, e.x, e.y, e.r * 1.12 + 3, rgb(ZHU), G.PAPER ? 0.8 : 0.55, 0.03, 3); // 脚下一圈朱红：和主角脚下那圈青色对应，一眼分清敌我（鬼物、火灵这些不描边的也靠它）
       if (e.slowT > 0) flatAt(P.ring, e.x, e.y, e.r * 1.25, rgb('140,220,255'), 0.7, 0.035, 4);
       if (e.psn > 0) { const pc = rgb('154,200,50'); flatAt(P.circ, e.x, e.y, e.r * 1.15, pc, 0.1 + Math.min(0.2, e.psn * 0.02), 0.028, 3); if (((t * 9 + e.t * 3) | 0) % 3 === 0) glows.push(e.x * S + U.rand(-0.2, 0.2), e.z * S + U.rand(0.2, 0.9), e.y * S + U.rand(-0.15, 0.15), pc, 0.6, 0.5); } // 中毒：脚下一摊毒绿，身上冒泡
       if (alpha > 0.1) {
@@ -1228,7 +1273,7 @@
       heroM.update({ t: p.t, moving: p.moving, atk: p.atkAnim, dashing: p.dashing > 0 });
       heroM.setFlash(p.flash);
       pLight.position.set(p.x * S, 1.9, p.y * S + 0.7);
-      if (!p.dead) flatAt(P.ring, p.x, p.y, 17, rgb('127,224,192'), 0.4, 0.03, 4);
+      if (!p.dead) flatAt(P.ring, p.x, p.y, 17, rgb(QING), G.PAPER ? 0.75 : 0.4, 0.03, 4);
       if (p.fy && p.sp >= 100 && !p.dead) { flatAt(P.ring, p.x, p.y, 24 + Math.sin(t * 6) * 3, rgb('200,255,120'), 0.7, 0.035, 5); glows.push(p.x * S, 0.5, p.y * S, rgb('200,255,120'), 0.22, 2.4); }
       const tier = p.fy ? 2 : p.qy ? 1 : 0, swPool = P['sw' + tier], swC = rgb(p.du ? '186,226,84' : tier === 2 ? '170,255,110' : tier === 1 ? '110,255,170' : '150,255,220'); // 淬了毒的飞剑拖一道黄绿的光
       // 本命飞剑悬在身后，出剑时前指（身静器动）
@@ -1270,7 +1315,7 @@
       m.update({ t: pt.t, moving: pt.moving || !!pt.z, atk: pt.atk, charge: pt.charge, wind: pt.atk > 0.5 ? 1 : 0 });
       if (pt.hide > 0) continue;
       const pc = rgb(E_PET_C[pt.id] || '127,224,192'), x = pt.x * S, z = pt.y * S;
-      flatAt(P.ring, pt.x, pt.y, 11, rgb('127,224,192'), 0.4, 0.03, 4); // 与主角脚下同色的环：这是自己人
+      flatAt(P.ring, pt.x, pt.y, 11, rgb(QING), G.PAPER ? 0.7 : 0.4, 0.03, 4); // 与主角脚下同色的环：这是自己人
       if (pt.id === 'shuangwu') { // 六翼：三对振动的霜翼
         const sx = Math.sin(pt.face), sz = -Math.cos(pt.face), y = fly * S + 0.35;
         for (let i = 0; i < 3; i++) { const fl = 0.22 + Math.abs(Math.sin(t * 34 + i * 1.3)) * 0.22, bx = x - Math.cos(pt.face) * i * 0.14, bz = z - Math.sin(pt.face) * i * 0.14; glows.push(bx + sx * fl, y + 0.08, bz + sz * fl, WHITE3, 0.7, 0.34); glows.push(bx - sx * fl, y + 0.08, bz - sz * fl, WHITE3, 0.7, 0.34); }
@@ -1452,7 +1497,8 @@
     }
     if (world && p && room.theme !== undefined) { // 黑暗里的一圈光：离主角越远越暗
       const dk = Math.min(0.86, G.Themes[room.theme].dark * (room.terrain === 'cave' ? 1.35 : 1)), s = proj(p.x, p.y, 24), g = c.createRadialGradient(s.x, s.y, H * 0.3, s.x, s.y, Math.max(W, H) * 0.8);
-      g.addColorStop(0, 'rgba(2,4,10,0)'); g.addColorStop(0.5, `rgba(2,4,10,${dk * 0.5})`); g.addColorStop(1, `rgba(2,4,10,${dk})`);
+      const dc = G.PAPER ? '84,62,36' : '2,4,10';
+      g.addColorStop(0, `rgba(${dc},0)`); g.addColorStop(0.5, `rgba(${dc},${dk * 0.5})`); g.addColorStop(1, `rgba(${dc},${dk})`);
       c.fillStyle = g; c.fillRect(0, 0, W, H);
       c.globalAlpha = 0.55; c.drawImage(vignette, 0, 0, W, H); c.globalAlpha = 1;
     } else c.drawImage(vignette, 0, 0, W, H);

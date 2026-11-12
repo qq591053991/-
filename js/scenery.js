@@ -14,11 +14,12 @@
   // 四章的石、盖、木、叶、花
   const PAL = (Mo.PAL = [
     // capK：顶面有几成覆着"盖"。苔与枯苔只是零星几片，雪盖得满
-    // 631 的"三"：每一章的山石、树、屋宇都在同一个辅色族里（黛蓝 / 暗枫红 / 玄紫 / 玄青），饱和度压住，不和要紧的东西抢
-    { rock: '#8a96a2', dark: '#3a4452', cap: '#5c7a6c', cap2: '#6c8c7a', capK: 0.34, trunk: '#3a3c44', leaf: '#4a7268', leafD: '#24403a', bloom: '#a4aeb8', bloomD: '#7a8694' }, // 青石、苔、松、白梅
-    { rock: '#8c7870', dark: '#3a2c2a', cap: '#6a6250', cap2: '#7a705a', capK: 0.3, trunk: '#2a2022', leaf: '#5e2e34', leafD: '#2e1418', bloom: '#7c544e', bloomD: '#4e2a2e' },  // 赭石、枯苔、血枫（暗下去：亮的红只留给敌人）
-    { rock: '#7a7490', dark: '#2c2838', cap: '#5a5668', cap2: '#666278', capK: 0.5, trunk: '#1e1a24', leaf: '#464058', leafD: '#221e2c', bloom: '#8a84a0', bloomD: '#4a4460' },  // 玄石、灰
-    { rock: '#a2b4c6', dark: '#44587a', cap: '#dfe9f1', cap2: '#f4f8fc', capK: 0.85, trunk: '#34405a', leaf: '#c9d8e4', leafD: '#5a7a98', bloom: '#e6eef6', bloomD: '#94b4d0' }, // 寒石、雪
+    // 青绿山水：山脚赭石（dark）→ 山头石绿（rock），朝天的面点石青（cap）；树是汁绿、石绿，花是淡粉。
+    // 这些都是"辅色"：画面里最鲜的朱红只给敌人，金只给能交互的东西
+    { rock: '#6c9c7c', dark: '#a8804e', cap: '#2f6f8e', cap2: '#3f8698', capK: 0.5, trunk: '#4a3626', leaf: '#4c8c6a', leafD: '#2a5444', bloom: '#f0d8d0', bloomD: '#c8a09c' }, // 七玄门：青绿
+    { rock: '#94a074', dark: '#9c6c42', cap: '#6c7e5c', cap2: '#7c8a64', capK: 0.35, trunk: '#3a2a1e', leaf: '#a87a52', leafD: '#6a4a34', bloom: '#b88c64', bloomD: '#7a5a40' },  // 血色禁地：浅绛，赭色的枫（不艳：画面里最艳的红只给敌人）
+    { rock: '#a29e92', dark: '#7a6a52', cap: '#6c766e', cap2: '#7c847a', capK: 0.35, trunk: '#2e2a24', leaf: '#6c6a5a', leafD: '#3c3a32', bloom: '#9a948a', bloomD: '#5c584e' },  // 燕翎堡：墨灰
+    { rock: '#c8d6d8', dark: '#5a8494', cap: '#f6f6f0', cap2: '#ffffff', capK: 0.82, trunk: '#3c4a50', leaf: '#dce6e4', leafD: '#6a8a94', bloom: '#eef2f0', bloomD: '#a8bcc0' }, // 虚天殿：石青与雪
   ]);
 
   const n3 = (x, y, z, s) => U.hash(Math.round(x * 997) + s * 57, Math.round(y * 991) + Math.round(z * 983) * 3, s);
@@ -36,10 +37,24 @@
         P.setXYZ(i, x, y * o.sy, z);
       }
       g.computeBoundingBox(); g.translate(0, -g.boundingBox.min.y, 0);
-      g.computeVertexNormals(); g.computeBoundingBox(); // 非索引几何体：每个面一个法线，即削面
+      g.computeVertexNormals(); g.computeBoundingBox();
       const N = g.attributes.normal, H = g.boundingBox.max.y, col = new Float32Array(P.count * 3), t = new THREE.Color();
       const a = new THREE.Color(o.dark), b = new THREE.Color(o.lite), c1 = new THREE.Color(o.cap || o.lite), c2 = new THREE.Color(o.cap2 || o.cap || o.lite);
-      for (let f = 0; f < P.count; f += 3) {
+      if (G.PAPER) {
+        /* 绢本设色：不要削面。位置相同的顶点把法线取平均（光照是软的），颜色按顶点算（深浅是晕开的）——
+           山脚赭石、山头石绿、朝天的面点石青，正是青绿山水"先赭后青绿"的染法 */
+        const acc = new Map(), key2 = (i) => Math.round(P.getX(i) * 997) + ',' + Math.round(P.getY(i) * 997) + ',' + Math.round(P.getZ(i) * 997);
+        for (let i = 0; i < P.count; i++) { const k = key2(i), v = acc.get(k) || [0, 0, 0]; v[0] += N.getX(i); v[1] += N.getY(i); v[2] += N.getZ(i); acc.set(k, v); }
+        for (let i = 0; i < P.count; i++) { const v = acc.get(key2(i)), l = Math.hypot(v[0], v[1], v[2]) || 1; N.setXYZ(i, v[0] / l, v[1] / l, v[2] / l); }
+        for (let i = 0; i < P.count; i++) {
+          const ny = N.getY(i), x = P.getX(i), y = P.getY(i), z = P.getZ(i), nz = n3(x, y, z, 9);
+          if (o.byNormal) t.copy(a).lerp(b, U.clamp(ny * 0.6 + 0.45, 0, 1));
+          else t.copy(a).lerp(b, U.clamp(Math.pow(y / H, 0.8) * 1.15 - 0.05, 0, 1));
+          if (o.capAt !== undefined) { const cw = U.clamp((ny - o.capAt + 0.3) / 0.4, 0, 1) * (n3(x * 0.6, 0, z * 0.6, 5) < o.capK ? 1 : 0.25); t.lerp(c1.clone().lerp(c2, n3(x, y, z, 7)), cw * 0.85); }
+          t.multiplyScalar(0.94 + nz * 0.12);
+          col[i * 3] = t.r; col[i * 3 + 1] = t.g; col[i * 3 + 2] = t.b;
+        }
+      } else for (let f = 0; f < P.count; f += 3) { // 非索引几何体：每个面一个法线，即削面
         const ny = N.getY(f), cy = (P.getY(f) + P.getY(f + 1) + P.getY(f + 2)) / 3, cx = P.getX(f), cz = P.getZ(f);
         if (o.capAt !== undefined && ny > o.capAt && n3(cx * 0.5, 0, cz * 0.5, 5) < o.capK) t.copy(c1).lerp(c2, n3(cx, cy, cz, 7));
         else if (o.byNormal) t.copy(a).lerp(b, U.clamp(ny * 0.55 + 0.5, 0, 1)).multiplyScalar(0.92 + n3(cx, cy, cz, 9) * 0.16);
@@ -47,18 +62,19 @@
         for (let k = 0; k < 3; k++) { col[(f + k) * 3] = t.r; col[(f + k) * 3 + 1] = t.g; col[(f + k) * 3 + 2] = t.b; }
       }
       g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-      g.userData.h = H;
+      g.userData.h = H; g.userData.brush = o.brush || 0; // 合并成静态网格后，着色器按它加笔触：1 皴（山石）、2 点叶（叶团）
       return g;
     });
   }
+
   // 山石（四种形状 × 四章配色）；g.userData.h 是它的高
-  const rockGeo = (Mo.rockGeo = (vr, ti) => { const p = PAL[ti]; return lump(`rk${vr}_${ti}`, vr * 17 + ti + 1, { rough: 0.58, top: 0.34, flat: 0.38, bot: 0.3, sy: 1, dark: p.dark, lite: p.rock, cap: p.cap, cap2: p.cap2, capAt: 0.66, capK: p.capK }); });
+  const rockGeo = (Mo.rockGeo = (vr, ti) => { const p = PAL[ti]; return lump(`rk${vr}_${ti}`, vr * 17 + ti + 1, { rough: 0.58, top: 0.34, flat: 0.38, bot: 0.3, sy: 1, dark: p.dark, lite: p.rock, cap: p.cap, cap2: p.cap2, capAt: 0.66, capK: p.capK, brush: 1 }); });
   // 叶团：松是扁的云片，花树是圆的团
-  const padGeo = (vr, ti, kind) => { const p = PAL[ti], bl = kind === 'bloom'; return lump(`pad${vr % 3}_${ti}_${kind}`, (vr % 3) * 29 + ti + 3, { rough: 0.36, top: 0.5, flat: 0.7, bot: 0.22, sy: kind === 'pine' ? 0.5 : 0.8, dark: bl ? p.bloomD : p.leafD, lite: bl ? p.bloom : p.leaf, byNormal: true }); };
+  const padGeo = (vr, ti, kind) => { const p = PAL[ti], bl = kind === 'bloom'; return lump(`pad${vr % 3}_${ti}_${kind}`, (vr % 3) * 29 + ti + 3, { rough: 0.36, top: 0.5, flat: 0.7, bot: 0.22, sy: kind === 'pine' ? 0.5 : 0.8, dark: bl ? p.bloomD : p.leafD, lite: bl ? p.bloom : p.leaf, byNormal: true, brush: 2 }); };
 
   Mo.padGeo = padGeo;
   function stick(parent, a, b, r, mat) { // 一截上细下粗的枝干，从 a 到 b
-    const m = new THREE.Mesh(gg('stk', () => new THREE.CylinderGeometry(0.38, 0.5, 1, 6, 1, true)), mat); // 两端不封口：接缝被下一截或叶团盖住，省一半的面
+    const m = new THREE.Mesh(gg('stk', () => { const q = new THREE.CylinderGeometry(0.38, 0.5, 1, 6, 1, true); q.userData.brush = 1; return q; }), mat); // 两端不封口：接缝被下一截或叶团盖住，省一半的面
     D.subVectors(b, a); const len = D.length();
     m.position.copy(a).addScaledVector(D, 0.5); m.quaternion.setFromUnitVectors(UP, D.normalize()); m.scale.set(r * 2, len * 1.06, r * 2); m.castShadow = true;
     parent.add(m); return m;
@@ -118,10 +134,10 @@
 
   /* 青铜环门：立在北门上的半环，环身满布云雷纹，两脚落在山石上 */
   const ARCH = [
-    { base: '#3a4a5a', hi: '#56687c', line: '#9aa8b4' }, // 黛蓝的旧铜
-    { base: '#463630', hi: '#64504a', line: '#a8968a' },
-    { base: '#2e2a3c', hi: '#4a4460', line: '#8e88a4' },
-    { base: '#62788e', hi: '#8ea2b4', line: '#cfdbe6' },
+    { base: '#5a8a90', hi: '#86b0b2', line: '#2c4448' }, // 石青
+    { base: '#8a6a4c', hi: '#ac8a64', line: '#4a3424' }, // 赭
+    { base: '#6c6860', hi: '#8c887e', line: '#34322c' }, // 墨灰
+    { base: '#6c94a4', hi: '#a2c0c8', line: '#2c4a56' },
   ];
   function archCanvas(ti) {
     const A = ARCH[ti], cv = document.createElement('canvas'); cv.width = 512; cv.height = 64;
@@ -184,10 +200,10 @@
     g.computeVertexNormals(); return g;
   });
   const KIT = [
-    { tile: '#2f3b4e', ridge: '#4a5b72', wood: '#4c4a52', stone: '#8b949c', dark: '#59626c', gold: '#a8946a' },  // 黛瓦、乌木、青石；"金"是旧铜，不亮
-    { tile: '#3a2c28', ridge: '#54423c', wood: '#5e4a40', stone: '#84746c', dark: '#3a2c28', gold: '#9a8468' },
-    { tile: '#2a2636', ridge: '#453e58', wood: '#241f2e', stone: '#5a5468', dark: '#383246', gold: '#8a8aa0' },  // 玄瓦、黑铁、城砖
-    { tile: '#6f8498', ridge: '#93a0aa', wood: '#b8c6d4', stone: '#9aabb9', dark: '#62788e', gold: '#a3a394' },  // 寒玉；金只剩一点旧铜色
+    { tile: '#2f5a6a', ridge: '#4a7480', wood: '#8e5a3c', stone: '#d8ccac', dark: '#9a8a6a', gold: '#a89a70' },  // 石青瓦、赭木、白墙下的青石
+    { tile: '#6a4a36', ridge: '#8a6448', wood: '#7a5038', stone: '#c8b48e', dark: '#8a7254', gold: '#a08a62' },
+    { tile: '#3a3834', ridge: '#58554e', wood: '#4a4038', stone: '#b8ae98', dark: '#7c7466', gold: '#9a9078' },  // 墨瓦、焦木、城砖
+    { tile: '#7c9aa4', ridge: '#b8ccd0', wood: '#c8d4d6', stone: '#cfd4cc', dark: '#5c7c88', gold: '#a8a890' },  // 雪覆的瓦、玉柱
   ];
   Mo.archKit = function (root, ti) {
     const K = KIT[ti], mats = {}, M = (n) => mats[n] || (mats[n] = lam(K[n] || n)); // 名字不在色表里时，当作颜色直接用
@@ -333,8 +349,8 @@
   /* 一丛竹：每竿三截、节上一圈深色的箍，越往上越向外弯；叶是一片片下垂的扁叶团 */
   Mo.bamboo = function (v, ti) {
     const g = new THREE.Group(), h = (i) => U.hash(v * 9 + i, i * 3 + 2, ti + 23), add = adder(g);
-    const s1 = lam('#527f72'), s2 = lam('#3f6a5f'), nd = lam('#284a44'), leaf = vcol(), rk = vcol();
-    const lg = (k) => lump('bleaf' + k, 71 + k * 13, { rough: 0.3, top: 0.4, flat: 0.5, bot: 0.3, sy: 0.3, dark: '#2a5248', lite: '#7fae9a', byNormal: true });
+    const s1 = lam('#6a9a78'), s2 = lam('#558a6a'), nd = lam('#2e5444'), leaf = vcol(), rk = vcol(); // 竹：石绿
+    const lg = (k) => lump('bleaf' + k, 71 + k * 13, { rough: 0.3, top: 0.4, flat: 0.5, bot: 0.3, sy: 0.3, dark: '#2e5a48', lite: '#7cb08e', byNormal: true, brush: 2 });
     const n = 5 + ((h(0) * 2) | 0);
     for (let i = 0; i < n; i++) {
       const a = h(i + 1) * TAU, r = 0.07 + h(i + 11) * 0.27, H = 1.45 + h(i + 21) * 1.0, bend = 0.1 + h(i + 31) * 0.26, mat = i % 2 ? s1 : s2;

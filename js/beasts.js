@@ -50,7 +50,7 @@
     put(geo, color, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], [w, len, d === undefined ? w : d], [Es.x, Es.y, Es.z]);
   }
   Mo.sculpt = sculpt; Mo.span = span; // 场景物件（scenery.js）也用
-  const skinOf = (c, o) => c.flat('#ffffff', Object.assign({ vertexColors: true, shininess: 5 }, o));
+  const skinOf = (c, o) => c.flat('#ffffff', Object.assign({ vertexColors: true, shininess: 5, flatShading: !G.PAPER }, o)); // 绢本：不要削面，明暗是晕开的
   const glowOf = (c, o) => c.glow('#ffffff', Object.assign({ vertexColors: true }, o));
   const part = (geo, mat, parent, p, shadow) => { const m = new THREE.Mesh(geo, mat); m.castShadow = shadow !== false; if (p) m.position.set(p[0], p[1], p[2]); parent.add(m); return m; };
 
