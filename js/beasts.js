@@ -586,6 +586,75 @@
 
   /* ============================ 灵宠的形象 ============================ */
   const pet0 = Mo.pet;
+  /* ============================ 贴片角色（写实画风） ============================
+     人物与妖兽不再用几何体拼：每个角色一张图集——站立 / 行进 / 出手，由图像生成模型画成，与场景是同一种质感。
+     一个角色就是一片朝着镜头后仰的四边形，按朝向左右翻转；动作靠换帧，再加一点起伏与蓄力时的压缩。
+     描边在着色器里做：透明处如果紧挨着不透明的像素，就画成线——敌人朱红，自己人青。线贴着轮廓，粗细均匀。
+     s 贴片边长（格）/ fly 悬浮（图集里按重心居中，高度用角色自己的 z）/ glow 自己发光（鬼火之类，不受环境光影响）
+     idle 原地也循环行进的几帧 / fps 换帧的快慢 / grid 图集每边几格（默认 2：站立、行进一、行进二、出手）
+     run 行进用哪几帧 / atk 出手 / dash 冲刺 / runFirst 边走边出手时仍显示行进（主角：身静器动，人只管跑） */
+  const SPR = {
+    thug: { s: 1.3 }, archer: { s: 1.3 }, wolf: { s: 1.3, fps: 9 }, ironslave: { s: 1.7, fps: 4.5 }, bat: { s: 1.0, fly: 1, idle: 1, fps: 9 }, toad: { s: 1.1, fps: 5 }, centipede: { s: 1.5, fps: 7 },
+    flower: { s: 1.35, idle: 1, fps: 1.4 }, disciple: { s: 1.3 }, ghostcult: { s: 1.34 }, bloodguard: { s: 1.38 }, ironcorpse: { s: 1.65, fps: 4.5 }, flamecult: { s: 1.3 },
+    wraith: { s: 1.4, fly: 1, idle: 1, fps: 3, glow: 0.75 }, skull: { s: 0.85, fly: 1, idle: 1, fps: 6, glow: 0.9 }, icepuppet: { s: 1.45, idle: 1, fps: 1.2, glow: 0.35 },
+    firespirit: { s: 1.0, fly: 1, idle: 1, fps: 7, glow: 1 }, puppetarcher: { s: 1.3 }, golem: { s: 2.0, fps: 4 }, yinhun: { s: 1.4, fly: 1, idle: 1, fps: 3, glow: 0.75 }, corpse: { s: 1.5, fps: 5 },
+    modaifu: { s: 1.7 }, wangchan: { s: 1.7 }, jiyin: { s: 1.8 },
+    hero: { s: 1.3, grid: 3, run: [1, 2, 3, 4], atk: 5, dash: 6, fps: 10, runFirst: 1 },
+    pet_zhizhu: { s: 0.8, fps: 9 }, pet_tihun: { s: 0.75, fps: 8 }, pet_shuangwu: { s: 0.95, fly: 1, idle: 1, fps: 9 }, pet_yinyue: { s: 0.9, fps: 8 }, pet_tujia: { s: 0.95, fps: 6 },
+    pet_baolin: { s: 1.15, fps: 9 }, pet_quhun: { s: 1.55, fps: 5 }, pet_renxing: { s: 1.25 }, ally_puppet: { s: 0.85, fps: 8 },
+  };
+  const sprTex = {}, SPR_TILT = 0.42, LINE = { foe: [0.84, 0.16, 0.09], friend: [0.24, 0.74, 0.58] };
+  function sprite(key, o = {}) {
+    const P = SPR[key], im = G.DH && P && G.Tex.img['spr_' + key]; if (!im) return null;
+    let tex = sprTex[key]; if (!tex) { tex = sprTex[key] = new THREE.Texture(im); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4; tex.needsUpdate = true; }
+    const N = P.grid || 2, size = P.s * (o.scale || 1), hw = size / 2, uy = Math.cos(SPR_TILT) * size, uz = -Math.sin(SPR_TILT) * size, ln = LINE[o.line || 'foe'];
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([-hw, 0, 0, hw, 0, 0, hw, uy, uz, -hw, uy, uz], 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3)); // 法线朝上：受光与地面一致
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2)); geo.setIndex([0, 1, 2, 0, 2, 3]);
+    const U0 = { uFrame: { value: new THREE.Vector2(0, 1 - 1 / N) }, uCell: { value: 1 / N }, uLine: { value: new THREE.Vector3(ln[0], ln[1], ln[2]) }, uGlow: { value: P.glow || 0 }, uPx: { value: 3.2 / im.width } };
+    const uvFix = (sh) => { sh.uniforms.uFrame = U0.uFrame; sh.uniforms.uCell = U0.uCell; sh.vertexShader = 'uniform vec2 uFrame;\nuniform float uCell;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vUv = uv * uCell + uFrame;'); };
+    const mat = new THREE.MeshLambertMaterial({ map: tex, side: THREE.DoubleSide, alphaTest: 0.02 }); // alphaTest 会被带给投影用的深度材质：影子按贴图的轮廓裁
+    mat.onBeforeCompile = (sh) => {
+      uvFix(sh); sh.uniforms.uLine = U0.uLine; sh.uniforms.uGlow = U0.uGlow; sh.uniforms.uPx = U0.uPx;
+      sh.fragmentShader = 'uniform vec2 uFrame;\nuniform float uCell;\nuniform vec3 uLine;\nuniform float uGlow;\nuniform float uPx;\n' + sh.fragmentShader
+        .replace('#include <map_fragment>', `
+          vec4 sC = texture2D( map, vUv );
+          float sLine = 0.0;
+          if ( sC.a < 0.5 ) { // 透明处：四周一圈之内有不透明的像素，就是描边
+            vec2 lo = uFrame + uPx * 1.3, hi = uFrame + uCell - uPx * 1.3; float oa = 0.0;
+            for ( int i = 0; i < 8; i ++ ) { float a = float( i ) * 0.7854; vec2 d = vec2( cos( a ), sin( a ) ) * uPx; oa = max( oa, texture2D( map, clamp( vUv + d, lo, hi ) ).a ); oa = max( oa, texture2D( map, clamp( vUv + d * 0.5, lo, hi ) ).a ); }
+            if ( oa < 0.5 ) discard;
+            sLine = 1.0; sC = vec4( 0.0, 0.0, 0.0, 1.0 );
+          }
+          diffuseColor.rgb *= sC.rgb;`)
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += sLine * uLine + ( 1.0 - sLine ) * uGlow * sC.rgb;');
+    };
+    mat.customProgramCacheKey = () => 'spr-actor';
+    const dep = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: 0.5, side: THREE.DoubleSide });
+    dep.onBeforeCompile = uvFix; dep.customProgramCacheKey = () => 'spr-actor-d';
+    const g = new THREE.Group(), mesh = new THREE.Mesh(geo, mat); mesh.customDepthMaterial = dep; mesh.castShadow = !P.glow; mesh.frustumCulled = false; g.add(mesh);
+    const fly = !!P.fly, fps = P.fps || 7, run = P.run || [1, 2], fAtk = P.atk === undefined ? 3 : P.atk, fDash = P.dash === undefined ? fAtk : P.dash;
+    let dir = 1, ph = Math.random() * 6.28;
+    const m = { g, mats: [mat, dep], h: size * (fly ? 0.9 : 0.78), spr: true, _f: 0, _a: 1 };
+    m.update = function (en) {
+      const t = (en.t || 0) + ph, fx = Math.cos(en.face || 0);
+      if (fx > 0.2) dir = 1; else if (fx < -0.2) dir = -1;
+      const dash = !!(en.charge || en.dashing), atk = (en.atk || 0) > 0.05, wind = en.wind || 0, cyc = en.moving || P.idle;
+      const f = dash ? fDash : atk && !(P.runFirst && en.moving) ? fAtk : cyc ? run[Math.floor(t * fps * (en.moving ? 1 : 0.6)) % run.length] : 0;
+      U0.uFrame.value.set((f % N) / N, 1 - (Math.floor(f / N) + 1) / N);
+      const sq = wind > 0 ? 1 - 0.07 * Math.min(1, wind) : 1 + Math.sin(t * 2.2) * 0.012; // 蓄力时往下一缩；平时略有呼吸
+      mesh.scale.set(dir * (wind > 0 ? 1 + 0.05 * Math.min(1, wind) : 1), sq, sq);
+      mesh.position.set(atk && !dash ? dir * 0.06 : wind > 0 ? Math.sin(t * 60) * 0.012 : 0, fly ? Math.sin(t * 2.6) * 0.05 - size * 0.18 : en.moving ? Math.abs(Math.sin(t * fps * 1.57)) * 0.03 : 0, 0);
+    };
+    m.setFlash = function (f) { f = f > 0 ? 1 : 0; if (f === this._f) return; this._f = f; mat.emissive.setScalar(f ? 0.5 : 0); };
+    m.setAlpha = function (a) { a = Math.round(a * 20) / 20; if (a === this._a) return; this._a = a; mat.opacity = a; mat.transparent = a < 0.999; mat.depthWrite = a > 0.5; mesh.castShadow = !P.glow && a > 0.6; };
+    m.dispose = function () { mat.dispose(); dep.dispose(); geo.dispose(); };
+    return m;
+  }
+  Mo.sprite = sprite;
+  Mo.spriteFor = (e) => sprite(e.key, { scale: e.elite ? 1.18 : 1 });
+
   const PETS = {
     tihun: () => Mo.monkey({ fur: '#2c2834', dark: '#17151c', face: '#5c526c', eye: '#c9a0ff' }, { scale: 0.82 }),
     yinyue: () => Mo.wolf({ fur: '#eaeef6', dark: '#b4bed2', eye: '#ffc0e8', mark: '#ffd8f2', fox: true }, { scale: 0.7 }),

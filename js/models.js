@@ -43,7 +43,7 @@
     const g = new THREE.Group(), mats = [];
     const reg = (m) => { m.userData.o0 = m.opacity; if (m.emissive) m.userData.e0 = m.emissive.clone(); mats.push(m); return m; };
     const lam = (c, o) => reg(new THREE.MeshLambertMaterial(Object.assign({ color: c instanceof THREE.Color ? c : col(c) }, o)));
-    const flat = (c, o) => reg(new THREE.MeshPhongMaterial(Object.assign({ color: c instanceof THREE.Color ? c : col(c), flatShading: true, shininess: 12 }, o)));
+    const flat = (c, o) => reg(new THREE.MeshPhongMaterial(Object.assign({ color: c instanceof THREE.Color ? c : col(c), flatShading: !G.DH, shininess: 12 }, o))); // 写实画风不削面
     const glow = (c, o) => reg(new THREE.MeshBasicMaterial(Object.assign({ color: c instanceof THREE.Color ? c : col(c) }, o)));
     const add = (geo, mat, p, s, r, parent) => {
       const m = new THREE.Mesh(geo, mat);
@@ -478,6 +478,7 @@
 
   Mo.forEnemy = function (e) {
     const d = e.def, k = d.draw, o = { scale: e.scale || 1 };
+    const sp = Mo.spriteFor && Mo.spriteFor(e); if (sp) return sp; // 写实画风：有贴片图集的敌人用贴片
     // 有同名的 Tripo 模型（assets/tripo/<角色键名>.glb）就用它
     const tm = G.Assets.makeRig(e.key, { atk: d.gl && d.gl.atk, walk: d.gl && d.gl.walk, scale: ((d.gl && d.gl.s) || d.scale || 1) * (e.elite ? 1.22 : 1) });
     if (tm) return tm;
