@@ -478,7 +478,6 @@
 
   Mo.forEnemy = function (e) {
     const d = e.def, k = d.draw, o = { scale: e.scale || 1 };
-    const sp = Mo.spriteFor && Mo.spriteFor(e); if (sp) return sp; // 写实画风：有贴片图集的敌人用贴片
     // 有同名的 Tripo 模型（assets/tripo/<角色键名>.glb）就用它
     const tm = G.Assets.makeRig(e.key, { atk: d.gl && d.gl.atk, walk: d.gl && d.gl.walk, scale: ((d.gl && d.gl.s) || d.scale || 1) * (e.elite ? 1.22 : 1) });
     if (tm) return tm;

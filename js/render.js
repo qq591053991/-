@@ -883,8 +883,9 @@
   /* 写实画风里人物与妖兽的材质：
      1. 一层皮毛 / 鳞 / 皮革 / 甲壳的细节——按模型自己的坐标三向投影，贴在它身上跟着它动（坐标乘上模型的缩放，疏密才一致）；
      2. 一圈轮廓光：越是侧对镜头的面越亮。敌人是朱红的，像身上腾着煞气；自己人是冷白的；能交互的是金的。
-     两样都只是在原有材质上加几行着色器，模型、动画都不动 */
-  const RIMS = { foe: [1.0, 0.13, 0.06, 1.15], ink: [0.55, 0.8, 0.74, 0.3], gold: [1.0, 0.7, 0.2, 0.75] }, skinTex = {};
+     3. 朝下的面压暗：肚腹、腋下、下巴底下比背上暗，模型才有分量（相当于一层很便宜的环境光遮蔽）。
+     三样都只是在原有材质上加几行着色器，模型、动画都不动 */
+  const RIMS = { foe: [1.0, 0.13, 0.06, 0.62], ink: [0.6, 0.8, 0.76, 0.22], gold: [1.0, 0.7, 0.2, 0.6] }, skinTex = {};
   const SKINS = { wolf: 'fur', bat: 'hide', toad: 'hide', centipede: 'shell', flower: 'leaf', jiao: 'scale', puppet: 'rock', monkey: 'fur', spider: 'shell' };
   const PET_SKIN = { zhizhu: 'shell', shuangwu: 'shell', quhun: null, renxing: null };
   function dress(m, kind, skin) {
@@ -898,15 +899,16 @@
       mt.onBeforeCompile = (sh, r) => {
         if (prev) prev(sh, r);
         sh.uniforms.uRim = { value: rim }; if (useTex) sh.uniforms.tSkin = { value: tex };
-        sh.vertexShader = 'varying vec3 vOP;\nvarying vec3 vON;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vOP = position * vec3(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz), length(modelMatrix[2].xyz)); vON = normal;');
+        sh.vertexShader = 'varying vec3 vOP;\nvarying vec3 vON;\nvarying float vUpN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vOP = position * vec3(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz), length(modelMatrix[2].xyz)); vON = normal;\n  vUpN = normalize((vec4(transformedNormal, 0.0) * viewMatrix).xyz).y;');
         let f = sh.fragmentShader;
         if (useTex) f = f.replace('#include <color_fragment>', `#include <color_fragment>
-          { vec3 bw = pow(abs(normalize(vON)) + 0.001, vec3(4.0)); bw /= (bw.x + bw.y + bw.z); vec3 P = vOP * 3.2;
+          { vec3 bw = pow(abs(normalize(vON)) + 0.001, vec3(4.0)); bw /= (bw.x + bw.y + bw.z); vec3 P = vOP * 2.4;
             vec3 d = texture2D(tSkin, P.zy).rgb * bw.x + texture2D(tSkin, P.xz).rgb * bw.y + texture2D(tSkin, P.xy).rgb * bw.z;
-            diffuseColor.rgb *= clamp(mix(vec3(0.5), d, 1.5) * 2.0, 0.0, 2.0); }`);
+            diffuseColor.rgb *= clamp(mix(vec3(0.5), d, 1.9) * 2.0, 0.0, 2.0); }`);
+        f = f.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= mix(0.5, 1.04, smoothstep(-0.75, 0.55, vUpN));');
         f = f.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-          { float rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 2.2); totalEmissiveRadiance += uRim * rimF; }`);
-        sh.fragmentShader = 'varying vec3 vOP;\nvarying vec3 vON;\nuniform vec3 uRim;\n' + (useTex ? 'uniform sampler2D tSkin;\n' : '') + f;
+          { float rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0); totalEmissiveRadiance += uRim * rimF; }`);
+        sh.fragmentShader = 'varying vec3 vOP;\nvarying vec3 vON;\nvarying float vUpN;\nuniform vec3 uRim;\n' + (useTex ? 'uniform sampler2D tSkin;\n' : '') + f;
       };
       const ck = mt.customProgramCacheKey ? mt.customProgramCacheKey() : '';
       mt.customProgramCacheKey = () => 'dress|' + (useTex ? skin : '') + '|' + ck;
@@ -1383,16 +1385,16 @@
         if (e.stT > 0.25) continue;
       }
       let m = actors.get(e);
-      if (!m) { m = Mo.forEnemy(e); if (!m.world && !m.gl && !m.spr) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); actors.set(e, m); if (!m.spr && !NO_INK[e.def.draw]) inkActor(m, 'foe', m.gl ? null : SKINS[e.def.draw]); }
+      if (!m) { m = Mo.forEnemy(e); if (!m.world && !m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); actors.set(e, m); if (!NO_INK[e.def.draw]) inkActor(m, 'foe', m.gl ? null : SKINS[e.def.draw]); }
       m.seen = frame;
-      if (!m.world) { m.g.position.set(e.x * S, e.z * S, e.y * S); m.g.rotation.y = m.spr ? 0 : PI / 2 - e.face; } // 贴片不转身，只左右翻
+      if (!m.world) { m.g.position.set(e.x * S, e.z * S, e.y * S); m.g.rotation.y = PI / 2 - e.face; }
       m.update(e);
       m.setFlash(e.flash);
       let alpha = e.st === 'spawn' ? U.clamp(1 - e.stT / 0.25, 0, 1) : e.alpha === undefined ? 1 : e.alpha;
       if (e.invT > 0) alpha *= 0.6 + Math.sin(t * 30) * 0.3;
       m.setAlpha(alpha); m.g.visible = alpha > 0.03;
       if (e.elite) { const gc = rgb('255,200,80'); flatAt(P.ring, e.x, e.y, e.r * 1.6, gc, 0.6 + Math.sin(t * 5) * 0.2, 0.03, 4); flatAt(P.circ, e.x, e.y, e.r * 1.6, gc, 0.12, 0.02, 2); }
-      if (G.DH && alpha > 0.3 && !m.spr && !NO_INK[e.def.draw]) glows.push(e.x * S, (e.z || 0) * S + 0.42, e.y * S, rgb(ZHU), 0.2 + Math.sin(t * 2.3 + e.x * 0.05) * 0.04, e.r * S * 5.2); // 写实画风：身上腾着一团淡淡的朱红煞气
+      if (G.DH && alpha > 0.3 && !NO_INK[e.def.draw]) glows.push(e.x * S, (e.z || 0) * S + 0.42, e.y * S, rgb(ZHU), 0.2 + Math.sin(t * 2.3 + e.x * 0.05) * 0.04, e.r * S * 5.2); // 写实画风：身上腾着一团淡淡的朱红煞气
       if (alpha > 0.3) flatAt(P.ring, e.x, e.y, e.r * 1.12 + 3, rgb(ZHU), G.PAPER ? 0.8 : 0.55, 0.03, 3); // 脚下一圈朱红：和主角脚下那圈青色对应，一眼分清敌我（鬼物、火灵这些不描边的也靠它）
       if (e.slowT > 0) flatAt(P.ring, e.x, e.y, e.r * 1.25, rgb('140,220,255'), 0.7, 0.035, 4);
       if (e.psn > 0) { const pc = rgb('154,200,50'); flatAt(P.circ, e.x, e.y, e.r * 1.15, pc, 0.1 + Math.min(0.2, e.psn * 0.02), 0.028, 3); if (((t * 9 + e.t * 3) | 0) % 3 === 0) glows.push(e.x * S + U.rand(-0.2, 0.2), e.z * S + U.rand(0.2, 0.9), e.y * S + U.rand(-0.15, 0.15), pc, 0.6, 0.5); } // 中毒：脚下一摊毒绿，身上冒泡
@@ -1416,11 +1418,11 @@
 
     // 主角
     if (p) {
-      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = Mo.sprite('hero', { line: 'friend' }) || Mo.hero(p.look); if (!heroM.gl && !heroM.spr) heroM.g.scale.multiplyScalar(ACTOR); heroS0 = heroM.g.scale.x; if (!heroM.spr) inkActor(heroM); dyn.add(heroM.g); heroOwner = p; }
+      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = Mo.hero(p.look); if (!heroM.gl) heroM.g.scale.multiplyScalar(ACTOR); heroS0 = heroM.g.scale.x; inkActor(heroM); dyn.add(heroM.g); heroOwner = p; }
       heroM.g.scale.setScalar(heroS0 * (p.apeT > 0 ? 1.3 * Math.min(1, 0.8 + (p.apeT > 0.3 ? 0.2 : 0)) : 1)); // 惊蛰十二变：身形暴涨
       heroM.g.visible = !p.dead && !(p.inv > 0 && p.dashing <= 0 && Math.floor(t * 20) % 2 === 0);
-      place(heroM.g, p.x, p.y, 0); heroM.g.rotation.y = heroM.spr ? 0 : PI / 2 - p.face;
-      heroM.update({ t: p.t, moving: p.moving, atk: p.atkAnim, dashing: p.dashing > 0, face: p.face });
+      place(heroM.g, p.x, p.y, 0); heroM.g.rotation.y = PI / 2 - p.face;
+      heroM.update({ t: p.t, moving: p.moving, atk: p.atkAnim, dashing: p.dashing > 0 });
       heroM.setFlash(p.flash);
       pLight.position.set(p.x * S, 1.9, p.y * S + 0.7);
       if (!p.dead) flatAt(P.ring, p.x, p.y, 17, rgb(QING), G.PAPER ? 0.75 : 0.4, 0.03, 4);
@@ -1458,11 +1460,11 @@
     // 灵宠灵虫
     for (const pt of Gm.pets) {
       let m = petM.get(pt);
-      if (!m) { m = Mo.sprite('pet_' + pt.id, { line: 'friend' }) || Mo.pet(pt.id); if (!m.gl && !m.spr) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); if (!m.spr) inkActor(m, undefined, m.gl ? null : PET_SKIN[pt.id] === undefined ? 'fur' : PET_SKIN[pt.id]); }
+      if (!m) { m = Mo.pet(pt.id); if (!m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); inkActor(m, undefined, m.gl ? null : PET_SKIN[pt.id] === undefined ? 'fur' : PET_SKIN[pt.id]); }
       m.seen = frame; m.g.visible = !(pt.hide > 0);
       const fly = pt.z ? pt.z + Math.sin(t * 3 + pt.slot) * 4 : 0;
-      place(m.g, pt.x, pt.y, fly); m.g.rotation.y = m.spr ? 0 : PI / 2 - pt.face;
-      m.update({ t: pt.t, moving: pt.moving || !!pt.z, atk: pt.atk, charge: pt.charge, wind: pt.atk > 0.5 ? 1 : 0, face: pt.face });
+      place(m.g, pt.x, pt.y, fly); m.g.rotation.y = PI / 2 - pt.face;
+      m.update({ t: pt.t, moving: pt.moving || !!pt.z, atk: pt.atk, charge: pt.charge, wind: pt.atk > 0.5 ? 1 : 0 });
       if (pt.hide > 0) continue;
       const pc = rgb(E_PET_C[pt.id] || '127,224,192'), x = pt.x * S, z = pt.y * S;
       flatAt(P.ring, pt.x, pt.y, 11, rgb(QING), G.PAPER ? 0.7 : 0.4, 0.03, 4); // 与主角脚下同色的环：这是自己人
@@ -1481,8 +1483,8 @@
     // 傀儡
     for (const a of Gm.allies) {
       let m = allyM.get(a);
-      if (!m) { m = Mo.sprite('ally_puppet', { line: 'friend' }) || Mo.puppet({ body: '#d9b06a', dark: '#7a5a2a', eye: '#7dffea' }, { scale: 0.92 * ACTOR }); dyn.add(m.g); allyM.set(a, m); if (!m.spr) inkActor(m); }
-      m.seen = frame; place(m.g, a.x, a.y, 0); m.g.rotation.y = m.spr ? 0 : PI / 2 - a.face; m.update({ t: a.t, moving: false, atk: Math.max(0, a.atk || 0), face: a.face });
+      if (!m) { m = Mo.puppet({ body: '#d9b06a', dark: '#7a5a2a', eye: '#7dffea' }, { scale: 0.92 * ACTOR }); dyn.add(m.g); allyM.set(a, m); inkActor(m); }
+      m.seen = frame; place(m.g, a.x, a.y, 0); m.g.rotation.y = PI / 2 - a.face; m.update({ t: a.t, moving: false, atk: Math.max(0, a.atk || 0) });
     }
     for (const [a, m] of allyM) if (m.seen !== frame) { dyn.remove(m.g); m.dispose(); allyM.delete(a); }
 
@@ -1709,10 +1711,10 @@
       G.World.buildRoom(menuRoom, true);
     }
     setRoom(menuRoom);
-    if (!menuHero && G.Assets.settled) { menuHero = Mo.sprite('hero', { line: 'friend', scale: 1.15 }) || Mo.hero({ robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' }); if (!menuHero.spr) inkActor(menuHero); scene.add(menuHero.g); }
+    if (!menuHero && G.Assets.settled) { menuHero = Mo.hero({ robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' }); inkActor(menuHero); scene.add(menuHero.g); }
     if (heroM) heroM.g.visible = false;
     const cx = menuRoom.w / 2, cz = menuRoom.h / 2 + 0.6;
-    if (menuHero) { menuHero.g.visible = true; menuHero.g.position.set(cx, 0, cz); menuHero.g.rotation.y = menuHero.spr ? Math.atan2(camera.position.x - cx, camera.position.z - cz) : 0.5; menuHero.update({ t, moving: false, face: 0 }); } // 贴片：转过来正对镜头
+    if (menuHero) { menuHero.g.visible = true; menuHero.g.position.set(cx, 0, cz); menuHero.g.rotation.y = 0.5; menuHero.update({ t, moving: false }); }
     pLight.position.set(cx, 1.8, cz + 0.8);
     beginPools();
     animateRoom(menuRoom, t);
