@@ -3,6 +3,16 @@
 (function () {
   const G = (window.G = {});
 
+  /* 画风：dh = 写实贴图（地面、岩石、草木用生成的贴图，暗一些的环境托住发光的法术）；ink = 青绿山水（绢本设色）。
+     网址带 ?style=ink 或 ?style=dh 可以切换，选择会记住 */
+  G.STYLE = (() => {
+    let s = null;
+    try { s = new URLSearchParams(location.search).get('style'); if (s === 'ink' || s === 'dh') localStorage.setItem('fr_style', s); else s = localStorage.getItem('fr_style'); } catch (e) { /* 读不到就用默认 */ }
+    return s === 'ink' ? 'ink' : 'dh';
+  })();
+  G.PAPER = G.STYLE === 'ink'; G.DH = !G.PAPER;
+  document.documentElement.classList.add(G.PAPER ? 'paper' : 'dh');
+
   G.TILE = 48;        // 逻辑坐标：一格边长（渲染时 1 格 = 1 个三维单位）
   G.TAU = Math.PI * 2;
 

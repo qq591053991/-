@@ -48,11 +48,11 @@ kbd { display: inline-block; min-width: 22px; padding: 1px 6px; margin: 0 2px; b
 #menu-tip { font-family: var(--kai); font-size: 15px; color: rgba(232, 228, 216, 0.6); }
 #menu .credit { position: absolute; bottom: calc(12px + var(--sb)); left: 0; right: 0; font-size: 11px; color: rgba(232, 228, 216, 0.36); padding: 0 12px; }
 /* 绢本：主菜单的题字是墨，副题是赭，托一圈绢色的晕 */
-#menu .title em { color: #6a4a26; text-shadow: 0 0 6px rgba(248, 240, 222, 0.95); }
-#menu .title h1 { color: #2a2218; text-shadow: 0 0 30px rgba(248, 240, 222, 0.95), 0 0 8px rgba(248, 240, 222, 0.95); }
-#menu .title p { color: #7a4e26; text-shadow: 0 0 6px rgba(248, 240, 222, 0.95); }
-#menu-info { color: #1f6a56; text-shadow: 0 0 5px rgba(248, 240, 222, 0.95); } #menu-tip { color: #4a3a26; text-shadow: 0 0 5px rgba(248, 240, 222, 0.95); }
-#menu .credit { color: rgba(60, 46, 30, 0.6); }
+html.paper #menu .title em { color: #6a4a26; text-shadow: 0 0 6px rgba(248, 240, 222, 0.95); }
+html.paper #menu .title h1 { color: #2a2218; text-shadow: 0 0 30px rgba(248, 240, 222, 0.95), 0 0 8px rgba(248, 240, 222, 0.95); }
+html.paper #menu .title p { color: #7a4e26; text-shadow: 0 0 6px rgba(248, 240, 222, 0.95); }
+html.paper #menu-info { color: #1f6a56; text-shadow: 0 0 5px rgba(248, 240, 222, 0.95); } html.paper #menu-tip { color: #4a3a26; text-shadow: 0 0 5px rgba(248, 240, 222, 0.95); }
+html.paper #menu .credit { color: rgba(60, 46, 30, 0.6); }
 
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; display: none; pointer-events: none; }
@@ -139,8 +139,10 @@ body.touch #prompt kbd { display: none; }
 
 #title-card { position: fixed; left: 0; right: 0; top: 26%; text-align: center; pointer-events: none; opacity: 0; }
 #title-card.show { animation: titlein 3.4s ease forwards; }
-#title-card em { display: block; font-style: normal; font-family: var(--kai); font-size: 20px; letter-spacing: 8px; color: #7a4e26; text-shadow: 0 0 10px rgba(248, 240, 222, 0.95); } /* 绢上题字：墨与赭 */
-#title-card b { display: block; font-family: var(--kai); font-size: clamp(54px, 9vw, 96px); letter-spacing: 0.25em; margin-left: 0.25em; color: #2a2218; text-shadow: 0 0 24px rgba(248, 240, 222, 0.95), 0 0 6px rgba(248, 240, 222, 0.9); }
+#title-card em { display: block; font-style: normal; font-family: var(--kai); font-size: 20px; letter-spacing: 8px; color: var(--gold); text-shadow: 0 2px 6px #000; }
+html.paper #title-card em { color: #7a4e26; text-shadow: 0 0 10px rgba(248, 240, 222, 0.95); } /* 绢上题字：墨与赭 */
+#title-card b { display: block; font-family: var(--kai); font-size: clamp(54px, 9vw, 96px); letter-spacing: 0.25em; margin-left: 0.25em; color: #f4efe0; text-shadow: 0 0 30px rgba(127, 224, 192, 0.6), 0 4px 10px #000; }
+html.paper #title-card b { color: #2a2218; text-shadow: 0 0 24px rgba(248, 240, 222, 0.95), 0 0 6px rgba(248, 240, 222, 0.9); }
 @keyframes titlein { 0% { opacity: 0; transform: scale(1.12); } 18% { opacity: 1; transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; } }
 
 #toasts { position: fixed; left: 50%; top: calc(96px + var(--st)); transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; z-index: 5; }
@@ -268,13 +270,13 @@ body.touch #prompt kbd { display: none; }
 #combo { position: absolute; right: calc(34px + var(--sr, 0px)); top: 38%; text-align: right; pointer-events: none; opacity: 0; transition: opacity 0.35s; transform: rotate(-5deg); font-family: var(--kai); color: #f4efe0; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.85), 0 0 14px rgba(0, 0, 0, 0.7); }
 #combo.show { opacity: 1; transition: opacity 0.08s; }
 /* 绢本：画面是浅色的绢，界面上的字改成墨与赭，用一圈绢色的晕托住（不用黑影） */
-#realm { color: #6a4418; text-shadow: 0 0 6px rgba(248, 240, 222, 0.95), 0 0 2px rgba(248, 240, 222, 0.95); }
-#gongfa { color: #24584a; text-shadow: 0 0 5px rgba(248, 240, 222, 0.95), 0 0 2px rgba(248, 240, 222, 0.95); } #gongfa b { color: #5a4a14; }
-#res { text-shadow: 0 0 5px rgba(248, 240, 222, 0.95), 0 0 2px rgba(248, 240, 222, 0.95); }
-#res .stone { color: #187a6a; } #res .potion { color: #a83a2a; } #res .drop { color: #3a7a2a; } #res b { color: #2a2218; }
-#chap { color: #2a2218; text-shadow: 0 0 6px rgba(248, 240, 222, 0.95), 0 0 2px rgba(248, 240, 222, 0.95); }
-#combo { color: #2a2218; text-shadow: 0 0 10px rgba(248, 240, 222, 0.95), 0 0 3px rgba(248, 240, 222, 0.95); }
-#combo.t2 { color: #9a6a10; } #combo.t3 { color: #c8341e; text-shadow: 0 0 10px rgba(248, 240, 222, 0.95), 0 0 3px rgba(248, 240, 222, 0.95); }
+html.paper #realm { color: #6a4418; text-shadow: 0 0 6px rgba(248, 240, 222, 0.95), 0 0 2px rgba(248, 240, 222, 0.95); }
+html.paper #gongfa { color: #24584a; text-shadow: 0 0 5px rgba(248, 240, 222, 0.95), 0 0 2px rgba(248, 240, 222, 0.95); } html.paper #gongfa b { color: #5a4a14; }
+html.paper #res { text-shadow: 0 0 5px rgba(248, 240, 222, 0.95), 0 0 2px rgba(248, 240, 222, 0.95); }
+html.paper #res .stone { color: #187a6a; } html.paper #res .potion { color: #a83a2a; } html.paper #res .drop { color: #3a7a2a; } html.paper #res b { color: #2a2218; }
+html.paper #chap { color: #2a2218; text-shadow: 0 0 6px rgba(248, 240, 222, 0.95), 0 0 2px rgba(248, 240, 222, 0.95); }
+html.paper #combo { color: #2a2218; text-shadow: 0 0 10px rgba(248, 240, 222, 0.95), 0 0 3px rgba(248, 240, 222, 0.95); }
+html.paper #combo.t2 { color: #9a6a10; } html.paper #combo.t3 { color: #c8341e; text-shadow: 0 0 10px rgba(248, 240, 222, 0.95), 0 0 3px rgba(248, 240, 222, 0.95); }
 #combo b { display: inline-block; font-size: 54px; line-height: 1; font-weight: normal; font-style: italic; animation: combopop 0.16s ease-out; }
 #combo em { font-style: normal; font-size: 19px; letter-spacing: 3px; margin-left: 6px; opacity: 0.85; }
 #combo.t2 { color: #ffe6a0; } #combo.t3 { color: #c8ff8a; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.85), 0 0 18px rgba(170, 255, 110, 0.55); }

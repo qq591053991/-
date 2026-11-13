@@ -137,7 +137,7 @@
     const sm = R.lite ? 1024 : 2048;
     sun.shadow.mapSize.set(sm, sm); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.035;
     scene.add(sun); scene.add(sun.target);
-    pLight = new THREE.PointLight(0xfff0d8, G.PAPER ? 0.35 : 1.25, 10.5, 1.2); scene.add(pLight);
+    pLight = new THREE.PointLight(0xfff0d8, G.PAPER ? 0.35 : 0.55, 10.5, 1.2); scene.add(pLight);
     for (let i = 0; i < MAX_LIGHTS; i++) { const l = new THREE.PointLight(0xffffff, 0, 6, 1.4); scene.add(l); roomLights.push(l); }
     dyn = new THREE.Group(); scene.add(dyn);
 
@@ -272,6 +272,7 @@
 
   /* ============================ 房间场景 ============================ */
   function buildRoom(room) {
+    treeQ.length = 0;
     const ti = room.theme, th = G.Themes[ti], w = room.w, h = room.h, tiles = room.tiles;
     const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : tiles[y * w + x]);
     const g = new THREE.Group(), rs = { g, tex: [], mats: [], geos: [], anims: [], doors: {}, lights: [], sprites: [] };
@@ -284,6 +285,8 @@
     const fgeo = new THREE.PlaneGeometry(w, h); rs.geos.push(fgeo);
     const floor = new THREE.Mesh(fgeo, lm({ map: tx(ctex(Tx.floor(room))) }));
     floor.rotation.x = -PI / 2; floor.position.set(w / 2, 0, h / 2); floor.receiveShadow = true; g.add(floor);
+    // 草木贴片（写实画风）：墙根、林缘的蕨与草，场中零星几丛。只是装饰，不挡路
+    if (G.DH && Tx.img['veg' + ti]) vegCards(room, rs, g);
     // 浮岛基座
     const rock = lm({ color: new THREE.Color(Tx.shade(th.base, -0.3)) }), rock2 = new THREE.MeshPhongMaterial({ color: new THREE.Color(Tx.shade(th.base, -0.45)), flatShading: true, shininess: 4 });
     rs.mats.push(rock2);
@@ -299,7 +302,7 @@
     const rockM = new THREE.MeshLambertMaterial({ vertexColors: true }); rs.mats.push(rockM);
     const sd = (room.gx || 0) * 31 + (room.gy || 0) * 17 + ti * 7;
     // rk：放一块山石，top 是它顶面的高度
-    const rockFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: G.PAPER ? new THREE.Color(0.62, 0.6, 0.56) : new THREE.Color(0.4, 0.44, 0.54) }); rs.mats.push(rockFg); // 前景的山石压暗成剪影
+    const rockFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: G.PAPER ? new THREE.Color(0.62, 0.6, 0.56) : new THREE.Color(0.5, 0.5, 0.52) }); rs.mats.push(rockFg); // 前景的山石压暗成剪影
     const rk = (x, top, z, s, sy, k, fg) => {
       const geo = Mo.rockGeo((k + sd) % 4, ti), m = new THREE.Mesh(geo, fg ? rockFg : rockM);
       m.position.set(x, top - geo.userData.h * s * sy, z); m.scale.set(s, s * sy, s * (0.8 + U.hash(k, 3, sd) * 0.4)); m.rotation.y = U.hash(k, 7, sd) * TAU; scn.add(m); return m;
@@ -331,7 +334,7 @@
       const bark = lm({ color: new THREE.Color(Mo.PAL[ti].trunk) }), leaf = new THREE.MeshLambertMaterial({ vertexColors: true }), barkD = bark.clone(), leafD = new THREE.MeshLambertMaterial({ vertexColors: true, color: G.PAPER ? new THREE.Color(0.84, 0.84, 0.8) : new THREE.Color(0.6, 0.62, 0.68) });
       barkD.color.multiplyScalar(0.6); rs.mats.push(leaf, barkD, leafD);
       // 前景：夹在镜头与场内之间的东西（它的北面几格之内就是空地）。一律压成暗影，不许比场内亮、不许比场内艳
-      const leafFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: G.PAPER ? new THREE.Color(0.5, 0.48, 0.45) : new THREE.Color(0.3, 0.32, 0.4) }), barkFg = bark.clone(); barkFg.color.multiplyScalar(G.PAPER ? 0.6 : 0.4); rs.mats.push(leafFg, barkFg);
+      const leafFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: G.PAPER ? new THREE.Color(0.5, 0.48, 0.45) : new THREE.Color(0.42, 0.42, 0.45) }), barkFg = bark.clone(); barkFg.color.multiplyScalar(G.PAPER ? 0.6 : 0.5); rs.mats.push(leafFg, barkFg);
       const northFloor = (x, y, n) => { for (let k = 1; k <= n; k++) if (y - k >= 0 && tiles[(y - k) * w + x] !== 1) return k; return 0; };
       const taken = new Set(room.deco.map((dd) => Math.floor(dd.y) * w + Math.floor(dd.x)));
       const cliffN = !cave && room.doors.n && room.doors.n.cave; // 北面的出口是洞口
@@ -343,6 +346,10 @@
         if (at(x, y) !== 1 || taken.has(y * w + x)) continue;
         if (!cave && far[y * w + x] > 3) { // 林子深处：隔一格放一团压暗的树冠
           if ((x + y) % 2) continue;
+          if (G.DH && Tx.img['tree' + ti]) { // 写实画风：深处也是一棵棵压暗的树（贴片很省）
+            const fg2 = northFloor(x, y, 8), tr = Mo.tree(x * 31 + y * 17 + sd, ti, treeKind(U.hash(x, y, sd + 66) * 1.6), (fg2 ? 0.95 : 1.3) + U.hash(x, y, sd + 64) * 0.5, { bark: bark, leaf: fg2 ? leafFg : leafD });
+            tr.g.position.set(x + 0.5 + (U.hash(x, y, sd + 67) - 0.5) * 0.6, -0.04, y + 0.5 + (U.hash(x, y, sd + 68) - 0.5) * 0.6); scnFar.add(tr.g); continue;
+          }
           const fgc = northFloor(x, y, 8), cm = new THREE.Mesh(Mo.padGeo(x + y, ti, padKind), fgc ? leafFg : leafD), cs = (fgc ? 1.05 : 1.25) + U.hash(x, y, sd + 64) * 0.6;
           cm.position.set(x + 0.5, (fgc ? 0.7 : 1.0) + U.hash(x, y, sd + 65) * 0.7, y + 0.5); cm.scale.set(cs, cs * 0.8, cs); cm.rotation.y = x * 1.3 + y; scnFar.add(cm); continue;
         }
@@ -557,7 +564,7 @@
       const m = Mo.stoneLantern(Math.floor(dd.x * 3 + dd.y), ti); m.g.scale.setScalar(0.74); m.g.position.set(dd.x, 0, dd.y); propRoot.add(m.g); rs.mats.push(...m.mats); rs.candles.push([dd.x, dd.y]);
     }
     const merged = mergeStatic(propRoot);
-    if (merged) { g.add(merged); rs.geos.push(merged.geometry); rs.mats.push(merged.material); inkOutline(merged, 0.022, g, rs, th.ink); }
+    if (merged) { g.add(merged); rs.geos.push(merged.geometry); rs.mats.push(merged.material); if (!G.DH) inkOutline(merged, 0.022, g, rs, th.ink); }
     // 灯光与光晕
     const glowSprite = (x, y, z, hex, s, op) => {
       const sm = Mo.inkBlend(new THREE.SpriteMaterial({ map: glowTex, color: hex, transparent: true, opacity: op * (G.PAPER ? 0.5 : 1), depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -654,16 +661,17 @@
       g.add(isl);
     });
     const mergedScn = mergeStatic(scn);
-    if (mergedScn) { g.add(mergedScn); rs.geos.push(mergedScn.geometry); rs.mats.push(mergedScn.material); inkOutline(mergedScn, 0.03, g, rs, th.ink); }
+    if (mergedScn) { g.add(mergedScn); rs.geos.push(mergedScn.geometry); rs.mats.push(mergedScn.material); if (!G.DH) inkOutline(mergedScn, 0.03, g, rs, th.ink); }
     const mergedFar = mergeStatic(scnFar);
     if (mergedFar) { mergedFar.castShadow = false; g.add(mergedFar); rs.geos.push(mergedFar.geometry); rs.mats.push(mergedFar.material); }
     const mergedTuft = mergeStatic(tuft); // 草丛太细，不描线
     if (mergedTuft) { mergedTuft.castShadow = false; g.add(mergedTuft); rs.geos.push(mergedTuft.geometry); rs.mats.push(mergedTuft.material); }
     rs.mats.push(...kit.mats());
     const mergedArch = mergeStatic(archRoot);
-    if (mergedArch) { g.add(mergedArch); rs.geos.push(mergedArch.geometry); rs.mats.push(mergedArch.material); inkOutline(mergedArch, 0.018, g, rs, th.ink); }
+    if (mergedArch) { g.add(mergedArch); rs.geos.push(mergedArch.geometry); rs.mats.push(mergedArch.material); if (!G.DH) inkOutline(mergedArch, 0.018, g, rs, th.ink); }
     // 岩浆的光
     // （虚天殿的水面原先是熔池，带一团团橙红的光；现在是寒潭，不发光——橙红只留给敌人）
+    treeCards(room, rs, g);
     return rs;
   }
 
@@ -675,7 +683,34 @@
     float bn(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
       return mix(mix(mix(bh(i), bh(i + vec3(1, 0, 0)), f.x), mix(bh(i + vec3(0, 1, 0)), bh(i + vec3(1, 1, 0)), f.x), f.y),
                  mix(mix(bh(i + vec3(0, 0, 1)), bh(i + vec3(1, 0, 1)), f.x), mix(bh(i + vec3(0, 1, 1)), bh(i + vec3(1, 1, 1)), f.x), f.y), f.z); }`;
+  let dhTex = null;
+  function dhDetail() {
+    if (dhTex) return dhTex;
+    const mk = (n) => { const t = new THREE.Texture(Tx.img[n]); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso; t.needsUpdate = true; return t; }; // 细节贴图是 0.5 灰，按线性取值
+    return (dhTex = { rock: mk('rock'), leaf: mk('leaf') });
+  }
   function brushMat(m) {
+    if (G.DH) {
+      /* 写实画风：合并后的静态网格没有 UV，按世界坐标从三个方向把贴图投上去（哪个方向正对着面，就用哪个方向的）。
+         贴图是归一到 0.5 灰的"细节"，乘上去不改变顶点色定的颜色，只添石纹、叶片 */
+      if (!Tx.img.rock || !Tx.img.leaf) return m;
+      const D = dhDetail();
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.tRock = { value: D.rock }; sh.uniforms.tLeaf = { value: D.leaf };
+        sh.vertexShader = 'attribute float brush;\nvarying float vBrush;\nvarying vec3 vWP;\nvarying vec3 vWN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBrush = brush; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
+        sh.fragmentShader = 'varying float vBrush;\nvarying vec3 vWP;\nvarying vec3 vWN;\nuniform sampler2D tRock;\nuniform sampler2D tLeaf;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        {
+          vec3 bw = pow(abs(normalize(vWN)), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
+          vec3 d;
+          if (vBrush > 1.5) { vec3 P = vWP * 0.8; d = texture2D(tLeaf, P.zy).rgb * bw.x + texture2D(tLeaf, P.xz).rgb * bw.y + texture2D(tLeaf, P.xy).rgb * bw.z; d = mix(vec3(0.5), d, 1.3); }
+          else if (vBrush > 0.5) { vec3 P = vWP * 0.42; d = texture2D(tRock, P.zy).rgb * bw.x + texture2D(tRock, P.xz).rgb * bw.y + texture2D(tRock, P.xy).rgb * bw.z; d = mix(vec3(0.5), d, 1.2); }
+          else { vec3 P = vWP * 0.9; d = texture2D(tRock, P.zy).rgb * bw.x + texture2D(tRock, P.xz).rgb * bw.y + texture2D(tRock, P.xy).rgb * bw.z; d = mix(vec3(0.5), d, 0.55); }
+          diffuseColor.rgb *= clamp(d * 2.0, 0.0, 2.0);
+        }`);
+      };
+      m.customProgramCacheKey = () => 'dh-detail';
+      return m;
+    }
     if (!G.PAPER) return m;
     m.onBeforeCompile = (sh) => {
       sh.vertexShader = 'attribute float brush;\nvarying float vBrush;\nvarying vec3 vWP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBrush = brush; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -699,9 +734,89 @@
     return m;
   }
 
+  /* 草木贴片：一张图集（2×2 四种草木），每丛是一片朝镜头后仰的四边形。镜头的朝向是固定的，所以不用每帧转向；
+     法线朝上，受光与地面一致；顶上两个顶点随风轻摆 */
+  const VEG_UP = [0, Math.cos(0.5), -Math.sin(0.5)], TREE_UP = [0, Math.cos(0.32), -Math.sin(0.32)], treeQ = [], v3b = new THREE.Vector3();
+  /* 树的贴片：做法同草木，只是大得多，而且投影（深度材质按贴图的透明度裁剪，影子是树的形状） */
+  function treeCards(room, rs, g) {
+    const ti = room.theme, n = treeQ.length / 9, TK = ti === 1 ? 0.86 : 1; if (!n) return; // 血色禁地的枫叶略压一点：最艳的红留给敌人
+    const pos = new Float32Array(n * 12), uv = new Float32Array(n * 8), col = new Float32Array(n * 12), sw = new Float32Array(n * 4), nor = new Float32Array(n * 12), idx = [];
+    for (let i = 0; i < n; i++) {
+      const q = i * 9, x = treeQ[q], y = treeQ[q + 1], z = treeQ[q + 2], sz = treeQ[q + 3], cell = treeQ[q + 4], flip = treeQ[q + 5], hw = sz / 2, cx = cell % 2, cy = (cell / 2) | 0, o = i * 12;
+      pos.set([x - hw, y, z, x + hw, y, z, x + hw, y + TREE_UP[1] * sz, z + TREE_UP[2] * sz, x - hw, y + TREE_UP[1] * sz, z + TREE_UP[2] * sz], o);
+      const u0 = (cx + (flip ? 1 : 0)) / 2, u1 = (cx + (flip ? 0 : 1)) / 2, v0 = 1 - (cy + 1) / 2 + 0.003, v1 = 1 - cy / 2 - 0.003;
+      uv.set([u0, v0, u1, v0, u1, v1, u0, v1], i * 8);
+      for (let k = 0; k < 4; k++) { col[o + k * 3] = treeQ[q + 6] * TK; col[o + k * 3 + 1] = treeQ[q + 7] * TK; col[o + k * 3 + 2] = treeQ[q + 8] * TK; nor[o + k * 3 + 1] = 1; }
+      sw[i * 4 + 2] = sw[i * 4 + 3] = 1; idx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3);
+    }
+    treeQ.length = 0;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); geo.setAttribute('sway', new THREE.BufferAttribute(sw, 1)); geo.setIndex(idx);
+    const tex = new THREE.Texture(Tx.img['tree' + ti]); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = maxAniso; tex.needsUpdate = true;
+    const uT = { value: 0 }, sway = (sh) => { sh.uniforms.uT = uT; sh.vertexShader = 'attribute float sway;\nuniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed.x += sway * sin(uT * 0.9 + position.x * 0.7 + position.z * 0.9) * 0.05;'); };
+    const mat = new THREE.MeshLambertMaterial({ map: tex, alphaTest: 0.5, vertexColors: true, side: THREE.DoubleSide }); mat.onBeforeCompile = sway; mat.customProgramCacheKey = () => 'tree-sway';
+    const dep = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: 0.5, side: THREE.DoubleSide }); dep.onBeforeCompile = sway; dep.customProgramCacheKey = () => 'tree-sway-d';
+    const m = new THREE.Mesh(geo, mat); m.customDepthMaterial = dep; m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false; g.add(m);
+    rs.geos.push(geo); rs.mats.push(mat, dep); rs.tex.push(tex); rs.anims.push((t) => { uT.value = t; });
+  }
+  function vegCards(room, rs, g) {
+    const ti = room.theme, w = room.w, h = room.h, tiles = room.tiles, at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 1 : tiles[y * w + x]);
+    const open = room.terrain && room.terrain !== 'court', cave = room.terrain === 'cave', wild = open && !cave, sd = (room.gx || 0) * 13 + (room.gy || 0) * 29 + ti * 5 + 1;
+    const pos = [], uv = [], col = [], sw = [], idx = [];
+    const skip = new Set();
+    for (const d in room.doors || {}) for (const [dx, dy] of room.doors[d].cells) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) skip.add((dy + b) * w + dx + a);
+    for (const pp of room.props || []) skip.add(pp.ty * w + pp.tx);
+    for (const dd of room.deco || []) skip.add(Math.floor(dd.y) * w + Math.floor(dd.x));
+    const card = (x, z, size, cell, k) => {
+      const y0 = hRoom(room, x, z), n = pos.length / 3, flip = U.hash(n, 3, sd) < 0.5, cx = cell % 2, cy = (cell / 2) | 0, hw = size / 2, ht = size;
+      pos.push(x - hw, y0, z, x + hw, y0, z, x + hw + VEG_UP[0] * ht, y0 + VEG_UP[1] * ht, z + VEG_UP[2] * ht, x - hw + VEG_UP[0] * ht, y0 + VEG_UP[1] * ht, z + VEG_UP[2] * ht);
+      const u0 = (cx + (flip ? 1 : 0)) / 2, u1 = (cx + (flip ? 0 : 1)) / 2, v0 = 1 - (cy + 1) / 2 + 0.004, v1 = 1 - cy / 2;
+      uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
+      for (let i = 0; i < 4; i++) col.push(k, k, k);
+      sw.push(0, 0, 1, 1); idx.push(n, n + 1, n + 2, n, n + 2, n + 3);
+    };
+    const mcx = w / 2, mcy = h / 2;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const t = at(x, y), hh = (i) => U.hash(x * 3 + i, y * 7 + i, sd + i);
+      if (t === 1) { // 山野：林缘、石脚下的灌草
+        if (!wild || !(at(x, y + 1) !== 1 || at(x - 1, y) !== 1 || at(x + 1, y) !== 1)) continue;
+        for (let i = 0; i < 2; i++) if (hh(i * 5) < 0.7) card(x + 0.15 + hh(i * 5 + 1) * 0.7, y + 0.45 + hh(i * 5 + 2) * 0.5, 0.75 + hh(i * 5 + 3) * 0.5, Math.floor(hh(i * 5 + 4) * 4), 0.62 + hh(i + 9) * 0.2);
+        continue;
+      }
+      if ((t !== 0 && t !== 2) || skip.has(y * w + x)) continue;
+      const edgeN = at(x, y - 1) === 1, edge = edgeN || at(x - 1, y) === 1 || at(x + 1, y) === 1 || at(x, y + 1) === 1, dc = Math.hypot(x + 0.5 - mcx, y + 0.5 - mcy);
+      if (edge) {
+        const p0 = wild ? 0.85 : cave ? 0.35 : 0.5, nn = wild ? 2 : 1;
+        for (let i = 0; i < nn; i++) if (hh(20 + i * 5) < p0) {
+          let px = x + 0.1 + hh(21 + i * 5) * 0.8, pz = y + 0.1 + hh(22 + i * 5) * 0.8;
+          if (edgeN) pz = y + 0.08 + hh(22 + i * 5) * 0.3; else if (at(x, y + 1) === 1) pz = y + 0.75 + hh(22 + i * 5) * 0.2; else if (at(x - 1, y) === 1) px = x + 0.05 + hh(21 + i * 5) * 0.3; else px = x + 0.65 + hh(21 + i * 5) * 0.3;
+          card(px, pz, 0.6 + hh(23 + i * 5) * 0.45, Math.floor(hh(24 + i * 5) * 4), 0.78 + hh(i + 30) * 0.22);
+        }
+      } else if (dc > 3.4 && hh(40) < (wild ? 0.12 : 0.025)) card(x + 0.2 + hh(41) * 0.6, y + 0.2 + hh(42) * 0.6, 0.42 + hh(43) * 0.28, hh(44) < 0.6 ? 1 : Math.floor(hh(45) * 4), 0.85 + hh(46) * 0.15);
+    }
+    if (!idx.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setAttribute('sway', new THREE.Float32BufferAttribute(sw, 1));
+    const nor = new Float32Array(pos.length); for (let i = 1; i < nor.length; i += 3) nor[i] = 1; geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setIndex(idx);
+    const tex = new THREE.Texture(Tx.img['veg' + ti]); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = maxAniso; tex.needsUpdate = true;
+    const uT = { value: 0 }, mat = new THREE.MeshLambertMaterial({ map: tex, alphaTest: 0.5, vertexColors: true, side: THREE.DoubleSide });
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uT = uT;
+      sh.vertexShader = 'attribute float sway;\nuniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed.x += sway * sin(uT * 1.4 + position.x * 1.9 + position.z * 2.3) * 0.035;');
+    };
+    mat.customProgramCacheKey = () => 'veg-sway';
+    const m = new THREE.Mesh(geo, mat); m.receiveShadow = true; m.frustumCulled = false; g.add(m);
+    rs.geos.push(geo); rs.mats.push(mat); rs.tex.push(tex); rs.anims.push((t) => { uT.value = t; });
+  }
+
   /* 把一组静态网格烘焙成单个带顶点色的网格 */
   function mergeStatic(root) {
     root.updateMatrixWorld(true);
+    { const marks = []; root.traverse((o) => { if (o.userData.tree) marks.push(o); }); // 写实画风：树是贴片，先收走
+      for (const o of marks) { const t = o.userData.tree, c = t.tint.color; o.getWorldPosition(v3); treeQ.push(v3.x, v3.y, v3.z, t.size * o.getWorldScale(v3b).y, t.cell, t.flip ? 1 : 0, c.r, c.g, c.b); o.parent.remove(o); } }
     const pos = [], nor = [], colr = [], brush = [], dead = [], v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
     root.traverse((o) => {
       if (!o.isMesh) return;

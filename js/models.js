@@ -6,7 +6,6 @@
   const Mo = (G.Models = {});
   /* 绢本设色：画面是一张浅色的绢，发光的东西不能再"加亮"（加在浅底上看不出来），改成颜料——
      把原本要加上去的颜色 A，换成它的补色去"减"：浅底上显出 A 的颜色，深底上只是压暗一点，像墨与颜料落在绢上 */
-  G.PAPER = true;
   Mo.inkBlend = function (m) {
     if (!G.PAPER) return m;
     m.blending = THREE.SubtractiveBlending;

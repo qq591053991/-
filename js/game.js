@@ -618,5 +618,5 @@
     debugKillAll() { for (const e of this.room.enemies.slice()) { e.st = 'idle'; e.untarget = false; e.invT = 0; E.dmgEnemy(e, 1e7, { noCrit: true }); } },
   });
 
-  window.addEventListener('load', () => Game.init());
+  window.addEventListener('load', () => G.Tex.whenReady(() => Game.init())); // 写实画风：等贴图解码完再开始
 })();
