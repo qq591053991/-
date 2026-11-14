@@ -593,4 +593,91 @@
     baolin: () => Mo.wolf({ fur: '#e8c050', dark: '#8a6a20', eye: '#7dffea', horn: '#fff2c0', tip: '#fff2c0' }, { scale: 0.98 }),
   };
   Mo.pet = (id) => (PETS[id] ? PETS[id]() : pet0(id));
+
+  /* ============================ 飞剑（写实画风） ============================
+     一口像样的剑：菱形截面的剑身（脊暗、刃亮，收成剑尖）、两头起翘的剑格、缠绳的剑柄、剑首、剑穗。
+     剑身是受光的金属，自带一点灵光（自发光），外面罩一层剑芒；三档随功法进境换形：
+     0 凡铁飞剑 / 1 青元剑光（月白剑身、青芒）/ 2 青竹蜂云剑（竹节剑身、亮剑尖、金格）/ mini 金蚨子刃
+     整口剑沿 +Z，剑尖在前；长度归一成 1，由调用处缩放 */
+  const SWD = {
+    0: { ridge: '#59646e', edge: '#e6eef4', aura: 0x8fd8d0, glow: 0.1, emis: 0.06, guard: '#8a6a3c', grip: '#2a2422', tassel: '#9a2a22', L: 0.78 },
+    1: { ridge: '#4fae8e', edge: '#f2fff8', aura: 0x5cffb0, glow: 0.17, emis: 0.2, guard: '#d9b45a', grip: '#1e3a36', tassel: '#3fd0a0', L: 0.82 },
+    2: { ridge: '#3f8a2c', edge: '#dcffa8', aura: 0x9aff4a, glow: 0.18, emis: 0.22, guard: '#f0cc5a', grip: '#24341e', tassel: '#f0cc5a', joint: '#2c6220', tip: '#f6ffe0', L: 0.86 },
+    mini: { ridge: '#b0822a', edge: '#fff4c0', aura: 0xffdc82, glow: 0.18, emis: 0.24, L: 0.42, bare: true },
+  };
+  const swGeo = {};
+  // 把若干三角形攒成一个带顶点色的几何体；法线按面算，所以每个面一个明暗（金属的棱）
+  function triGeo(key, build) {
+    if (swGeo[key]) return swGeo[key];
+    const pos = [], col = [], c1 = new THREE.Color(), c2 = new THREE.Color(), c3 = new THREE.Color();
+    const tri = (a, b, c, ca, cb, cc) => { pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]); c1.set(ca); c2.set(cb || ca); c3.set(cc || cb || ca); col.push(c1.r, c1.g, c1.b, c2.r, c2.g, c2.b, c3.r, c3.g, c3.b); };
+    const quad = (a, b, c, d, ca, cb, cc, cd) => { tri(a, b, c, ca, cb, cc); tri(a, c, d, ca, cc, cd); };
+    // 一截四棱台：两头各一个菱形（半宽 w、半厚 t），棱上的颜色 e（左右刃）与 r（上下脊）
+    const seg = (z0, w0, t0, z1, w1, t1, e, r) => {
+      const A = [[w0, 0, z0], [0, t0, z0], [-w0, 0, z0], [0, -t0, z0]], B = [[w1, 0, z1], [0, t1, z1], [-w1, 0, z1], [0, -t1, z1]], C = [e, r, e, r];
+      for (let i = 0; i < 4; i++) { const k = (i + 1) % 4; if (w1 < 1e-5 && t1 < 1e-5) tri(A[i], A[k], B[0], C[i], C[k], e); else quad(A[i], A[k], B[k], B[i], C[i], C[k], C[k], C[i]); }
+    };
+    const box = (cx, cy, cz, sx, sy, sz, c, ry = 0) => { // 一个长方体，可绕 Y 轴转
+      const co = Math.cos(ry), si = Math.sin(ry), P = (x, y, z) => [cx + (x * co + z * si), cy + y, cz + (-x * si + z * co)], h = [sx / 2, sy / 2, sz / 2];
+      const v = [P(-h[0], -h[1], -h[2]), P(h[0], -h[1], -h[2]), P(h[0], h[1], -h[2]), P(-h[0], h[1], -h[2]), P(-h[0], -h[1], h[2]), P(h[0], -h[1], h[2]), P(h[0], h[1], h[2]), P(-h[0], h[1], h[2])];
+      for (const f of [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [3, 7, 6, 2], [0, 4, 7, 3], [1, 2, 6, 5]]) quad(v[f[0]], v[f[1]], v[f[2]], v[f[3]], c);
+    };
+    build({ tri, quad, seg, box });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+    return (swGeo[key] = g);
+  }
+  const Z_GUARD = -0.2, Z_TIP = 0.5;
+  // 剑身：自剑格到剑尖，中段略收，末了收成尖；wk 是宽度的倍数（剑芒用它放大一圈）
+  const bladeOf = (key, st, wk = 1, tk = 1) => triGeo(key, (b) => {
+    const N = 10, TP = 0.72, hw = (u) => 0.044 * wk * (u < TP ? 1 - 0.14 * u : (1 - 0.14 * TP) * (1 - Math.pow((u - TP) / (1 - TP), 1.35))), ht = (u) => 0.015 * tk * (u < TP ? 1 - 0.25 * u : (1 - 0.25 * TP) * (1 - (u - TP) / (1 - TP)));
+    for (let i = 0; i < N; i++) {
+      const u0 = i / N, u1 = (i + 1) / N, z0 = Z_GUARD + u0 * (Z_TIP - Z_GUARD), z1 = Z_GUARD + u1 * (Z_TIP - Z_GUARD);
+      const tipC = st.tip && u0 > 0.7; // 青竹蜂云剑：前三成是亮的剑尖
+      b.seg(z0, hw(u0), ht(u0), z1, i === N - 1 ? 0 : hw(u1), i === N - 1 ? 0 : ht(u1), tipC ? st.tip : st.edge, tipC ? st.edge : st.ridge);
+    }
+    if (st.joint && wk === 1) for (const u of [0.18, 0.42, 0.64]) { const z = Z_GUARD + u * (Z_TIP - Z_GUARD); b.seg(z - 0.012, hw(u) * 1.12, ht(u) * 1.7, z + 0.012, hw(u) * 1.12, ht(u) * 1.7, st.joint, st.joint); } // 竹节
+  });
+  // 剑格、剑柄、剑首、剑穗
+  const hiltOf = (key, st) => triGeo(key, (b) => {
+    const g = st.guard, dk = G.Tex.shade(g, -0.35);
+    b.box(0, 0, Z_GUARD, 0.08, 0.044, 0.044, g);                                 // 剑格：中间一块
+    for (const sx of [-1, 1]) { b.box(sx * 0.068, 0, Z_GUARD + 0.012, 0.075, 0.03, 0.03, g, sx * 0.5); b.box(sx * 0.104, 0, Z_GUARD + 0.034, 0.026, 0.026, 0.036, dk, sx * 0.9); } // 两翼前翘
+    b.box(0, 0.024, Z_GUARD, 0.03, 0.012, 0.03, G.Tex.shade(g, 0.4));               // 格上一颗饰
+    b.seg(Z_GUARD - 0.19, 0.02, 0.02, Z_GUARD - 0.02, 0.023, 0.023, st.grip, st.grip);               // 剑柄
+    for (let i = 0; i < 4; i++) b.box(0, 0, Z_GUARD - 0.045 - i * 0.04, 0.048, 0.048, 0.012, i % 2 ? dk : g, PI / 4); // 缠绳
+    b.seg(Z_GUARD - 0.24, 0.012, 0.012, Z_GUARD - 0.19, 0.034, 0.034, g, g); b.seg(Z_GUARD - 0.19, 0.034, 0.034, Z_GUARD - 0.175, 0.02, 0.02, g, g); // 剑首
+    for (const [dx, dy, l] of [[0.012, -0.03, 0.2], [-0.014, -0.05, 0.26]]) b.seg(Z_GUARD - 0.24 - l, 0.002, 0.002, Z_GUARD - 0.235, 0.011, 0.007, st.tassel, st.tassel); // 剑穗（两缕）
+  });
+  const swMat = {};
+  function swordMats(style, giant) {
+    const k = style + (giant ? 'G' : ''); if (swMat[k]) return swMat[k];
+    const st = SWD[style], o = giant ? { transparent: true } : {};
+    const blade = new THREE.MeshPhongMaterial(Object.assign({ vertexColors: true, shininess: 110, specular: 0xffffff, emissive: st.aura, emissiveIntensity: st.emis * (giant ? 1.3 : 1), side: THREE.DoubleSide }, o));
+    const hilt = new THREE.MeshPhongMaterial(Object.assign({ vertexColors: true, shininess: 40, specular: 0x554422, emissive: 0x241a0c, side: THREE.DoubleSide }, o));
+    const aura = new THREE.MeshBasicMaterial({ color: st.aura, transparent: true, opacity: st.glow * (giant ? 1.3 : 1), blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    for (const m of [blade, hilt, aura]) m.userData.o0 = m.opacity;
+    return (swMat[k] = { blade, hilt, aura });
+  }
+  function swordDH(style, giant) {
+    const st = SWD[style] || SWD[0], M = giant ? swordMats(style, true) : swordMats(style), g = new THREE.Group(), body = new THREE.Group(); g.rotation.order = 'YXZ';
+    const mats = giant ? { blade: M.blade.clone(), hilt: M.hilt.clone(), aura: M.aura.clone() } : M; // 巨剑要单独淡入淡出
+    if (giant) for (const k in mats) mats[k].userData.o0 = M[k].userData.o0;
+    const add = (geo, m, rz) => { const x = new THREE.Mesh(geo, m); x.renderOrder = rz || 0; body.add(x); return x; };
+    add(bladeOf('aura' + style, st, 1.9, 2.6), mats.aura, 12);
+    add(bladeOf('blade' + style, st), mats.blade);
+    if (!st.bare) add(hiltOf('hilt' + style, st), mats.hilt);
+    body.scale.setScalar(st.L); body.position.z = st.bare ? 0 : st.L * 0.06; g.add(body);
+    g.userData.mats = [mats.blade, mats.hilt, mats.aura];
+    return g;
+  }
+  if (G.DH) {
+    Mo.sword = (style) => swordDH(SWD[style] ? style : 0);
+    Mo.giantSword = function () { // 巨剑术：剑尖朝下，原点在剑尖
+      const g = new THREE.Group(), s = swordDH(1, true), L = 4.4;
+      s.rotation.set(PI / 2, 0, 0); s.scale.setScalar(L / SWD[1].L); s.position.y = L * (Z_TIP + 0.06); g.add(s);
+      g.userData.mats = s.userData.mats;
+      return g;
+    };
+  }
 })();

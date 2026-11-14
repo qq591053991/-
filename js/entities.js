@@ -42,7 +42,7 @@
         br.push(seg);
       }
       this.parts.push({ kind: 'bolt', pts, br, life: 0.22, max: 0.22, c, w, add: true, x: x2, y: y2, z: z2, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
-      if (z1 > 200) { this.ring(x2, y2, 4, 52, c, 0.28, 4); this.burst(x2, y2, 8, 9, { c, s0: 60, s1: 230, l0: 0.15, l1: 0.38, z0: 2, z1: 3.5 }); }
+      if (z1 > 200) { this.ring(x2, y2, 4, 52, c, 0.28, 4); this.burst(x2, y2, 8, 9, { c, s0: 60, s1: 230, l0: 0.15, l1: 0.38, z0: 2, z1: 3.5 }); this.boom(x2, y2, 44, c, { smoke: false, zap: true }); } // 雷落下来不起火：一闪、几道电芒、地上一片焦裂
     },
     // 阵图：贴地旋转的法阵，r0 → r1
     array(x, y, r0, r1, c, life = 0.6, spin = 1.5) {
@@ -63,6 +63,17 @@
     // 绸带：绕着某个人盘旋上升的一道流光
     ribbon(who, c, life = 0.9, r = 34, turns = 1.6, a0 = U.rand(TAU)) {
       this.parts.push({ kind: 'ribbon', who, x: who.x, y: who.y, z: 0, c, r, turns, a0, life, max: life, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
+    },
+    // 爆炸：一团火、几缕烟、一圈冲击波，地上留一片焦裂（由写实画风的贴图粒子来画；青绿画风下只有原来那圈环与火星）
+    boom(x, y, r, c, o = {}) {
+      if (this.parts.length > 860) return;
+      this.parts.push({ kind: 'boom', x, y, z: o.z || 0, r, c, foe: !!o.foe, smoke: o.smoke !== false, zap: !!o.zap, seed: Math.random() * 100, life: 0.55, max: 0.55, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
+      if (o.scorch !== false && r >= 36) this.parts.push({ kind: 'scorch', x, y, z: 0, r: r * 0.95, c, foe: !!o.foe, seed: Math.random() * 6.28, life: 2.6, max: 2.6, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
+    },
+    // 命中的火花：一闪而过的星芒
+    spark(x, y, z, c, size = 24) {
+      if (this.parts.length > 860) return;
+      this.parts.push({ kind: 'spark', x, y, z, size, c, rot: Math.random() * 6.28, life: 0.13, max: 0.13, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
     },
     // 剑丝：一道转瞬即逝的直线
     thread(x1, y1, x2, y2, c, life = 0.24) {
@@ -212,6 +223,7 @@
     Gm.stats.dmg += d;
     Gm.combo = (Gm.comboT > 0 ? Gm.combo : 0) + 1; Gm.comboT = 2.4;
     FX.text(e.x, e.y, e.r * 2 + 14, crit ? d + '!' : d, crit ? '#ffd24a' : o.c || '#ffffff', crit ? 19 : o.dot ? 11 : 13);
+    if (!o.dot && !(e.spT > p.t)) { e.spT = p.t + 0.07; FX.spark(e.x + U.rand(-e.r, e.r) * 0.5, e.y + U.rand(-e.r, e.r) * 0.4, e.r + 8 + U.rand(10), crit ? '255,214,90' : '255,246,220', crit ? 40 : 26); } // 命中的星芒（同一个敌人不连着闪）
     if ((o.kx || o.ky) && !e.boss) { const m = e.def.ai === 'tank' || e.def.ai === 'turret' ? 0.2 : 1; e.kx += (o.kx || 0) * m; e.ky += (o.ky || 0) * m; }
     if (!o.dot) Au.sfx(crit ? 'crit' : 'hit');
     if (e.hp <= 0) E.killEnemy(e);
@@ -236,7 +248,7 @@
     const rgb = hexRgb(col);
     FX.burst(e.x, e.y, e.r, e.boss ? 80 : 14, { c: rgb, s1: e.boss ? 380 : 190, add: false, z1: 6 });
     FX.burst(e.x, e.y, e.r, e.boss ? 50 : 8, { c: '255,240,200', s1: 220 });
-    FX.ring(e.x, e.y, 6, e.boss ? 260 : 50, '255,240,200', 0.35);
+    FX.ring(e.x, e.y, 6, e.boss ? 260 : 50, '255,240,200', 0.35); FX.spark(e.x, e.y, e.r + 6, '255,240,200', e.boss ? 150 : 52);
     Gm.stain(e.x, e.y, e.boss ? 70 : e.elite ? 40 : 22 + e.r * 0.5, e.def.fly || e.def.draw === 'ghost' || e.def.draw === 'skull' || e.def.draw === 'flame' ? 1 : e.def.draw === 'puppet' || e.def.draw === 'crystal' ? 2 : 0);
     Au.sfx('kill');
     if (!e.def.minion || e.boss) {
@@ -373,7 +385,7 @@
 
   E.explode = function (x, y, r, dmg, c, opts = {}) {
     const Gm = G.Game;
-    FX.ring(x, y, 10, r, c, 0.3, 5);
+    FX.ring(x, y, 10, r, c, 0.3, 5); FX.boom(x, y, r, c);
     FX.burst(x, y, 10, 18, { c, s1: r * 3, l1: 0.5, z1: 6 });
     FX.burst(x, y, 10, 8, { c: '60,50,50', s1: r * 1.5, add: false, z1: 8, l1: 0.8, g: -40 });
     if (opts.shake) Gm.shake(opts.shake); Au.sfx('boom');
@@ -540,7 +552,7 @@
           done = true;
           if (h.from === 1) {
             if (U.dist(h.x, h.y, p.x, p.y) < h.r + p.r * 0.5) E.hurtPlayer(h.dmg, h.x, h.y);
-            FX.ring(h.x, h.y, h.r * 0.3, h.r, h.c, 0.3, 5);
+            FX.ring(h.x, h.y, h.r * 0.3, h.r, h.c, 0.3, 5); FX.boom(h.x, h.y, h.r, h.c, { foe: true });
             FX.burst(h.x, h.y, 6, 14, { c: h.c, s1: h.r * 2.6, l1: 0.45 });
             if (h.sfx !== false) Au.sfx('boom');
             if (h.r >= 90) Gm.shake(4);
@@ -594,7 +606,7 @@
         if (h.t >= h.dur) {
           done = true;
           if (U.dist(h.x, h.y, p.x, p.y) < h.r + p.r * 0.5) E.hurtPlayer(h.dmg, h.x, h.y);
-          FX.ring(h.x, h.y, 8, h.r, h.c, 0.3, 4); FX.burst(h.x, h.y, 4, 10, { c: h.c, s1: 140 });
+          FX.ring(h.x, h.y, 8, h.r, h.c, 0.3, 4); FX.burst(h.x, h.y, 4, 10, { c: h.c, s1: 140 }); FX.boom(h.x, h.y, h.r, h.c, { foe: true });
           Au.sfx('hit');
           if (h.puddle) E.hazPuddle(h.x, h.y, h.r, h.puddle, h.dmg * 0.8, { c: h.c });
         }

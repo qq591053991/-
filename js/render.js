@@ -77,6 +77,45 @@
     this.mat.uniforms.uScale.value = (H * renderer.getPixelRatio()) / (2 * HALF_TAN);
   };
 
+  /* 贴图粒子（写实画风）：火、烟、火花。和点云一样一次画完，只是每个点从一张图集里取一格，还能转。
+     贴图是黑底白图——叠加时乘上颜色；mode：add 叠加 / fire 叠加，亮处过渡到白炽 / smoke 正常混合，亮度当透明度 */
+  function TexCloud(max, img, N, mode) {
+    this.max = max; this.n = 0;
+    this.pos = new Float32Array(max * 3); this.colr = new Float32Array(max * 4); this.misc = new Float32Array(max * 3); // 大小、取图集的第几格、转角
+    const g = (this.geo = new THREE.BufferGeometry());
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('acolor', new THREE.BufferAttribute(this.colr, 4).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('misc', new THREE.BufferAttribute(this.misc, 3).setUsage(THREE.DynamicDrawUsage));
+    const tex = new THREE.Texture(img); tex.needsUpdate = true;
+    const out = mode === 'smoke' ? 'gl_FragColor = vec4(vC.rgb, vC.a * l);' : mode === 'fire' ? 'gl_FragColor = vec4(mix(vC.rgb, vec3(1.0, 0.93, 0.72), smoothstep(0.42, 0.95, l)) * l, vC.a);' : 'gl_FragColor = vec4(vC.rgb * l, vC.a);';
+    this.mat = new THREE.ShaderMaterial({
+      uniforms: { uScale: { value: 500 }, map: { value: tex }, uN: { value: N } },
+      vertexShader: 'attribute vec4 acolor; attribute vec3 misc; varying vec4 vC; varying vec3 vM; uniform float uScale; void main(){ vC = acolor; vM = misc; vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = min(420.0, misc.x * uScale / max(0.1,-mv.z)); gl_Position = projectionMatrix * mv; }',
+      fragmentShader: `varying vec4 vC; varying vec3 vM; uniform sampler2D map; uniform float uN;
+        void main(){ vec2 q = gl_PointCoord - 0.5; float sn = sin(vM.z), cs = cos(vM.z); q = vec2(cs * q.x - sn * q.y, sn * q.x + cs * q.y) * 1.42; // 转过之后四角会伸出格子，所以贴图只占中间一块
+          if (abs(q.x) > 0.5 || abs(q.y) > 0.5) discard;
+          float cell = floor(vM.y + 0.5); vec2 uv = (vec2(mod(cell, uN), floor(cell / uN)) + q + 0.5) / uN;
+          float l = texture2D(map, uv).r; ${out} }`,
+      transparent: true, depthWrite: false, blending: mode === 'smoke' ? THREE.NormalBlending : THREE.AdditiveBlending,
+    });
+    this.obj = new THREE.Points(g, this.mat); this.obj.frustumCulled = false; this.obj.renderOrder = mode === 'smoke' ? 19 : 31;
+  }
+  TexCloud.prototype.push = function (x, y, z, c, a, size, cell, rot) {
+    if (this.n >= this.max) return;
+    const i = this.n++;
+    if (curRoom && curRoom.hc) y += hW(x, z);
+    this.pos[i * 3] = x; this.pos[i * 3 + 1] = y; this.pos[i * 3 + 2] = z;
+    this.colr[i * 4] = c[0]; this.colr[i * 4 + 1] = c[1]; this.colr[i * 4 + 2] = c[2]; this.colr[i * 4 + 3] = a;
+    this.misc[i * 3] = size * 1.42; this.misc[i * 3 + 1] = cell || 0; this.misc[i * 3 + 2] = rot || 0;
+  };
+  TexCloud.prototype.end = function () {
+    this.geo.setDrawRange(0, this.n);
+    this.geo.attributes.position.needsUpdate = this.geo.attributes.acolor.needsUpdate = this.geo.attributes.misc.needsUpdate = true;
+    this.mat.uniforms.uScale.value = (H * renderer.getPixelRatio()) / (2 * HALF_TAN);
+  };
+  const NOFX = { n: 0, push() {}, end() {} }; // 没有贴图时（青绿画风）这几样粒子不画
+  let fires = NOFX, smokes = NOFX, sparks = NOFX, FXT = null;
+
   let glows, dusts, orbs, shards, orbRims, shardRims, fySw, bugs, P = {};
   let trailMesh, trPos, trCol, trQ = 0, arrayTex = null, bugSeq = 0, fyN = 0, heroS0 = 1;
   const ZHU = G.PAPER ? '222,52,30' : '255,74,50';       // 朱砂：敌人与危险（绢上用更沉的朱）
@@ -173,6 +212,12 @@
 
     glows = new Cloud(2600, true); dusts = new Cloud(700, false);
     scene.add(glows.obj); scene.add(dusts.obj);
+    if (G.DH && Tx.img.fx_flame && Tx.img.fx_smoke && Tx.img.fx_burst && Tx.img.fx_array) { // 写实画风：法术特效用贴图
+      fires = new TexCloud(700, Tx.img.fx_flame, 2, 'fire'); smokes = new TexCloud(500, Tx.img.fx_smoke, 2, 'smoke'); sparks = new TexCloud(400, Tx.img.fx_burst, 1, 'add');
+      scene.add(fires.obj); scene.add(smokes.obj); scene.add(sparks.obj);
+      const ft = (n) => { const t = new THREE.Texture(Tx.img['fx_' + n]); t.encoding = THREE.sRGBEncoding; t.anisotropy = maxAniso; t.needsUpdate = true; return t; };
+      FXT = { array: ft('array'), bagua: ft('bagua'), warn: ft('warn'), ring: ft('ring'), slash: ft('slash'), bolt: ft('bolt'), crack: ft('crack'), swirl: ft('swirl') };
+    }
 
     const mkInst = (geo, n, o) => {
       const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial(Object.assign({ color: 0xffffff }, o)), n);
@@ -185,7 +230,7 @@
     fySw = mkInst(Mo.bladeGeo(), 240, { side: THREE.DoubleSide }); // 蜂云剑阵的小剑
     bugs = mkInst(Mo.geo.sph(10), 160);                             // 噬金虫
     initTrails();
-    arrayTex = ctex(Tx.array());
+    arrayTex = FXT ? FXT.array : ctex(Tx.array());
 
     // 贴地图形的池
     /* 贴地的图形（预警圈、阵纹、脚下的环、墨渍）要"披"在地形上：台地上高、平地上低，跨过台沿时顺着坡走。
@@ -213,6 +258,23 @@
     P.beam = new Pool(() => new THREE.Mesh(Mo.geo.box(), Mo.inkBlend(new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))));
     P.sw0 = new Pool(() => Mo.sword(0)); P.sw1 = new Pool(() => Mo.sword(1)); P.sw2 = new Pool(() => Mo.sword(2)); P.mini = new Pool(() => Mo.sword('mini'));
     P.arr = new Pool(flat(circG, { map: arrayTex, blending: THREE.AdditiveBlending, ink: 1 }));
+    if (FXT) {
+      const addv = { blending: THREE.AdditiveBlending };
+      P.bagua = new Pool(flat(circG, Object.assign({ map: FXT.bagua }, addv)));   // 颠倒五行阵：八卦阵图
+      P.shock = new Pool(flat(circG, Object.assign({ map: FXT.ring }, addv)));    // 冲击波
+      P.warn = new Pool(flat(circG, Object.assign({ map: FXT.warn }, addv)));     // 敌人招式的预警圈
+      P.swirl = new Pool(flat(circG, Object.assign({ map: FXT.swirl }, addv)));   // 毒瘴的漩涡
+      P.crackG = new Pool(flat(circG, Object.assign({ map: FXT.crack }, addv)));  // 地裂里的余烬
+      P.crackD = new Pool(flat(circG, { alphaMap: FXT.crack, color: 0x070504 })); // 地裂：焦黑的缝
+      // 剑气：一弯月牙，平躺在离地一尺处
+      P.slash = new Pool(() => { const m = new THREE.Mesh(planeG, new THREE.MeshBasicMaterial({ map: FXT.slash, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); m.rotation.x = -PI / 2; m.renderOrder = 29; return m; });
+      // 闪电：一条从 A 拉到 B、正对镜头的带子，顶点每帧重写
+      P.boltq = new Pool(() => {
+        const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3).setUsage(THREE.DynamicDrawUsage));
+        g2.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2)); g2.setIndex([0, 1, 2, 0, 2, 3]);
+        const m = new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ map: FXT.bolt, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); m.frustumCulled = false; m.renderOrder = 30; m.userData.drape = true; return m;
+      });
+    }
     P.wing = new Pool(() => Mo.wings()); P.plate = new Pool(() => Mo.shieldPlate());
     P.gem = new Pool(() => { const m = new THREE.Mesh(Mo.geo.oct(), new THREE.MeshBasicMaterial({ color: 0x8affd8 })); m.scale.set(0.15, 0.24, 0.15); return m; });
     P.potion = new Pool(() => { const g = new THREE.Group(); const a = new THREE.Mesh(Mo.geo.sph(10), new THREE.MeshLambertMaterial({ color: 0xe0484a, emissive: 0x5a1012 })); a.scale.setScalar(0.24); const b = new THREE.Mesh(Mo.geo.cyl(0.5, 0.5, 8), new THREE.MeshLambertMaterial({ color: 0xd9b45a })); b.scale.set(0.09, 0.14, 0.09); b.position.y = 0.16; g.add(a, b); return g; });
@@ -222,7 +284,20 @@
     P.brick = new Pool(() => { const g = new THREE.Group(), a = new THREE.Mesh(Mo.geo.box(), new THREE.MeshBasicMaterial({ color: 0xffe9a8 })), b = new THREE.Mesh(Mo.geo.box(), new THREE.MeshBasicMaterial({ color: 0xffb93c, side: THREE.BackSide })); b.scale.setScalar(1.16); g.add(a, b); return g; });
     P.hill = new Pool(() => { const g = new THREE.Group(), a = new THREE.Mesh(Mo.geo.cone(6), new THREE.MeshPhongMaterial({ color: 0x5c6470, emissive: 0x2c2416, flatShading: true, shininess: 6 })), b = new THREE.Mesh(Mo.geo.cone(6), new THREE.MeshBasicMaterial({ color: 0xd0a858, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false })); b.scale.setScalar(1.14); g.add(a, b); return g; });
     P.bowl = new Pool(() => { const m = new THREE.Mesh(Mo.geo.dome(), new THREE.MeshLambertMaterial({ color: 0xd6a04e, emissive: 0x5a3a10, side: THREE.DoubleSide })); m.rotation.x = PI; return m; });
-    P.rock = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshLambertMaterial({ color: 0x8e7650, emissive: 0x1c140a })));
+    if (G.DH) { // 土牢的石柱：上细下粗、棱角不齐的六棱石，叠一层石纹
+      const pillar = (v) => {
+        const g2 = new THREE.CylinderGeometry(0.34, 1, 1, 6, 3).toNonIndexed(), A = g2.attributes.position, col = new Float32Array(A.count * 3), c0 = new THREE.Color(0x4a4032), c1 = new THREE.Color(0xa8987c), tc = new THREE.Color();
+        for (let i = 0; i < A.count; i++) {
+          const x = A.getX(i), y = A.getY(i) + 0.5, z = A.getZ(i), j = U.hash(Math.round(x * 40) + v * 7, Math.round(y * 9), Math.round(z * 40)) - 0.5, tw = y * 0.5 * (v % 2 ? 1 : -1), cs = Math.cos(tw), sn = Math.sin(tw);
+          A.setXYZ(i, (x * cs - z * sn) * (1 + j * 0.32), y + (y > 0.95 ? j * 0.22 : 0), (x * sn + z * cs) * (1 + j * 0.32));
+          tc.copy(c0).lerp(c1, Math.min(1, y * 1.1)).multiplyScalar(0.88 + (j + 0.5) * 0.24); col[i * 3] = tc.r; col[i * 3 + 1] = tc.g; col[i * 3 + 2] = tc.b;
+        }
+        g2.setAttribute('color', new THREE.BufferAttribute(col, 3)); g2.computeVertexNormals(); return g2;
+      };
+      const pg = [0, 1, 2].map(pillar); let rk = 0;
+      P.rock = new Pool(() => { const m = new THREE.Mesh(pg[rk++ % 3], brushMat(new THREE.MeshLambertMaterial({ vertexColors: true }))); m.castShadow = true; m.userData.rockH = 1; return m; });
+    }
+    else P.rock = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshLambertMaterial({ color: 0x8e7650, emissive: 0x1c140a })));
     P.shield = new Pool(() => new THREE.Mesh(Mo.geo.sph(14), Mo.inkBlend(new THREE.MeshBasicMaterial({ color: 0xbcd8ff, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }))));
 
     window.addEventListener('resize', () => this.resize());
@@ -254,6 +329,7 @@
     else if (fps > 57 && qScale < 1) { if (++qGood >= 4) { qScale = Math.min(1, qScale + 0.1); qGood = 0; qCool = 1; this.resize(); } }
     else qGood = 0;
   };
+  R.debugAdd = (o) => scene.add(o); // 调试用：往场景里加一个物体（特写截图）
   R.info = () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, scale: qScale, quality: R.quality });
 
   /* 屏幕坐标 → 地面上的游戏坐标 */
@@ -1197,6 +1273,7 @@
         flatAt(P.circ, h.x, h.y, h.r, wc, 0.12 + k * 0.14, 0.02, 2);
         flatAt(P.circ, h.x, h.y, Math.max(1, h.r * k), wc, 0.3, 0.025, 3);
         flatAt(P.ring, h.x, h.y, h.r, wc, 0.75 + Math.sin(t * 20) * 0.25, 0.03, 4);
+        if (FXT) { const m = flatAt(P.warn, h.x, h.y, h.r / 0.93, wc, 0.5 + k * 0.5, 0.032, 4); m.rotation.z = t * 0.9 + h.x * 0.01; } // 写实画风：一圈带齿的预警纹，越近落下越亮
         if (h.type === 'lob') {
           const b = P.ball.get(); place(b, U.lerp(h.sx, h.x, k), U.lerp(h.sy, h.y, k), 14 + Math.sin(k * PI) * 130);
           b.scale.setScalar(0.34); b.material.color.copy(c.col).multiplyScalar(0.3);
@@ -1238,10 +1315,11 @@
   }
 
   /* 我方的阵：大庚剑阵、颠倒五行阵、土牢 */
+  const MIASMA_C = [0.3, 0.42, 0.1];
   const WUXING = ['255,240,200', '110,255,170', '110,160,255', '255,120,60', '208,168,88']; // 金 木 水 火 土
   function syncZone(h, c, t) {
     const f = Math.min(1, h.t / 0.35) * Math.min(1, h.life / 0.4), grow = 0.25 + 0.75 * Math.min(1, h.t / 0.35), r = h.r * grow;
-    const arr = (rr, rot, col, op) => { const m = P.arr.get(); m.position.set(h.x * S, 0.045, h.y * S); m.scale.set(rr * S, rr * S, 1); m.rotation.z = rot; m.material.color.copy(col.col); m.material.opacity = op; m.renderOrder = 5; };
+    const arr = (rr, rot, col, op, pool) => { const m = (pool || P.arr).get(); m.position.set(h.x * S, 0.045, h.y * S); m.scale.set(rr * S, rr * S, 1); m.rotation.z = rot; m.material.color.copy(col.col); m.material.opacity = op; m.renderOrder = 5; };
     if (h.kind === 'dageng') { // 七十二口青竹蜂云剑，剑尖朝下，环立成阵
       const gold = rgb('255,235,130');
       arr(r * 1.02, t * 0.7, c, 0.75 * f); arr(r * 0.56, -t * 1.5, gold, 0.6 * f);
@@ -1256,7 +1334,7 @@
       if (h.t < 0.5) { const b = P.beam.get(), k = h.t / 0.5; b.position.set(h.x * S, 4, h.y * S); b.rotation.set(0, t * 3, 0); b.scale.set(0.3 + k, 8, 0.3 + k); b.material.color.copy(c.col); b.material.opacity = 0.3 * (1 - k); }
       glows.push(h.x * S, 0.3, h.y * S, c, 0.12 * f, 9);
     } else if (h.kind === 'wuxing') { // 五色灵光绕阵流转
-      arr(r, t * 0.6, c, 0.6 * f); flatAt(P.ring, h.x, h.y, r, c, 0.6 * f, 0.035, 4); flatAt(P.circ, h.x, h.y, r, c, 0.05 * f, 0.02, 2);
+      arr(r, t * 0.6, c, (FXT ? 0.85 : 0.6) * f, P.bagua); flatAt(P.ring, h.x, h.y, r, c, 0.6 * f, 0.035, 4); flatAt(P.circ, h.x, h.y, r, c, 0.05 * f, 0.02, 2);
       for (let i = 0; i < 5; i++) {
         const a = t * 0.8 + (i / 5) * TAU, ec = rgb(WUXING[i]), x = h.x + Math.cos(a) * r * 0.82, y = h.y + Math.sin(a) * r * 0.82;
         flatAt(P.circ, x, y, 9, ec, 0.5 * f, 0.03, 4);
@@ -1268,13 +1346,16 @@
       for (let i = 0; i < n; i++) {
         const a = i * 2.4 + t * (0.25 + (i % 3) * 0.12), rr = r * (0.2 + ((i * 37) % 80) / 100), x = h.x + Math.cos(a) * rr, y = h.y + Math.sin(a) * rr;
         glows.push(x * S, 0.25 + ((i * 13) % 5) * 0.1 + Math.sin(t * 1.7 + i) * 0.08, y * S, c, 0.11 * f, 1.3 + (i % 4) * 0.4);
+        if (FXT && i < 8) smokes.push(x * S, 0.22 + (i % 3) * 0.14, y * S, MIASMA_C, 0.1 * f, 1.5 + (i % 4) * 0.5, i % 4, t * 0.3 * (i % 2 ? 1 : -1) + i); // 贴地翻滚的毒雾
       }
+      if (FXT) for (let j = 0; j < 2; j++) { const m = flatAt(P.swirl, h.x, h.y, r * (j ? 0.72 : 1.08), c, (j ? 0.17 : 0.13) * f, 0.03 + j * 0.004, 4); m.rotation.z = t * (j ? -0.9 : 0.5) + j * 2; } // 两层反着转的漩涡
     } else if (h.kind === 'tulao') { // 一圈石柱拔地而起
       const k = Math.min(1, h.t / 0.14) * Math.min(1, h.life / 0.25);
       flatAt(P.ring, h.x, h.y, h.r, c, 0.6 * f, 0.035, 4); flatAt(P.circ, h.x, h.y, h.r, c, 0.08 * f, 0.02, 2);
       for (let i = 0; i < 9; i++) {
         const a = (i / 9) * TAU, m = P.rock.get(), hh = 1.0 + (i % 3) * 0.16;
-        m.position.set((h.x + Math.cos(a) * h.r) * S, hh * (k - 0.5), (h.y + Math.sin(a) * h.r) * S); m.rotation.set(0, a + i, 0); m.scale.set(0.42, hh, 0.36);
+        if (m.userData.rockH) { const sy = hh * 1.3; m.position.set((h.x + Math.cos(a) * h.r) * S, sy * (k - 1), (h.y + Math.sin(a) * h.r) * S); m.rotation.set(0, a + i, 0); m.scale.set(0.27, sy, 0.25); if (h.t < 0.3 && i % 3 === 0) dusts.push(m.position.x, 0.1, m.position.z, rgb('150,128,96'), 0.6, 0.5); } // 写实画风：拔地而起的山石
+        else { m.position.set((h.x + Math.cos(a) * h.r) * S, hh * (k - 0.5), (h.y + Math.sin(a) * h.r) * S); m.rotation.set(0, a + i, 0); m.scale.set(0.42, hh, 0.36); }
       }
     }
   }
@@ -1303,6 +1384,7 @@
         const s = (pr.mini ? P.mini : pr.style === 2 ? P.sw2 : pr.style === 1 ? P.sw1 : P.sw0).get(); s.position.set(x, y, z); s.rotation.set(0, ry, 0);
         glows.push(x, y, z, c, pr.style ? 0.5 : 0.32, pr.mini ? 0.7 : 1.0);
         trail(pr, x, y, z, c, pr.mini ? 0.05 : pr.style ? 0.1 : 0.07, pr.style ? 0.95 : 0.55);
+        if (G.DH && !pr.mini) trail(pr, x, y, z, rgb('255,255,255'), pr.style ? 0.03 : 0.022, pr.style ? 0.9 : 0.6); // 写实画风：剑光中间一线白炽的芯
         if (pr.style === 2 && !pr.mini && ((pr.t * 40) | 0) % 2 === 0) glows.push(x + U.rand(-0.2, 0.2), y + U.rand(-0.1, 0.1), z + U.rand(-0.2, 0.2), GOLD, 0.95, 0.32); // 剑身游走的金色电弧
       } else if (pr.kind === 'fy') { // 蜂云剑阵：七十二口竹青小剑
         if (nf < 240) {
@@ -1338,6 +1420,7 @@
         const big = pr.kind === 'fire' && !foe;
         if (no < 900) { putOrb(no, x, y, z, r * 1.5, r * 1.5, r * 1.5, 0, c, foe, foe ? 1.42 : 1.3); no++; }
         glows.push(x, y, z, c, foe ? 0.36 : 0.75, r * (big ? 6.5 : 4.6));
+        if ((pr.kind === 'fire' || pr.kind === 'flame' || pr.kind === 'ghostfire') && fires !== NOFX) for (let i = 0; i < 3; i++) { const bk = i * 0.9; fires.push(x - Math.cos(a) * r * bk, y + (i ? 0.03 * i : 0), z - Math.sin(a) * r * bk, c, foe ? 0.8 - i * 0.2 : 1 - i * 0.25, r * (big ? 4.4 : 3) * (1 - i * 0.18), (((pr.t || 0) * 14 + i) | 0) % 4, (pr.t || 0) * (i % 2 ? 5 : -4) + i * 2); } // 一团翻卷的火
         if (big || pr.kind === 'spirit' || pr.kind === 'flame') trail(pr, x, y, z, c, r * (big ? 1.3 : 0.9), big ? 0.8 : 0.6);
         else if (pr.kind === 'ghostfire' || pr.kind === 'skullp') glows.push(x - Math.cos(a) * r * 2.4, y, z - Math.sin(a) * r * 2.4, c, 0.3, r * 3.4);
       }
@@ -1347,6 +1430,15 @@
   }
   const WHITE = new THREE.Color(0xffffff), GOLD = [1, 0.92, 0.5], WHITE3 = [1, 1, 1], FLAME = [1, 0.62, 0.22];
 
+  const WHITE_C = [1, 1, 1], SMOKE_C = [0.1, 0.09, 0.085], bA = new THREE.Vector3(), bB = new THREE.Vector3(), bS = new THREE.Vector3(), bV = new THREE.Vector3();
+  // 一条正对镜头的带子，从 A 拉到 B（游戏坐标 [x, y, z]）；wk 是宽度占长度的几成
+  function boltQuad(A, B, col, op, wk, flip) {
+    const m = P.boltq.get(), P3 = m.geometry.attributes.position;
+    bA.set(A[0] * S, A[2] * S + hW(A[0] * S, A[1] * S), A[1] * S); bB.set(B[0] * S, B[2] * S + hW(B[0] * S, B[1] * S), B[1] * S);
+    camera.getWorldDirection(bV); bS.subVectors(bB, bA); const len = bS.length(); bS.cross(bV).normalize().multiplyScalar(Math.min(1.3, Math.max(0.22, len * wk)) * flip);
+    P3.setXYZ(0, bA.x - bS.x, bA.y - bS.y, bA.z - bS.z); P3.setXYZ(1, bB.x - bS.x, bB.y - bS.y, bB.z - bS.z); P3.setXYZ(2, bB.x + bS.x, bB.y + bS.y, bB.z + bS.z); P3.setXYZ(3, bA.x + bS.x, bA.y + bS.y, bA.z + bS.z);
+    P3.needsUpdate = true; m.material.color.copy(col); m.material.opacity = op;
+  }
   function syncFx(t) {
     for (const p of G.FX.parts) {
       const k = p.life / p.max;
@@ -1354,9 +1446,39 @@
         const c = rgb(p.c), size = p.size * S * (0.5 + k * 0.7) * (p.add ? 3.2 : 2.2);
         (p.add ? glows : dusts).push(p.x * S, p.z * S + 0.03, p.y * S, c, Math.min(1, k * 1.6) * (p.add ? 0.9 : 0.8), size);
       } else if (p.kind === 'ring') {
-        const r = U.lerp(p.r1, p.r0, k), m = P.fxring.get(), c = rgb(p.c);
-        m.position.set(p.x * S, 0.06, p.y * S); m.scale.set(Math.max(0.02, r * S), Math.max(0.02, r * S), 1);
-        m.material.color.copy(c.col); m.material.opacity = k * 0.9; m.renderOrder = 6;
+        const r = U.lerp(p.r1, p.r0, k), c = rgb(p.c);
+        if (FXT) { const m = P.shock.get(), sc = Math.max(0.02, (r * S) / 0.8); m.position.set(p.x * S, 0.06, p.y * S); m.scale.set(sc, sc, 1); m.rotation.z = p.x * 0.13 + p.y * 0.07; m.material.color.copy(c.col); m.material.opacity = Math.min(1, k * 1.5); m.renderOrder = 6; } // 写实画风：带着散逸光丝的冲击波
+        else { const m = P.fxring.get(); m.position.set(p.x * S, 0.06, p.y * S); m.scale.set(Math.max(0.02, r * S), Math.max(0.02, r * S), 1); m.material.color.copy(c.col); m.material.opacity = k * 0.9; m.renderOrder = 6; }
+      } else if (p.kind === 'boom') { // 爆炸：一闪、一团火、几缕烟
+        const q = 1 - k, c = rgb(p.foe ? ZHU : p.c), R = p.r * S, cx = p.x * S, cz = p.y * S, by = p.z * S, sd = p.seed, hv = (i) => { const n = Math.sin(sd * 12.9898 + i * 78.233) * 43758.5453; return n - Math.floor(n); };
+        if (q < 0.3) sparks.push(cx, by + 0.3, cz, WHITE_C, 1 - q / 0.3, R * (1.6 + q * 5), 0, sd);
+        const nf = p.zap ? 0 : Math.min(9, 4 + Math.round(p.r / 22));
+        if (p.zap && k > 0.35) for (let i = 0; i < 4; i++) { const a = sd + i * 1.57 + hv(i) * 0.8, L = p.r * (0.7 + hv(i + 2) * 0.7); boltQuad([p.x, p.y, 4], [p.x + Math.cos(a) * L, p.y + Math.sin(a) * L, 2 + hv(i + 4) * 14], c.col, (k - 0.35) * 1.5, 0.3, i % 2 ? 1 : -1); }
+        for (let i = 0; i < nf; i++) {
+          const a = sd + i * 2.4, d = R * 0.5 * Math.sqrt(q) * (0.25 + hv(i) * 0.9), sz = R * (0.75 + q * 1.1) * (0.55 + hv(i + 9) * 0.6);
+          fires.push(cx + Math.cos(a) * d, by + 0.18 + q * (0.35 + hv(i + 3) * 0.6), cz + Math.sin(a) * d, c, Math.pow(k, 1.4), sz, i % 4, sd * (i + 1) + q * (hv(i + 5) - 0.5) * 3);
+        }
+        if (p.smoke && q > 0.18) for (let i = 0; i < 4; i++) {
+          const a = sd * 2 + i * 1.7, u = (q - 0.18) / 0.82, d = R * 0.35 * (0.3 + hv(i + 20));
+          smokes.push(cx + Math.cos(a) * d, by + 0.3 + u * (0.7 + hv(i + 23) * 0.6), cz + Math.sin(a) * d, SMOKE_C, 0.42 * Math.sin(Math.min(1, u * 1.15) * PI), R * (0.8 + u * 1.3), i % 4, sd + i + u * 0.8);
+        }
+        glows.push(cx, by + 0.3, cz, c, 0.5 * k * k, R * 5);
+      } else if (p.kind === 'scorch') { // 炸过的地方：焦黑的裂纹，起初缝里还有余烬
+        if (FXT) {
+          const R = p.r, a = Math.min(1, k * 3) * 0.78, m = P.crackD.get(); m.position.set(p.x * S, 0.03, p.y * S); m.scale.set(R * S, R * S, 1); m.rotation.z = p.seed; m.material.opacity = a; m.renderOrder = 2;
+          const e = (k - 0.72) / 0.28; if (e > 0) { const g2 = P.crackG.get(), c = rgb(p.foe ? ZHU : p.c); g2.position.set(p.x * S, 0.035, p.y * S); g2.scale.set(R * S, R * S, 1); g2.rotation.z = p.seed; g2.material.color.copy(c.col); g2.material.opacity = e * 0.9; g2.renderOrder = 3; }
+        }
+      } else if (p.kind === 'spark') { // 命中的星芒
+        const c = rgb(p.c), q = 1 - k;
+        sparks.push(p.x * S, p.z * S + 0.05, p.y * S, c, Math.min(1, k * 2), p.size * S * (1.6 + q * 2.4), 0, p.rot);
+      } else if (p.kind === 'slash' && FXT) { // 剑气：一弯月牙顺着出手的方向扫过去
+        const c = rgb(p.c), q = 1 - k, m = P.slash.get(), sz = p.r * S * 2 * (0.95 + q * 0.25) * (0.85 + Math.min(2.4, p.arc || 1.3) * 0.12), a = p.ang + (q - 0.5) * 0.7;
+        m.position.set((p.x + Math.cos(a) * p.r * 0.34) * S, p.z * S + 0.1, (p.y + Math.sin(a) * p.r * 0.34) * S); m.rotation.set(-PI / 2, 0, -a); m.scale.set(sz, sz, 1);
+        m.material.color.copy(c.col).lerp(WHITE, 0.35); m.material.opacity = Math.min(1, k * 2.2);
+      } else if (p.kind === 'bolt' && FXT) { // 闪电：贴图的电光，每隔一两帧翻一下，像在抖
+        const c = rgb(p.c), A = p.pts[0], B = p.pts[p.pts.length - 1], flip = (((t * 28) | 0) + ((p.x * 7) | 0)) & 1 ? 1 : -1;
+        boltQuad(A, B, c.col, Math.min(1, k * 1.6), 0.17, flip); boltQuad(A, B, WHITE, Math.min(1, k * 1.3) * 0.7, 0.085, -flip);
+        glows.push(p.x * S, p.z * S + 0.15, p.y * S, c, 0.9 * k, 2.4);
       } else if (p.kind === 'array') {
         const r = U.lerp(p.r1, p.r0, k * k), m = P.arr.get(), c = rgb(p.c);
         m.position.set(p.x * S, 0.05, p.y * S); m.scale.set(r * S, r * S, 1); m.rotation.z = p.rot + t * p.spin;
@@ -1544,6 +1666,7 @@
       c.lineJoin = c.lineCap = 'round';
       for (const q of G.FX.parts) {
         const k = q.life / q.max;
+        if (FXT && (q.kind === 'bolt' || q.kind === 'slash')) continue; // 写实画风：闪电与剑气在三维里用贴图画
         if (q.kind === 'bolt') {
           c.globalCompositeOperation = 'lighter';
           const path = (pts) => { c.beginPath(); for (let j = 0; j < pts.length; j++) { const s = proj(pts[j][0], pts[j][1], pts[j][2]); if (j) c.lineTo(s.x, s.y); else c.moveTo(s.x, s.y); } };
@@ -1673,9 +1796,9 @@
     }
   }
 
-  function beginPools() { for (const k in P) P[k].begin(); glows.n = 0; dusts.n = 0; trQ = 0; fyN = 0; }
+  function beginPools() { for (const k in P) P[k].begin(); glows.n = 0; dusts.n = 0; fires.n = 0; smokes.n = 0; sparks.n = 0; trQ = 0; fyN = 0; }
   function endPools() {
-    for (const k in P) P[k].end(); glows.end(); dusts.end();
+    for (const k in P) P[k].end(); glows.end(); dusts.end(); fires.end(); smokes.end(); sparks.end();
     const g = trailMesh.geometry; g.setDrawRange(0, trQ * 6); g.attributes.position.needsUpdate = g.attributes.color.needsUpdate = true;
   }
 
