@@ -10,7 +10,7 @@
     parts: [], texts: [],
     darkA: 0, darkT: 0, darkD: 1, inkReq: null, inkCd: 0,
     clear() { this.parts.length = 0; this.texts.length = 0; this.darkT = 0; this.inkReq = null; },
-    /* 下面三样只在写实画风的"收尾一趟"里看得见（青绿画风下什么也不做）：
+    /* 下面三样只在卡通画风的"收尾一趟"里看得见（青绿画风下什么也不做）：
        shock 冲击波——爆炸那一圈空气把后面的景象折弯一下；
        darken 大招蓄势——天色压暗（只压暗处，发光的不压），a 是几成，dur 是多久；
        ink 落下的一瞬——一帧"墨"，画面只剩黑白两色，由落点放出几道白。不能连着用（隔一秒半） */
@@ -72,7 +72,7 @@
     ribbon(who, c, life = 0.9, r = 34, turns = 1.6, a0 = U.rand(TAU)) {
       this.parts.push({ kind: 'ribbon', who, x: who.x, y: who.y, z: 0, c, r, turns, a0, life, max: life, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
     },
-    // 爆炸：一团火、几缕烟、一圈冲击波，地上留一片焦裂（由写实画风的贴图粒子来画；青绿画风下只有原来那圈环与火星）
+    // 爆炸：一团火、几缕烟、一圈冲击波，地上留一片焦裂（由卡通画风的贴图粒子来画；青绿画风下只有原来那圈环与火星）
     boom(x, y, r, c, o = {}) {
       if (this.parts.length > 860) return;
       if (r >= 70 && !o.zap) this.shock(x, y, r * 1.7, Math.min(1, r / 120));

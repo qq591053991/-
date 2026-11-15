@@ -66,36 +66,37 @@
     },
   ];
 
-  /* 写实贴图画风：环境是低饱和的自然色、偏暗，雾是亮的（远处褪进天光里）；鲜艳的颜色只留给法术与敌人。
-     地面的颜色来自贴图（见下面的 GROUND），这里的 floor / dom 只在贴图没载入时兜底 */
+  /* 卡通画风（默认，?style=dh）：全由 three.js 的几何体与代码画的贴图搭成，不用任何图片。
+     颜色干净、明快：天是蓝的，云是白的，雾带着天的颜色——隔得越远的石峰越淡、越蓝（空气透视），这是纵深的主要来源；
+     环境仍比法术暗一档，鲜艳的朱红只留给敌人 */
   if (G.DH) [
-    { // 0 七玄门 —— 春日傍晚的山门：暖金的斜阳，苔石板，白墙黛瓦
-      void: '#15170f', mist: '255,236,200', dom: '#6a6a58', floor: '#6e6c5c', floor2: '#66655a', line: 'rgba(20,24,16,0.3)', moss: '#5a6e3c', grass: '#647a44',
-      face: '#d6cfbc', faceDark: '#a39c88', base: '#585246', top: '#3c4248', topHi: '#59616a', water: '#3a5852', waterHi: '#c4dccc',
-      bg: 0xbfae86, fog: [0xc0b08a, 20, 62], cloudShadow: [0.2, 15], dark: 0.3, ink: 0x15170f, hemi: [0xfff0d6, 0x4c543a, 0.62], sun: [0xffd9a0, 1.2],
-      sea: [0xf6e6c2, 0.85, 0xcab48a, 0.9], shaft: [0xffe6b4, 0.2], lamp: '255,200,120', lampHex: 0xffc878,
+    { // 0 七玄门 —— 春日晴空下的山门：粉墙黛瓦，青石板，草色新
+      void: '#2a3a44', mist: '240,248,255', dom: '#a0987f', floor: '#a49a82', floor2: '#988e78', line: 'rgba(52,46,34,0.32)', moss: '#7fa052', grass: '#84aa52',
+      face: '#f0e8d6', faceDark: '#cfc5ae', base: '#6e685a', top: '#3e4c5a', topHi: '#5e6e7e', water: '#3f9a98', waterHi: '#dcf6ee',
+      bg: 0xa6c8e2, fog: [0xb4d0e6, 21, 64], cloudShadow: [0.15, 15], dark: 0.2, ink: 0x1c2228, hemi: [0xfff6e6, 0x6e8060, 0.74], sun: [0xffe2b4, 1.02],
+      sea: [0xffffff, 0.92, 0xcfe0ee, 0.92], shaft: [0xfff2cc, 0.16], lamp: '255,204,128', lampHex: 0xffcc80,
     },
-    { // 1 血色禁地 —— 深秋的密林：冷蓝的暮霭，满地枫叶
-      void: '#101216', mist: '176,194,214', dom: '#544e48', floor: '#56504a', floor2: '#4e4944', line: 'rgba(0,0,0,0)', moss: '#4e5238', grass: '#6a5038',
-      face: '#5e564e', faceDark: '#403a34', base: '#2e2a26', top: '#4a3a30', topHi: '#66503e', water: '#283a42', waterHi: '#9cbac2',
-      bg: 0x6c7886, fog: [0x687480, 18, 58], cloudShadow: [0.28, 8], dark: 0.36, ink: 0x12100e, hemi: [0xccd8e8, 0x3e322a, 0.66], sun: [0xffe2c8, 1.0],
-      sea: [0xacb8c8, 0.8, 0x5e6a7a, 0.88], shaft: [0xdce8f8, 0.17], lamp: '255,196,140', lampHex: 0xffc48c,
+    { // 1 血色禁地 —— 深秋的密林：暮色偏冷，满山红叶
+      void: '#1a1e26', mist: '196,210,228', dom: '#6e5c46', floor: '#72604a', floor2: '#685642', line: 'rgba(0,0,0,0)', moss: '#6a6e42', grass: '#8a6a3e',
+      face: '#74685c', faceDark: '#52483e', base: '#3a342e', top: '#5a4436', topHi: '#7a5c46', water: '#2c4a56', waterHi: '#a8cad4',
+      bg: 0x7e8ea4, fog: [0x8494aa, 19, 60], cloudShadow: [0.22, 8], dark: 0.28, ink: 0x14120f, hemi: [0xdce6f4, 0x4a3c30, 0.78], sun: [0xffdcb8, 1.05],
+      sea: [0xdfe6f0, 0.86, 0x8e9cb0, 0.9], shaft: [0xe6eefa, 0.15], lamp: '255,196,140', lampHex: 0xffc48c,
     },
-    { // 2 燕翎堡 —— 围城：烟尘里的黄昏，焦土与残垣
-      void: '#12100e', mist: '206,178,156', dom: '#5a5650', floor: '#5c5852', floor2: '#54504a', line: 'rgba(10,8,6,0.34)', moss: '#4a463e', grass: '#50483c',
-      face: '#6c6862', faceDark: '#4a4640', base: '#2c2a28', top: '#302e2e', topHi: '#4a4846', water: '#1c1e22', waterHi: '#8a8e94',
-      bg: 0x74665c, fog: [0x706258, 18, 56], cloudShadow: [0.3, 12], dark: 0.38, ink: 0x100e0c, hemi: [0xdccec0, 0x3a322c, 0.66], sun: [0xffc48c, 1.0],
-      sea: [0xb09c8a, 0.8, 0x60544a, 0.88], shaft: null, lamp: '255,190,120', lampHex: 0xffbe78,
+    { // 2 燕翎堡 —— 围城：烽烟里的黄昏，天是橘红的
+      void: '#1c1612', mist: '236,200,170', dom: '#7a7268', floor: '#7e766c', floor2: '#746c62', line: 'rgba(16,12,8,0.36)', moss: '#5e584e', grass: '#6a5e4a',
+      face: '#8a8278', faceDark: '#625a52', base: '#38342f', top: '#3c3836', topHi: '#58524e', water: '#24282e', waterHi: '#9a9ea6',
+      bg: 0xc08e64, fog: [0xb48660, 19, 58], cloudShadow: [0.24, 12], dark: 0.3, ink: 0x120f0c, hemi: [0xf6dcc0, 0x4c4038, 0.76], sun: [0xffb878, 1.08],
+      sea: [0xe8c8a8, 0.84, 0xa07a5c, 0.9], shaft: null, lamp: '255,190,120', lampHex: 0xffbe78,
     },
-    { // 3 虚天殿 —— 雪中古殿：冷蓝的天光，霜石与积雪
-      void: '#0c1218', mist: '204,226,250', dom: '#7c8a96', floor: '#7e8c98', floor2: '#768490', line: 'rgba(30,50,70,0.34)', moss: '#b8c8d4', grass: '#c4d2dc',
-      face: '#405670', faceDark: '#2c3c54', base: '#1e2a3a', top: '#5c7084', topHi: '#8094a8', water: '#284860', waterHi: '#a8d0e8',
-      bg: 0x90a8c0, fog: [0x8ea6be, 20, 62], cloudShadow: [0.16, 16], dark: 0.28, ink: 0x0e1826, hemi: [0xdceaff, 0x4a5a6a, 0.6], sun: [0xf2f6ff, 0.9],
-      sea: [0xdee8f4, 0.88, 0x90a8c0, 0.9], shaft: [0xe2f0ff, 0.14], lamp: '255,206,150', lampHex: 0xffce96,
+    { // 3 虚天殿 —— 雪中古殿：天光清冷，玉砖与积雪
+      void: '#16222e', mist: '220,236,255', dom: '#a8bccc', floor: '#aabece', floor2: '#9eb2c2', line: 'rgba(40,64,88,0.36)', moss: '#d4e2ec', grass: '#dce8f0',
+      face: '#4a6482', faceDark: '#344a64', base: '#243448', top: '#6a8098', topHi: '#92a8be', water: '#2e5672', waterHi: '#b4dcf2',
+      bg: 0x9cb8d4, fog: [0xa2bcd6, 21, 64], cloudShadow: [0.14, 16], dark: 0.2, ink: 0x101c2a, hemi: [0xe6f0ff, 0x56687a, 0.72], sun: [0xf4f8ff, 0.95],
+      sea: [0xffffff, 0.92, 0xb4cade, 0.92], shaft: [0xe6f2ff, 0.13], lamp: '255,206,150', lampHex: 0xffce96,
     },
   ].forEach((o, i) => Object.assign(G.Themes[i], o));
 
-  /* ---- 生成的贴图（assets/textures.js 里以 base64 内嵌，file:// 下也能用）---- */
+  /* ---- 法术特效的贴图（assets/textures.js，黑底白图的阵图、冲击波、剑气、火、烟……）。场景与模型不用图片 ---- */
   Tx.img = {};
   Tx.whenReady = function (cb) {
     const data = window.G_TEX_DATA, keys = G.DH && data ? Object.keys(data) : [];
@@ -105,19 +106,6 @@
     for (const k of keys) { const im = new Image(); im.onload = () => { Tx.img[k] = im; if (--left <= 0) fin(); }; im.onerror = () => { if (--left <= 0) fin(); }; im.src = data[k]; }
     setTimeout(fin, 8000); // 载不全也照常开始：缺的贴图退回程序画的地面
   };
-  // 各章的地面：court 院落（石板）/ wild 山野（草、落叶、焦土、雪）；per 是一张贴图铺几格
-  const GROUND = [{ court: 'g0a', wild: 'g0b', per: 6 }, { court: 'g1b', wild: 'g1a', per: 6 }, { court: 'g2a', wild: 'g2b', per: 6 }, { court: 'g3a', wild: 'g3b', per: 5 }];
-  function pat(c, name, per) {
-    const im = Tx.img[name]; if (!im) return null;
-    const q = c.createPattern(im, 'repeat'), k = (per * 48) / im.width;
-    q.setTransform(new DOMMatrix([k, 0, 0, k, 0, 0])); return q;
-  }
-  // 给程序画的墙面叠一层贴图的质感：mode = overlay（细节贴图是 0.5 灰，叠上去不改变原来的深浅）/ multiply
-  function texOver(c, name, w, h, per, mode, alpha = 1) {
-    const q = pat(c, name, per); if (!q) return;
-    c.save(); c.globalCompositeOperation = mode; c.globalAlpha = alpha; c.fillStyle = q; c.fillRect(0, 0, w, h); c.restore();
-  }
-  Tx.GROUND = GROUND;
   const SHD = (a) => (G.DH ? `rgba(0,0,0,${Math.min(1, a * 1.9)})` : `rgba(80,60,38,${a})`); // 影子：绢本是淡赭，写实是黑
 
   /* 会发光的场景物件：z 高度(像素) / r 光照半径(像素) / c 颜色 */
@@ -132,7 +120,34 @@
 
   function drawFloorTile(c, th, ti, x, y, px, py, wild) {
     const hh = (i) => U.hash(x, y, i), TH = T;
-    if (ti === 0 && wild) { // 山谷：草地，深浅不一，零星野花
+    if (G.DH && wild) { // 山野的地面：一格一格画出来——底色、几团深浅、草茎 / 落叶 / 裂纹 / 雪痕、零星的花
+      const W4 = WILD[ti], r = (i) => hh(100 + i);
+      c.fillStyle = r(1) < 0.5 ? W4.a : W4.b; c.fillRect(px, py, T + 0.5, TH + 0.5);
+      for (let i = 0; i < 5; i++) { c.fillStyle = i % 2 ? W4.lo : W4.hi; c.globalAlpha = 0.42; ell(c, px + r(i * 3 + 2) * T, py + r(i * 3 + 3) * TH, 8 + r(i * 3 + 4) * 16, 5 + r(i + 30) * 10, r(i + 40) * 3); }
+      c.globalAlpha = 1; c.lineCap = 'round';
+      if (ti === 0) { // 草茎：一撮一撮，朝上略歪
+        for (let i = 0; i < 9; i++) { const gx = px + r(50 + i) * T, gy = py + r(60 + i) * TH, l = 4 + r(70 + i) * 5; c.strokeStyle = i % 3 ? W4.d1 : W4.d2; c.globalAlpha = 0.75; c.lineWidth = 1.2; for (let k = -1; k <= 1; k++) { c.beginPath(); c.moveTo(gx + k * 1.6, gy); c.lineTo(gx + k * 3.2 + (r(80 + i) - 0.5) * 2, gy - l + Math.abs(k) * 1.5); c.stroke(); } }
+        c.globalAlpha = 1;
+        if (r(90) < 0.22) { const fc = ['#fff4e0', '#f6b8cc', '#ffe07a'][Math.floor(r(91) * 3)]; for (let i = 0; i < 4; i++) { const fx = px + 6 + r(92 + i) * 36, fy = py + 6 + r(96 + i) * 36; c.fillStyle = fc; for (let k = 0; k < 5; k++) circ(c, fx + Math.cos(k * 1.257) * 2, fy + Math.sin(k * 1.257) * 2, 1.3); c.fillStyle = '#e8b030'; circ(c, fx, fy, 1); } } // 野花：五瓣
+      } else if (ti === 1) { // 满地枫叶：红、橙、黄，三尖的小叶
+        for (let i = 0; i < 7; i++) { const lx = px + r(50 + i) * T, ly = py + r(60 + i) * TH, a = r(70 + i) * TAU, z = 2.6 + r(80 + i) * 2.4; c.save(); c.translate(lx, ly); c.rotate(a); c.fillStyle = W4.lf[i % 3]; c.globalAlpha = 0.9;
+          c.beginPath(); c.moveTo(0, -z * 1.5); c.lineTo(z * 0.5, -z * 0.4); c.lineTo(z * 1.4, -z * 0.5); c.lineTo(z * 0.6, z * 0.3); c.lineTo(0, z * 1.2); c.lineTo(-z * 0.6, z * 0.3); c.lineTo(-z * 1.4, -z * 0.5); c.lineTo(-z * 0.5, -z * 0.4); c.closePath(); c.fill(); c.restore(); }
+        c.globalAlpha = 1;
+        if (r(90) < 0.2) { c.strokeStyle = W4.d1; c.lineWidth = 3.5; c.globalAlpha = 0.6; c.beginPath(); c.moveTo(px + r(91) * T, py + r(92) * TH); c.quadraticCurveTo(px + T / 2, py + TH / 2 + (r(93) - 0.5) * 30, px + r(94) * T, py + r(95) * TH); c.stroke(); c.globalAlpha = 1; } // 露出地面的树根
+      } else if (ti === 2) { // 焦土：裂纹、灰、零星余烬
+        c.strokeStyle = W4.d1; c.lineWidth = 1.3; c.globalAlpha = 0.7;
+        if (r(50) < 0.5) { c.beginPath(); c.moveTo(px + r(51) * T, py + r(52) * TH); c.lineTo(px + r(53) * T, py + r(54) * TH); c.lineTo(px + r(55) * T, py + r(56) * TH); c.stroke(); }
+        c.globalAlpha = 1;
+        for (let i = 0; i < 3; i++) { c.fillStyle = W4.d2; c.globalAlpha = 0.55; ell(c, px + r(60 + i) * T, py + r(64 + i) * TH, 2.5 + r(68 + i) * 3, 1.6, r(72 + i) * 3); }
+        c.globalAlpha = 1;
+        if (r(90) < 0.12) { c.fillStyle = '#e07a2a'; circ(c, px + r(91) * T, py + r(92) * TH, 1.6); c.fillStyle = 'rgba(224,122,42,0.25)'; circ(c, px + r(91) * T, py + r(92) * TH, 5); }
+      } else { // 雪：风吹出的雪棱、露出来的冰
+        c.strokeStyle = W4.d1; c.lineWidth = 2.2; c.globalAlpha = 0.55;
+        for (let i = 0; i < 2; i++) { const sx = px + r(50 + i) * T, sy = py + r(54 + i) * TH; c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(sx + 12, sy - 4 + r(58 + i) * 8, sx + 22 + r(62 + i) * 10, sy + (r(66 + i) - 0.5) * 6); c.stroke(); }
+        c.globalAlpha = 1;
+        if (r(90) < 0.1) { c.fillStyle = W4.d2; c.globalAlpha = 0.6; ell(c, px + 24, py + 24, 15 + r(91) * 8, 9 + r(92) * 5, r(93) * 3); c.globalAlpha = 1; c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1; c.beginPath(); c.moveTo(px + 14, py + 20); c.lineTo(px + 30, py + 27); c.stroke(); }
+      }
+    } else if (ti === 0 && wild) { // 山谷：草地，深浅不一，零星野花
       c.fillStyle = hh(1) < 0.5 ? '#cfc79f' : '#d3cba4'; c.fillRect(px, py, T + 0.5, TH + 0.5); // 绢上淡淡的汁绿
       for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#bdbf92' : '#ddd3b0'; c.globalAlpha = 0.45; ell(c, px + hh(i * 3 + 2) * T, py + hh(i * 3 + 3) * TH, 9 + hh(i * 3 + 4) * 15, 6 + hh(i + 30) * 9); }
       c.globalAlpha = 0.45; c.strokeStyle = '#7c8c5c'; c.lineWidth = 1; c.lineCap = 'round';
@@ -216,6 +231,13 @@
 
   /* 青铜地台：嵌在地面里的大圆盘 —— 外圈云雷纹，内圈如意云头，中心一章一字（虚天殿是北斗星图）。
      凡俗的地面上，只有这一块是"上古留下的东西"：战斗、机缘、首领都发生在它上面。 */
+  // 卡通画风里山野的地面用色：a / b 底色，hi / lo 深浅两团，d1 / d2 细处（草茎、裂纹、雪棱），lf 落叶
+  const WILD = [
+    { a: '#6e9648', b: '#769e4e', hi: '#8cb45e', lo: '#5a8240', d1: '#4e7636', d2: '#a2c670' },
+    { a: '#6e5c46', b: '#76634c', hi: '#86724e', lo: '#5a5238', d1: '#4a3c2c', d2: '#5e6a3e', lf: ['#c8562a', '#dc9a3a', '#a43a26'] },
+    { a: '#5a524c', b: '#625a52', hi: '#746c62', lo: '#48423c', d1: '#2c2824', d2: '#8a847a' },
+    { a: '#dde6ee', b: '#d5dfe9', hi: '#f2f6fa', lo: '#bfcedd', d1: '#b4c6d8', d2: '#a8d0ea' },
+  ];
   const MED = [
     // 地台是刻在地上的浅纹：和地面同一个色系，纹线是淡墨。金色不给它——金只留给"该去的地方"和"能拿的东西"
     { base: '#cfc09a', hi: '#dccfad', line: '#7a6444', glyph: '玄' },
@@ -223,14 +245,8 @@
     { base: '#c2b9a2', hi: '#d0c8b2', line: '#5c564c', glyph: '燕' },
     { base: '#d4d4c8', hi: '#e2e2d8', line: '#4c6a76', glyph: '' },
   ];
+  if (G.DH) [{ base: '#6f8a6a', hi: '#a8a06a', line: '#2c4034' }, { base: '#7a7468', hi: '#948c7c', line: '#3a3630' }, { base: '#5c5650', hi: '#7a726a', line: '#221e1a' }, { base: '#b4c8d8', hi: '#dce8f2', line: '#5c7a94' }].forEach((o, i) => Object.assign(MED[i], o)); // 青铜 / 苔石 / 铁 / 玉
   function medallion(c, cx, cy, R, ti, worn, seed, boss) {
-    const disc = G.DH && (Tx.img['disc' + ti] || Tx.img.disc);
-    if (disc) { // 嵌在地里的圆台，各章不同：青铜蟠龙盘 / 生苔的石坛 / 铁火战坛 / 玉质星盘
-      const g = c.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 1.16);
-      g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(cx - R * 1.2, cy - R * 1.2, R * 2.4, R * 2.4);
-      c.save(); c.translate(cx, cy); c.rotate(U.hash(seed, 5, 2) * TAU); c.globalAlpha = worn ? 0.88 : 1; c.drawImage(disc, -R, -R, R * 2, R * 2); c.restore();
-      return;
-    }
     const M = MED[ti], th = G.Themes[ti], hh = (i) => U.hash(seed, i, 11);
     c.save(); c.translate(cx, cy);
     c.fillStyle = 'rgba(0,0,0,0.16)'; circ(c, 0, 0, R * 1.03); // 陷进地面的一圈浅影
@@ -322,6 +338,7 @@
   }
   // 各类房间的地台大小（格）；寻常险地只有三成有，而且残破
   const MED_R = { boss: 5.2, elite: 3.2, start: 2.8, treasure: 2.5, shop: 2.5, garden: 2.5, event: 2.5 };
+  const LITTER_DH = [['#f6c8d6', '#fff0e4', '#e8a8bc'], ['#c8562a', '#dc9a3a', '#a43a26'], ['#8a847a', '#6a645c', '#3a3632'], ['#ffffff', '#eaf2f8', '#cfe2f0']]; // 落英 / 枫叶 / 灰烬 / 霜花
   const LITTER = [['#b4b88e', '#c8c0a0', '#e6dcc8'], ['#b88a5a', '#a87048', '#c8a070'], ['#8c8678', '#a49c8a', '#6c665c'], ['#f2f2ea', '#e4e8e4', '#ffffff']]; // 落叶、碎屑：只比地面深一点或浅一点
 
   Tx.floor = function (room) {
@@ -331,34 +348,17 @@
     const cv = document.createElement('canvas'); cv.width = Math.round(w * T * FS); cv.height = Math.round(h * T * FS);
     const c = cv.getContext('2d'); c.scale(FS, FS);
     const open = room.terrain && room.terrain !== 'court'; // 山野 / 洞窟：没有墙，地面一直铺到林子、岩壁底下
-    const GR = G.DH && Tx.img[GROUND[ti].court] && Tx.img[GROUND[ti].wild] ? GROUND[ti] : null, cave = room.terrain === 'cave';
-    let mk = null, mc = null; // 第二种地面（院里的草苔 / 山野里的石径）先画成一张蒙版，再填进贴图
-    if (GR) {
-      const wild = open && !cave;
-      c.fillStyle = pat(c, wild ? GR.wild : GR.court, GR.per); c.fillRect(0, 0, w * T, h * T);
-      mk = document.createElement('canvas'); mk.width = cv.width; mk.height = cv.height; mc = mk.getContext('2d'); mc.scale(FS, FS);
-      if (!wild) { // 院落 / 洞窟：墙根与角落爬着草苔、落叶，场中零星几片
-        const blob = (bx, by, r, a) => { const g = mc.createRadialGradient(bx, by, r * 0.25, bx, by, r); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)'); mc.fillStyle = g; mc.fillRect(bx - r, by - r, r * 2, r * 2); };
-        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-          const t = at(x, y); if (t === 1 || t === 3) continue;
-          const edge = at(x - 1, y) === 1 || at(x + 1, y) === 1 || at(x, y - 1) === 1 || at(x, y + 1) === 1, hh = (i) => U.hash(x, y, 300 + i);
-          if (edge && hh(1) < 0.75) blob((x + 0.2 + hh(2) * 0.6) * T, (y + 0.2 + hh(3) * 0.6) * T, T * (0.7 + hh(4) * 0.7), 0.95);
-          else if (hh(5) < (cave ? 0.2 : 0.09)) blob((x + hh(6)) * T, (y + hh(7)) * T, T * (0.8 + hh(8) * 1.3), 0.9);
-        }
-      }
-    } else {
+    const cave = room.terrain === 'cave';
     c.fillStyle = shade(th.floor, -0.14); // 石缝里是更深一点的赭 c.fillRect(0, 0, w * T, h * T); // 第一章的石缝里是苔
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const t = at(x, y); if (t === 1 && !open) continue;
-      drawFloorTile(c, th, ti, x, y, x * T, y * T, open);
-    }
+      drawFloorTile(c, th, ti, x, y, x * T, y * T, open && !cave);
     }
     if (open) {
       // 土路：从每个出口踩向空地中央的一条小径 —— 地图之间靠路连着，而不是靠门
       const trail = ti === 0 ? '160,132,92' : ti === 1 ? '150,108,70' : ti === 2 ? '124,112,96' : '176,186,186', mx = (w / 2) * T, my = (h / 2) * T; // 草地上的黄土路 / 林间的黑土路 / 焦土上的灰路 / 雪地里踩实的路
       c.lineCap = 'round';
-      const cx2 = GR && !cave ? mc : c; cx2.lineCap = 'round'; // 写实画风：山野里的小径是一条石板路，画进蒙版
-      const stroke = (ax, ay, bx, by, ex, ey) => { for (const [lw, a] of (GR && !cave ? [[T * 2.1, 0.35], [T * 1.7, 0.6], [T * 1.35, 1]] : GR ? [] : [[T * 2.3, 0.2], [T * 1.6, 0.3], [T * 0.9, 0.3]])) { cx2.strokeStyle = `rgba(${GR ? '0,0,0' : trail},${a})`; cx2.lineWidth = lw; cx2.beginPath(); cx2.moveTo(ax, ay); cx2.quadraticCurveTo(bx, by, ex, ey); cx2.stroke(); } };
+      const stroke = (ax, ay, bx, by, ex, ey) => { for (const [lw, a] of [[T * 2.3, 0.2], [T * 1.6, 0.3], [T * 0.9, 0.3]]) { c.strokeStyle = `rgba(${trail},${a})`; c.lineWidth = lw; c.beginPath(); c.moveTo(ax, ay); c.quadraticCurveTo(bx, by, ex, ey); c.stroke(); } };
       if (room.paths) { // 大图：小径就是连接各片空地的那几条路
         for (const q of room.paths) stroke(q[0] * T, q[1] * T, q[2] * T, q[3] * T, q[4] * T, q[5] * T);
         for (const d in room.doors || {}) { const [dx0, dy0] = room.doors[d].cells[1], o = G.World.DIRS[G.World.OPP[d]]; stroke((dx0 + 0.5) * T, (dy0 + 0.5) * T, (dx0 + 0.5 + o[0]) * T, (dy0 + 0.5 + o[1]) * T, (dx0 + 0.5 + o[0] * 2) * T, (dy0 + 0.5 + o[1] * 2) * T); }
@@ -373,18 +373,9 @@
         g.addColorStop(0, SHD(0.2)); g.addColorStop(1, SHD(0)); c.fillStyle = g; c.fillRect(sx - T * 1.1, sy - T * 1.1, T * 2.2, T * 2.2);
       }
     }
-    if (mk) { // 把蒙版填成第二种地面，盖到底图上
-      mc.globalCompositeOperation = 'source-in'; mc.fillStyle = pat(mc, open && !cave ? GR.court : GR.wild, GR.per); mc.fillRect(0, 0, w * T, h * T);
-      c.drawImage(mk, 0, 0, w * T, h * T);
-      if (open) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { // 林下 / 岩壁下的暗要压在石径上面：再补一遍
-        if (at(x, y) !== 1) continue;
-        const sx = (x + 0.5) * T, sy = (y + 0.5) * T, g = c.createRadialGradient(sx, sy, T * 0.2, sx, sy, T * 1.05);
-        g.addColorStop(0, SHD(0.12)); g.addColorStop(1, SHD(0)); c.fillStyle = g; c.fillRect(sx - T * 1.1, sy - T * 1.1, T * 2.2, T * 2.2);
-      }
-    }
     // 主色罩染（631 的"六"）：石缝、苔痕、土色的深浅都还在，但罩上一层主色之后只剩同色系里淡淡的起伏，
     // 整片地面读成"一种颜色"，上面站着什么一眼就看得见
-    c.globalAlpha = GR ? 0 : 0.5; c.fillStyle = th.dom;
+    c.globalAlpha = G.DH ? 0.08 : 0.5; c.fillStyle = th.dom; // 卡通画风只薄薄罩一层
     if (open) c.fillRect(0, 0, w * T, h * T);
     else for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const t = at(x, y); if (t !== 1 && t !== 3) c.fillRect(x * T, y * T, T + 0.5, T + 0.5); }
     c.globalAlpha = 1;
@@ -393,7 +384,7 @@
     let mr = MED_R[room.type] || (U.hash(seed, 3, 9) < 0.34 ? 2.6 : 0);
     if (mr) { mr = Math.min(mr, Math.min(w, h) / 2 - 1.6); medallion(c, (w / 2) * T, (h / 2) * T, mr * T, ti, !MED_R[room.type], seed, room.type === 'boss'); }
     // 散落物：成簇的落英 / 枯叶 / 余烬 / 霜花，让地面不那么"干净"
-    const nL = GR ? 0 : Math.round(w * h * (ti === 2 ? 0.2 : 0.34)), LC = LITTER[ti]; // 贴图里自带落叶碎屑
+    const nL = Math.round(w * h * (ti === 2 ? 0.2 : 0.34)), LC = (G.DH ? LITTER_DH : LITTER)[ti];
     for (let i = 0; i < nL; i++) {
       const k = (i / 7) | 0, lx = U.hash(k, 3, seed) * w * T + (U.hash(i, 7, seed) - 0.5) * 76, ly = U.hash(k, 5, seed) * h * T + (U.hash(i, 9, seed) - 0.5) * 54;
       const t = at(Math.floor(lx / T), Math.floor(ly / T)); if (t !== 0 && t !== 2) continue;
@@ -408,9 +399,7 @@
       c.save(); c.beginPath();
       c.roundRect(px, py, T, T, [!w3(x - 1, y) && !w3(x, y - 1) ? RR : 0, !w3(x + 1, y) && !w3(x, y - 1) ? RR : 0, !w3(x + 1, y) && !w3(x, y + 1) ? RR : 0, !w3(x - 1, y) && !w3(x, y + 1) ? RR : 0]);
       c.clip();
-      const wp = G.DH && pat(c, 'water', 4);
-      if (wp) { c.fillStyle = wp; c.fillRect(px, py, T, T); c.globalAlpha = 0.38; c.fillStyle = th.water; c.fillRect(px, py, T, T); c.globalAlpha = 1; } // 贴图的水，再罩一层各章的水色
-      else { c.fillStyle = th.water; c.fillRect(px, py, T, T); }
+      c.fillStyle = th.water; c.fillRect(px, py, T, T);
       const g = c.createLinearGradient(0, py, 0, py + T);
       g.addColorStop(0, 'rgba(40,60,66,0.28)'); g.addColorStop(0.45, 'rgba(40,60,66,0)');
       if (!w3(x, y - 1)) { c.fillStyle = g; c.fillRect(px, py, T, T); c.fillStyle = shade(th.base, -0.2); c.fillRect(px, py, T, 6); }
@@ -420,8 +409,8 @@
       if (!w3(x, y + 1)) { c.fillStyle = 'rgba(255,255,255,0.14)'; c.fillRect(px, py + T - 2, T, 2); }
       // 波纹
       c.strokeStyle = th.waterHi; c.lineCap = 'round'; c.lineWidth = ti === 3 ? 3 : 1.6;
-      for (let i = 0; i < (wp ? 1 : 3); i++) {
-        c.globalAlpha = (0.18 + U.hash(x, y, 60 + i) * 0.3) * (wp ? 0.5 : 1);
+      for (let i = 0; i < 3; i++) {
+        c.globalAlpha = 0.18 + U.hash(x, y, 60 + i) * 0.3;
         const lx = px + 5 + U.hash(x, y, 63 + i) * 24, ly = py + 8 + i * 14 + U.hash(x, y, 66 + i) * 5;
         c.beginPath(); c.moveTo(lx, ly); c.lineTo(lx + 9 + U.hash(x, y, 69 + i) * 12, ly); c.stroke();
       }
@@ -451,7 +440,7 @@
       const px = x * T, py = y * T;
       if (t === 4) { c.fillStyle = 'rgba(255,235,190,0.10)'; c.fillRect(px, py, T, T); }
       if (open) continue; // 山野没有墙根
-      if (!GR && ti < 2 && at(x, y - 1) === 1 && U.hash(x, y, 91) < 0.55) { c.fillStyle = th.moss; c.globalAlpha = 0.5; ell(c, px + U.hash(x, y, 92) * T, py + 5, 14 + U.hash(x, y, 93) * 12, 6 + U.hash(x, y, 94) * 5); c.globalAlpha = 1; } // 墙根的苔
+      if (ti < 2 && at(x, y - 1) === 1 && U.hash(x, y, 91) < 0.55) { c.fillStyle = th.moss; c.globalAlpha = 0.5; ell(c, px + U.hash(x, y, 92) * T, py + 5, 14 + U.hash(x, y, 93) * 12, 6 + U.hash(x, y, 94) * 5); c.globalAlpha = 1; } // 墙根的苔
       if (at(x, y - 1) === 1) { const g = c.createLinearGradient(0, py, 0, py + 22); g.addColorStop(0, SHD(0.22)); g.addColorStop(1, SHD(0)); c.fillStyle = g; c.fillRect(px, py, T, 22); }
       if (at(x - 1, y) === 1) { const g = c.createLinearGradient(px, 0, px + 14, 0); g.addColorStop(0, SHD(0.15)); g.addColorStop(1, SHD(0)); c.fillStyle = g; c.fillRect(px, py, 14, T); }
       if (at(x + 1, y) === 1) { const g = c.createLinearGradient(px + T, 0, px + T - 14, 0); g.addColorStop(0, SHD(0.15)); g.addColorStop(1, SHD(0)); c.fillStyle = g; c.fillRect(px + T - 14, py, 14, T); }
@@ -548,7 +537,6 @@
         if (x % 2) { c.strokeStyle = 'rgba(120,200,255,0.3)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(px + 24, 12); c.lineTo(px + 24, hgt - 14); c.stroke(); } // 玉的纹理；鎏金的框是立体构件
       }
     }
-    if (G.DH) { c.setTransform(1, 0, 0, 1, 0, 0); if (ti === 0) texOver(c, 'wall', cv.width, cv.height, 2.6, 'multiply'); else if (ti === 2) texOver(c, 'brick', cv.width, cv.height, 2.4, 'overlay', 0.9); else texOver(c, 'rock', cv.width, cv.height, 2.6, 'overlay'); }
     return cv;
   };
 
@@ -570,7 +558,6 @@
       c.fillStyle = th.topHi; c.fillRect(3, 3, 42, 42);
       c.strokeStyle = 'rgba(217,180,90,0.8)'; c.lineWidth = 1.4; c.strokeRect(6, 6, 36, 36);
     }
-    if (G.DH) { c.setTransform(1, 0, 0, 1, 0, 0); texOver(c, 'rock', 64, 64, 64 / 48, 'overlay', 0.8); }
     return cv;
   };
 
@@ -585,7 +572,6 @@
     if (ti === 2) { c.strokeStyle = 'rgba(10,8,14,0.45)'; c.lineWidth = 1.5; for (let r = 0; r < 4; r++) { c.beginPath(); c.moveTo(0, r * 16); c.lineTo(64, r * 16); c.moveTo(r % 2 ? 32 : 0.5, r * 16); c.lineTo(r % 2 ? 32 : 0.5, r * 16 + 16); c.stroke(); } }
     if (ti === 3) { c.fillStyle = '#8f9690'; c.fillRect(0, 6, 64, 2); }
     if (ti === 1) { c.strokeStyle = 'rgba(20,10,10,0.4)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 20); c.quadraticCurveTo(32, 28, 64, 20); c.moveTo(0, 40); c.quadraticCurveTo(32, 34, 64, 40); c.stroke(); }
-    if (G.DH) { if (ti === 0) texOver(c, 'wall', 64, 64, 64 / 48, 'multiply'); else if (ti === 2) texOver(c, 'brick', 64, 64, 64 / 48, 'overlay', 0.9); else texOver(c, 'rock', 64, 64, 64 / 48, 'overlay'); }
     return cv;
   };
 

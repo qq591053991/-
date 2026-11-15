@@ -22,12 +22,12 @@
     { rock: '#c8d6d8', dark: '#5a8494', cap: '#f6f6f0', cap2: '#ffffff', capK: 0.82, trunk: '#3c4a50', leaf: '#dce6e4', leafD: '#6a8a94', bloom: '#eef2f0', bloomD: '#a8bcc0' }, // 虚天殿：石青与雪
   ]);
 
-  // 写实画风：自然色。岩石是暖灰，朝天的面长苔（雪）；树叶的颜色各章不同，细节由贴图给
+  // 卡通画风：削面的山石，自下而上由暗到亮，朝天的面是草（苔 / 灰 / 雪）；树冠的颜色各章不同，干净、明快
   if (G.DH) [
-    { rock: '#8f8d84', dark: '#46423a', cap: '#586c3a', cap2: '#6c8046', capK: 0.62, trunk: '#3c2c20', leaf: '#56783e', leafD: '#22381f', bloom: '#eab6c2', bloomD: '#a4687a' }, // 七玄门：苔石、青松、桃花
-    { rock: '#75706a', dark: '#38322c', cap: '#5c5c3a', cap2: '#6c6440', capK: 0.42, trunk: '#2c201a', leaf: '#b0603a', leafD: '#5a2a1c', bloom: '#c8924a', bloomD: '#7c5428' },  // 血色禁地：湿石、枫（锈红，不及敌人的朱红艳）
-    { rock: '#726e68', dark: '#34302c', cap: '#4e4c46', cap2: '#5c5952', capK: 0.36, trunk: '#221e1a', leaf: '#4e483a', leafD: '#26221c', bloom: '#5e5648', bloomD: '#322e26' },  // 燕翎堡：烟熏的石，焦枯的树
-    { rock: '#8493a0', dark: '#3a4650', cap: '#eef3f6', cap2: '#ffffff', capK: 0.86, trunk: '#34383c', leaf: '#d6e2e8', leafD: '#36544e', bloom: '#e4ecf0', bloomD: '#8ea6b0' }, // 虚天殿：寒石、雪松
+    { rock: '#a6a294', dark: '#5a5448', cap: '#6f9a44', cap2: '#88b254', capK: 0.66, trunk: '#5a3c28', leaf: '#5e9a46', leafD: '#2e5a2c', bloom: '#f6bccc', bloomD: '#c47c94' }, // 七玄门：青石、绿树、桃花
+    { rock: '#8a8278', dark: '#443c34', cap: '#7a7440', cap2: '#8e8248', capK: 0.44, trunk: '#3a2a20', leaf: '#d2682e', leafD: '#7a3018', bloom: '#e8a03a', bloomD: '#a4662a' },  // 血色禁地：湿石、枫（橘红——朱红留给敌人）
+    { rock: '#8a847a', dark: '#403a34', cap: '#5c5850', cap2: '#6c665c', capK: 0.38, trunk: '#2a241e', leaf: '#5a5240', leafD: '#2e2a22', bloom: '#6e6452', bloomD: '#3a342a' },  // 燕翎堡：烟熏的石，焦枯的树
+    { rock: '#98aabc', dark: '#465668', cap: '#f2f6fa', cap2: '#ffffff', capK: 0.88, trunk: '#3c444c', leaf: '#e2ecf2', leafD: '#3e6a64', bloom: '#eaf2f6', bloomD: '#9ab4c0' }, // 虚天殿：寒石、雪松
   ].forEach((o, i) => Object.assign(PAL[i], o));
 
   const n3 = (x, y, z, s) => U.hash(Math.round(x * 997) + s * 57, Math.round(y * 991) + Math.round(z * 983) * 3, s);
@@ -48,7 +48,7 @@
       g.computeVertexNormals(); g.computeBoundingBox();
       const N = g.attributes.normal, H = g.boundingBox.max.y, col = new Float32Array(P.count * 3), t = new THREE.Color();
       const a = new THREE.Color(o.dark), b = new THREE.Color(o.lite), c1 = new THREE.Color(o.cap || o.lite), c2 = new THREE.Color(o.cap2 || o.cap || o.lite);
-      if (G.PAPER || G.DH) {
+      if (G.PAPER) {
         /* 绢本设色：不要削面。位置相同的顶点把法线取平均（光照是软的），颜色按顶点算（深浅是晕开的）——
            山脚赭石、山头石绿、朝天的面点石青，正是青绿山水"先赭后青绿"的染法 */
         const acc = new Map(), key2 = (i) => Math.round(P.getX(i) * 997) + ',' + Math.round(P.getY(i) * 997) + ',' + Math.round(P.getZ(i) * 997);
@@ -75,6 +75,12 @@
     });
   }
 
+  // 云团用的球：低面数，顶上亮、底下偏灰蓝（颜色烘在顶点上）
+  Mo.cloudGeo = () => gg('cloud', () => {
+    const g = new THREE.IcosahedronGeometry(1, 1), P = g.attributes.position, col = new Float32Array(P.count * 3); // 八十个面：削面的云，和山石、树冠是一种造型语言
+    for (let i = 0; i < P.count; i++) { const k = U.clamp(P.getY(i) * 0.6 + 0.55, 0, 1); col[i * 3] = 0.66 + 0.34 * k; col[i * 3 + 1] = 0.7 + 0.3 * k; col[i * 3 + 2] = 0.78 + 0.22 * k; }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+  });
   // 山石（四种形状 × 四章配色）；g.userData.h 是它的高
   const rockGeo = (Mo.rockGeo = (vr, ti) => { const p = PAL[ti]; return lump(`rk${vr}_${ti}`, vr * 17 + ti + 1, { rough: 0.58, top: 0.34, flat: 0.38, bot: 0.3, sy: 1, dark: p.dark, lite: p.rock, cap: p.cap, cap2: p.cap2, capAt: 0.66, capK: p.capK, brush: 1 }); });
   // 叶团：松是扁的云片，花树是圆的团
@@ -103,14 +109,6 @@
      kind：pine 松（扁云片）/ round 阔叶 / bloom 花树 */
   Mo.tree = function (v, ti, kind = 'pine', scale = 1, o = {}) { // o.lite：林子深处的树，省掉根与一半的枝；o.bark / o.leaf：整片林子共用的材质
     const pal = PAL[ti], g = new THREE.Group(), h = (i) => U.hash(v * 13 + i, i * 7 + 3, ti + 5), pine = kind === 'pine';
-    if (G.DH && G.Tex.img['tree' + ti]) {
-      /* 写实画风：一棵树是一张朝着镜头的贴片（镜头的朝向是固定的）。这里只留一个记号，
-         渲染器把整间屋子的树收成一个网格。图集 2×2：七玄门是两株松、两株花树，其余各章四株同类 */
-      const iv = Math.abs(Math.floor(v)), mat = new THREE.MeshBasicMaterial({ color: 0xffffff }), mk = new THREE.Object3D();
-      mk.userData.tree = { cell: ti === 0 ? (kind === 'bloom' ? 2 + (iv & 1) : iv & 1) : iv % 4, size: (pine ? 1.85 : 1.55) * (0.85 + h(1) * 0.35) * 1.55, tint: o.leaf || mat, flip: h(2) < 0.5 };
-      g.add(mk); g.scale.setScalar(scale);
-      return { g, mats: o.bark ? [] : [mat], anim: null };
-    }
     const bark = o.bark || lam(pal.trunk), leaf = o.leaf || vcol();
     const H = (pine ? 1.85 : 1.55) * (0.85 + h(1) * 0.35), segs = o.lite ? 3 : 4, pts = [new V3(0, 0, 0)], lean = (pine ? 0.36 : 0.2) * (H / segs);
     let a = h(2) * TAU, x = 0, z = 0;
@@ -222,13 +220,26 @@
     { tile: '#3a3834', ridge: '#58554e', wood: '#4a4038', stone: '#b8ae98', dark: '#7c7466', gold: '#9a9078' },  // 墨瓦、焦木、城砖
     { tile: '#7c9aa4', ridge: '#b8ccd0', wood: '#c8d4d6', stone: '#cfd4cc', dark: '#5c7c88', gold: '#a8a890' },  // 雪覆的瓦、玉柱
   ];
-  // 写实画风：黛瓦、旧木、青灰的石；鎏金是暗的铜色
+  // 卡通画风：黛瓦、朱漆的木、青灰的石、鎏金
   if (G.DH) [
-    { tile: '#3a424a', ridge: '#566068', wood: '#6a4630', stone: '#a8a294', dark: '#6c665a', gold: '#9a8250' },
-    { tile: '#4a3a30', ridge: '#66503e', wood: '#4e3626', stone: '#7e766a', dark: '#4e463c', gold: '#8a7448' },
-    { tile: '#302e2e', ridge: '#4a4846', wood: '#3a3028', stone: '#7c766c', dark: '#4a443c', gold: '#806c48' },
-    { tile: '#62788c', ridge: '#a8bccc', wood: '#7a8894', stone: '#9aa8b4', dark: '#4a5c6c', gold: '#a89a6c' },
+    { tile: '#3e4c5a', ridge: '#5e6e7e', wood: '#a8442e', stone: '#b8b2a0', dark: '#7a7466', gold: '#d0a84a' },
+    { tile: '#5a4436', ridge: '#7a5c46', wood: '#6a3a26', stone: '#8e867a', dark: '#5a5248', gold: '#b08a48' },
+    { tile: '#3c3836', ridge: '#58524e', wood: '#4a342a', stone: '#8a847a', dark: '#544e46', gold: '#9a7c48' },
+    { tile: '#6a8098', ridge: '#b4c8d8', wood: '#8a98a6', stone: '#a8b8c6', dark: '#526678', gold: '#c8b070' },
   ].forEach((o, i) => Object.assign(KIT[i], o));
+  /* 远处石峰上的亭子：台基、四根朱柱、攒尖顶、四角起翘、宝顶。只当远景，零件很少 */
+  Mo.pavilion = function (ti) {
+    const K = KIT[ti], g = new THREE.Group(), M = {}, m = (n) => M[n] || (M[n] = lam(K[n])), box = Mo.geo.box(), pyr = Mo.geo.cone(4), con = Mo.geo.cone(6);
+    const put = (geo, mat, x, y, z, sx, sy, sz, ry) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); if (ry) o.rotation.y = ry; g.add(o); return o; };
+    put(box, m('stone'), 0, 0.06, 0, 1.3, 0.12, 1.3); put(box, m('dark'), 0, 0.15, 0, 1.1, 0.06, 1.1);
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put(Mo.geo.cyl(0.5, 0.5, 6), m('wood'), sx * 0.42, 0.52, sz * 0.42, 0.11, 0.7, 0.11);
+    put(box, m('wood'), 0, 0.84, 0, 1.02, 0.08, 1.02);
+    put(pyr, m('tile'), 0, 1.16, 0, 1.95, 0.58, 1.95, PI / 4);                                   // 攒尖顶
+    put(box, m('ridge'), 0, 0.89, 0, 1.44, 0.05, 1.44);                                          // 檐口
+    for (let i = 0; i < 4; i++) { const a = PI / 4 + (i * PI) / 2, t = put(con, m('ridge'), Math.cos(a) * 0.98, 0.98, Math.sin(a) * 0.98, 0.13, 0.36, 0.13); t.rotation.set(Math.sin(a) * 1.0, 0, -Math.cos(a) * 1.0); } // 起翘的角
+    put(Mo.geo.sph(8), m('gold'), 0, 1.5, 0, 0.16, 0.2, 0.16);                                   // 宝顶
+    return { g, mats: Object.values(M) };
+  };
   Mo.archKit = function (root, ti) {
     const K = KIT[ti], mats = {}, M = (n) => mats[n] || (mats[n] = lam(K[n] || n)); // 名字不在色表里时，当作颜色直接用
     const box = Mo.geo.box(), gable = gableGeo(), pyr = Mo.geo.cone(4), con = Mo.geo.cone(6);

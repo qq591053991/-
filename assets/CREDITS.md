@@ -32,13 +32,14 @@ CC0 不要求署名，这里列出是为了感谢作者。
 
 妖兽、鬼物、傀儡、灵宠、墨蛟、场景物件与交互物没有使用外部素材，是在 `js/models.js` 里用 Three.js 基础几何体拼出来的；山石、松与花树、石灯、青铜环门、立轴在 `js/scenery.js` 里由代码生成（立轴上的山水、环门与地台上的纹样也都是程序画的）。社区模型加载失败时，人形角色也会退回这套内置模型。
 
-## 贴图（写实画风）
+## 贴图（只有法术特效）
 
-`assets/textures.js` 里的地面、岩石、树叶、墙面、水面、地台与草木贴图，以及法术特效的贴图（`fx_*`），是用图像生成模型（OpenAI `gpt-image-2.6-flare`）
-按为本作写的文字描述生成的，再用脚本处理成四方连续 / 抠成透明底 / 拼成图集。没有使用任何第三方素材或参考图片。
+场景与模型不用任何图片。`assets/textures.js` 里只剩十二张法术特效的贴图（`fx_*`：阵图、冲击波、剑气、火、烟、闪电……黑底白图），
+是用图像生成模型（OpenAI `gpt-image-2.6-flare`）按为本作写的文字描述生成的，再用脚本处理。没有使用任何第三方素材或参考图片。
 
 ## 代码
 
+- 场景的纵深（一层层自雾里拔起的石峰、空气透视、谷底的雾、成团的云、峰顶的亭子与飞瀑）参考了开源作品 [赤龍 Crimson Loong](https://github.com/ChetasLua/crimson-loong)（作者 ChetasLua，纯 three.js、不用素材）的搭法；本作的实现是另写的，没有使用它的代码。
 - 画面的"收尾一趟"（泛光、冲击波折弯、蓄势压暗、墨帧）与巨剑术半空叠阵图的想法，参考了开源游戏 [Small Magic](https://patch.gg/games/blendi/small-magic)（作者 blendi，代码 MIT 许可）；本作的实现是另写的，没有使用它的代码与素材。
 
 - [three.js](https://threejs.org) r147（MIT 许可）：`lib/three.min.js`，以及其示例目录中的 `lib/GLTFLoader.js`、`lib/SkeletonUtils.js`。

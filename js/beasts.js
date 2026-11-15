@@ -50,7 +50,7 @@
     put(geo, color, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], [w, len, d === undefined ? w : d], [Es.x, Es.y, Es.z]);
   }
   Mo.sculpt = sculpt; Mo.span = span; // 场景物件（scenery.js）也用
-  /* 卡通光照：明暗分成三档（背光 / 半明 / 受光），不是连续过渡。写实贴图画风下，人物与妖兽都用它 */
+  /* 卡通光照：明暗分成三档（背光 / 半明 / 受光），不是连续过渡。卡通画风下，人物与妖兽都用它 */
   let ramp = null;
   Mo.toonMat = function (c, o) {
     if (!ramp) { ramp = new THREE.DataTexture(new Uint8Array([150, 150, 150, 255, 150, 150, 150, 255, 214, 214, 214, 255, 255, 255, 255, 255]), 4, 1, THREE.RGBAFormat); ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true; }
@@ -601,7 +601,7 @@
   };
   Mo.pet = (id) => (PETS[id] ? PETS[id]() : pet0(id));
 
-  /* ============================ 飞剑（写实画风） ============================
+  /* ============================ 飞剑（卡通画风） ============================
      照动画里的样子建的五把剑（整口剑沿 +Z，剑尖在前；长度归一成 1，由调用处缩放）：
      0 凡铁飞剑 —— 素钢直剑：窄身、一道明脊，小方格，布缠柄，圆首，无穗
      1 青元剑光 —— 一口素白细剑，外面裹着一层青色剑芒：剑芒比剑身长出一截，拖着光丝

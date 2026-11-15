@@ -77,7 +77,7 @@
     this.mat.uniforms.uScale.value = (H * renderer.getPixelRatio()) / (2 * HALF_TAN);
   };
 
-  /* 贴图粒子（写实画风）：火、烟、火花。和点云一样一次画完，只是每个点从一张图集里取一格，还能转。
+  /* 贴图粒子（卡通画风）：火、烟、火花。和点云一样一次画完，只是每个点从一张图集里取一格，还能转。
      贴图是黑底白图——叠加时乘上颜色；mode：add 叠加 / fire 叠加，亮处过渡到白炽 / smoke 正常混合，亮度当透明度 */
   function TexCloud(max, img, N, mode) {
     this.max = max; this.n = 0;
@@ -212,7 +212,7 @@
 
     glows = new Cloud(2600, true); dusts = new Cloud(700, false);
     scene.add(glows.obj); scene.add(dusts.obj);
-    if (G.DH && Tx.img.fx_flame && Tx.img.fx_smoke && Tx.img.fx_burst && Tx.img.fx_array) { // 写实画风：法术特效用贴图
+    if (G.DH && Tx.img.fx_flame && Tx.img.fx_smoke && Tx.img.fx_burst && Tx.img.fx_array) { // 卡通画风：法术特效用贴图
       fires = new TexCloud(700, Tx.img.fx_flame, 2, 'fire'); smokes = new TexCloud(500, Tx.img.fx_smoke, 2, 'smoke'); sparks = new TexCloud(400, Tx.img.fx_burst, 1, 'add');
       scene.add(fires.obj); scene.add(smokes.obj); scene.add(sparks.obj);
       const ft = (n) => { const t = new THREE.Texture(Tx.img['fx_' + n]); t.encoding = THREE.sRGBEncoding; t.anisotropy = maxAniso; t.needsUpdate = true; return t; };
@@ -227,7 +227,7 @@
     // 弹幕 = 芯 + 外壳（外壳只画背面，于是在芯的外围露出一圈色边）。我方白芯，敌方暗芯
     orbs = mkInst(Mo.geo.sph(10), 900); orbRims = mkInst(Mo.geo.sph(10), 900, { side: THREE.BackSide });
     shards = mkInst(Mo.geo.oct(), 500); shardRims = mkInst(Mo.geo.oct(), 500, { side: THREE.BackSide });
-    fySw = Mo.fyGeo ? mkInst(Mo.fyGeo(), 240, { side: THREE.DoubleSide, vertexColors: true }) : mkInst(Mo.bladeGeo(), 240, { side: THREE.DoubleSide }); // 蜂云剑阵的小剑（写实画风：一口口翠竹剑）
+    fySw = Mo.fyGeo ? mkInst(Mo.fyGeo(), 240, { side: THREE.DoubleSide, vertexColors: true }) : mkInst(Mo.bladeGeo(), 240, { side: THREE.DoubleSide }); // 蜂云剑阵的小剑（卡通画风：一口口翠竹剑）
     bugs = mkInst(Mo.geo.sph(10), 160);                             // 噬金虫
     initTrails();
     arrayTex = FXT ? FXT.array : ctex(Tx.array());
@@ -307,13 +307,14 @@
     else P.rock = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshLambertMaterial({ color: 0x8e7650, emissive: 0x1c140a })));
     P.shield = new Pool(() => new THREE.Mesh(Mo.geo.sph(14), Mo.inkBlend(new THREE.MeshBasicMaterial({ color: 0xbcd8ff, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }))));
 
+    if (G.DH) heightMist();
     initPost();
     window.addEventListener('resize', () => this.resize());
     this.resize();
   };
 
 
-  /* ============================ 收尾一趟（写实画风） ============================
+  /* ============================ 收尾一趟（卡通画风） ============================
      整幅画面先画进一张高动态范围的图（发光的东西叠起来可以超过"白"，不被截掉），再过一遍：
      1. 泛光：超过白的那部分向四周晕开——剑光、阵图、火才像是"自己在发亮"。做法是取出亮部画进一张半大的图，
         用它的各级缩小图当作由近到远的模糊，叠回去；不需要一趟趟地模糊；
@@ -323,6 +324,18 @@
      5. 高光柔和地收住（不是硬切成一片白），略提一点饱和与反差。
      画面仍在显示空间里叠加（各种发光的东西原先就是按显示空间调的），所以不开这一趟时看起来和原来一样。
      这一趟的思路参考了开源游戏 Small Magic（MIT）的收尾处理；代码是另写的。 */
+  /* 谷底的雾（卡通画风）：三自带的雾只按离镜头的远近算；这里再加一层按高度算的——
+     比浮台低的东西越往下越化进雾色里，石峰的脚、台基、云海下面的一切因此"沉"下去，浮台就浮起来了。
+     做法是把所有内置材质共用的那几段雾的着色器换掉（顶点里算出世界高度，片元里取两种雾里浓的那个）。
+     世界高度由视图矩阵反推（不用 cameraPosition：朗伯、基础材质不会给它赋值） */
+  function heightMist() {
+    const C = THREE.ShaderChunk;
+    C.fog_pars_vertex = '#ifdef USE_FOG\n\tvarying float vFogDepth;\n\tvarying float vFogY;\n#endif';
+    C.fog_vertex = '#ifdef USE_FOG\n\tvFogDepth = - mvPosition.z;\n\tvFogY = dot( viewMatrix[ 1 ].xyz, mvPosition.xyz - viewMatrix[ 3 ].xyz );\n#endif';
+    C.fog_pars_fragment = C.fog_pars_fragment.replace('varying float vFogDepth;', 'varying float vFogDepth;\n\tvarying float vFogY;');
+    C.fog_fragment = C.fog_fragment.replace('float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );', 'float fogFactor = max( smoothstep( fogNear, fogFar, vFogDepth ), smoothstep( -0.7, -7.0, vFogY ) * 0.93 );');
+  }
+
   let post = null;
   function initPost() {
     if (!G.DH || !renderer.capabilities.isWebGL2) return;
@@ -450,7 +463,6 @@
 
   /* ============================ 房间场景 ============================ */
   function buildRoom(room) {
-    treeQ.length = 0;
     const ti = room.theme, th = G.Themes[ti], w = room.w, h = room.h, tiles = room.tiles;
     const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : tiles[y * w + x]);
     const g = new THREE.Group(), rs = { g, tex: [], mats: [], geos: [], anims: [], doors: {}, lights: [], sprites: [] };
@@ -463,8 +475,6 @@
     const fgeo = new THREE.PlaneGeometry(w, h); rs.geos.push(fgeo);
     const floor = new THREE.Mesh(fgeo, lm({ map: tx(ctex(Tx.floor(room))) }));
     floor.rotation.x = -PI / 2; floor.position.set(w / 2, 0, h / 2); floor.receiveShadow = true; g.add(floor);
-    // 草木贴片（写实画风）：墙根、林缘的蕨与草，场中零星几丛。只是装饰，不挡路
-    if (G.DH && Tx.img['veg' + ti]) vegCards(room, rs, g);
     // 浮岛基座
     const rock = lm({ color: new THREE.Color(Tx.shade(th.base, -0.3)) }), rock2 = new THREE.MeshPhongMaterial({ color: new THREE.Color(Tx.shade(th.base, -0.45)), flatShading: true, shininess: 4 });
     rs.mats.push(rock2);
@@ -524,10 +534,6 @@
         if (at(x, y) !== 1 || taken.has(y * w + x)) continue;
         if (!cave && far[y * w + x] > 3) { // 林子深处：隔一格放一团压暗的树冠
           if ((x + y) % 2) continue;
-          if (G.DH && Tx.img['tree' + ti]) { // 写实画风：深处也是一棵棵压暗的树（贴片很省）
-            const fg2 = northFloor(x, y, 8), tr = Mo.tree(x * 31 + y * 17 + sd, ti, treeKind(U.hash(x, y, sd + 66) * 1.6), (fg2 ? 0.95 : 1.3) + U.hash(x, y, sd + 64) * 0.5, { bark: bark, leaf: fg2 ? leafFg : leafD });
-            tr.g.position.set(x + 0.5 + (U.hash(x, y, sd + 67) - 0.5) * 0.6, -0.04, y + 0.5 + (U.hash(x, y, sd + 68) - 0.5) * 0.6); scnFar.add(tr.g); continue;
-          }
           const fgc = northFloor(x, y, 8), cm = new THREE.Mesh(Mo.padGeo(x + y, ti, padKind), fgc ? leafFg : leafD), cs = (fgc ? 1.05 : 1.25) + U.hash(x, y, sd + 64) * 0.6;
           cm.position.set(x + 0.5, (fgc ? 0.7 : 1.0) + U.hash(x, y, sd + 65) * 0.7, y + 0.5); cm.scale.set(cs, cs * 0.8, cs); cm.rotation.y = x * 1.3 + y; scnFar.add(cm); continue;
         }
@@ -800,6 +806,27 @@
         }
         if (fm && U.hash(x, y, sd + 48) < 0.3) { const f = new THREE.Mesh(Mo.geo.sph(6), fm); f.position.set(bx + 0.08, 0.12, bz - 0.06); f.scale.setScalar(0.07); tuft.add(f); }
       }
+      /* 山野里满地的草（卡通画风）：一撮一撮立着的草叶，是真的立体，不是画在地上的。
+         场子中央留空（地台与打斗的地方要看得清），越靠边越密；七玄门有野花，血色禁地有蘑菇 */
+      if (G.DH && open && !cave) {
+        const GC = [['#5a8a3c', '#7aae52', '#93c466'], ['#8a7a3e', '#a8924a', '#6a6a3a'], ['#4a443c', '#5e564c', '#3a342e'], ['#c8d8e4', '#e4eef6', '#a8c0d4']][ti].map((cc) => lm({ color: new THREE.Color(cc) }));
+        const petal = ti === 0 ? ['#fff4e0', '#f6b8cc', '#ffe07a'].map((cc) => lm({ color: new THREE.Color(cc) })) : ti === 1 ? [lm({ color: new THREE.Color('#b84a2e') })] : null, stem = lm({ color: new THREE.Color(ti === 1 ? '#e6dcc8' : '#4e7a36') });
+        const skipT = new Set(); for (const d in room.doors || {}) for (const [dx0, dy0] of room.doors[d].cells) for (let a = -1; a <= 1; a++) for (let b2 = -1; b2 <= 1; b2++) skipT.add((dy0 + b2) * w + dx0 + a);
+        for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+          if (at(x, y) !== 0 || skipT.has(y * w + x)) continue;
+          const dc = Math.hypot(x + 0.5 - w / 2, y + 0.5 - h / 2), hv2 = (i) => U.hash(x * 5 + i, y * 3 + i, sd + 60 + i);
+          if (dc < 3.4 || hv2(0) > Math.min(0.62, 0.16 + (dc - 3.4) * 0.07) * (ti === 2 ? 0.5 : 1)) continue;
+          const bx = x + 0.15 + hv2(1) * 0.7, bz = y + 0.15 + hv2(2) * 0.7, y0 = hRoom(room, bx, bz);
+          for (let k = 0; k < 4; k++) {
+            const hgt = (ti === 3 ? 0.08 : 0.11) + hv2(3 + k) * 0.14, b = new THREE.Mesh(bladeG, GC[(k + Math.floor(hv2(8) * 3)) % 3]);
+            b.position.set(bx + (hv2(9 + k) - 0.5) * 0.24, y0 + hgt / 2, bz + (hv2(13 + k) - 0.5) * 0.24); b.scale.set(0.055, hgt, 0.055); b.rotation.set((hv2(17 + k) - 0.5) * 0.7, hv2(21 + k) * 3, (hv2(25 + k) - 0.5) * 0.7); tuft.add(b);
+          }
+          if (petal && hv2(30) < (ti === 0 ? 0.3 : 0.14)) { // 花 / 蘑菇：一根细茎，顶上一点颜色
+            const fh = ti === 0 ? 0.16 + hv2(31) * 0.08 : 0.09, st = new THREE.Mesh(Mo.geo.cyl(0.5, 0.5, 6), stem), f = new THREE.Mesh(ti === 0 ? Mo.geo.ico(0) : Mo.geo.cone(6), petal[Math.floor(hv2(32) * petal.length)]);
+            st.position.set(bx + 0.09, y0 + fh / 2, bz + 0.05); st.scale.set(ti === 0 ? 0.014 : 0.035, fh, ti === 0 ? 0.014 : 0.035); f.position.set(bx + 0.09, y0 + fh + (ti === 0 ? 0.01 : 0.02), bz + 0.05); f.scale.set(ti === 0 ? 0.075 : 0.13, ti === 0 ? 0.05 : 0.07, ti === 0 ? 0.075 : 0.13); tuft.add(st, f);
+          }
+        }
+      }
     }
     // 北面：高出墙头的一道山脊，脊上有树
     for (let x = -0.9; x < w + 1; x += 1.8) {
@@ -815,6 +842,48 @@
         const sx = dcx + off; if (sx < 1.7 || sx > w - 1.7 || at(Math.floor(sx), 0) !== 1 || room.lights.some((L) => L.sconce && Math.abs(L.x * S - sx) < 0.75)) continue;
         const sc2 = Mo.scroll(ti, Math.floor(sx) * 7 + sd); sc2.g.position.set(sx, HN - 0.03, 1.035); g.add(sc2.g); rs.mats.push(...sc2.mats); rs.tex.push(...sc2.tex); rs.anims.push(sc2.anim);
       }
+    }
+    /* 层次（卡通画风）：浮台之外一圈圈石峰自雾里拔起，分近、中、远三层——
+       空气是有颜色的，隔得越远叠得越厚，所以一层比一层淡、比一层偏雾色、比一层平（空气透视）；
+       峰脚隐在贴着谷底的雾里（见 heightMist），峰间浮着成团的云。镜头在南边朝北看，所以正南不立峰，免得挡住场内 */
+    function backdrop() {
+      const hzC = new THREE.Color(th.fog[0]), bs = (room.gx || 0) * 19 + (room.gy || 0) * 7 + ti * 3 + 5, hb = (i, k) => U.hash(i * 7 + k, k * 3 + 1, bs);
+      const cx0 = w / 2, cz0 = h / 2, RX = w / 2, RZ = h / 2;
+      [[5, 11, 0.22, 10, 0.6], [13, 24, 0.5, 13, 3], [27, 46, 0.76, 16, 7]].forEach(([d0, d1, hk, n, lift], ri) => {
+        const rm = new THREE.MeshLambertMaterial({ vertexColors: true }); rm.userData.hz = [hzC, hk];
+        const lf = new THREE.MeshLambertMaterial({ vertexColors: true }); lf.userData.hz = [hzC, hk];
+        const bk = new THREE.MeshLambertMaterial({ color: new THREE.Color(Mo.PAL[ti].trunk) }); bk.userData.hz = [hzC, hk];
+        rs.mats.push(rm, lf, bk);
+        const col = (x, top, z, s, k) => { const geo = Mo.rockGeo(k % 4, ti), sy = (top + 13) / (geo.userData.h * s), m = new THREE.Mesh(geo, rm); m.position.set(x, -13, z); m.scale.set(s, s * sy, s * (0.8 + hb(k, 9) * 0.4)); m.rotation.y = hb(k, 8) * TAU; scnFar.add(m); };
+        for (let i = 0; i < n; i++) {
+          const k = ri * 40 + i, a = (i / n) * TAU + hb(k, 1) * 0.5, d = d0 + hb(k, 2) * (d1 - d0), x = cx0 + Math.cos(a) * (RX + d), z = cz0 + Math.sin(a) * (RZ + d * 0.8);
+          if (z > h + 1.5 && Math.abs(x - cx0) < RX + 9) continue;
+          const top = lift + hb(k, 3) * (2.6 + ri * 3.4), s = 1.5 + hb(k, 4) * 1.5 + ri * 1.1;
+          col(x, top, z, s, k); // 主峰，旁边靠一两根矮的
+          col(x + s * (0.7 + hb(k, 5) * 0.4), top - 1.6 - hb(k, 6) * 2.4, z + s * 0.35, s * 0.62, k + 1);
+          if (hb(k, 7) < 0.6) col(x - s * 0.75, top - 3 - hb(k, 10) * 2.5, z - s * 0.3, s * 0.5, k + 2);
+          const pav = ri < 2 && hb(k, 15) < 0.3 && z < h * 0.7; // 有的峰顶立着一座亭子
+          if (pav) { const pv = Mo.pavilion(ti), ps = (1.5 + ri * 0.9) * (0.85 + hb(k, 16) * 0.3); for (const pm of pv.mats) { pm.userData.hz = [hzC, hk]; rs.mats.push(pm); } pv.g.scale.setScalar(ps); pv.g.position.set(x, top - 0.12, z); pv.g.rotation.y = hb(k, 17) * 0.8; scnFar.add(pv.g); }
+          else if (woods && ri < 2 && hb(k, 11) < 0.75) { const tr = Mo.tree(k + bs, ti, treeKind(hb(k, 12) * 0.7), (1.5 + hb(k, 13)) * (1 + ri * 0.5), { lite: true, bark: bk, leaf: lf }); tr.g.position.set(x, top - 0.15, z); tr.g.rotation.y = hb(k, 14) * TAU; scnFar.add(tr.g); } // 峰顶的树
+          if (ti !== 2 && ri < 2 && hb(k, 18) < 0.34) { // 飞瀑：自峰腰垂进雾里的一道白，由几片细长的面叠成，一明一暗地闪
+            const wm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }), fh = top + 9, fw = 0.3 + hb(k, 19) * 0.3 + ri * 0.2;
+            const wf = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), wm); wf.position.set(x + s * 0.2, top - 0.9 - fh / 2, z + s * 0.62); g.add(wf);
+            rs.geos.push(wf.geometry); rs.mats.push(wm); rs.anims.push((t) => { wm.opacity = (0.62 + Math.sin(t * 5 + k) * 0.08 + Math.sin(t * 12.3 + k * 2) * 0.05) * (1 - hk * 0.5); });
+          }
+        }
+      });
+      // 云：一团团的积云，由几只压扁的球攒成，顶上亮、底下偏灰蓝；高低远近都有，缓缓地飘
+      const pg = Mo.cloudGeo(), NC = 15, cm = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2a2a2a, color: new THREE.Color(th.sea[0]).lerp(new THREE.Color(0xffffff), 0.45) });
+      const im = new THREE.InstancedMesh(pg, cm, NC * 7); im.castShadow = false; im.receiveShadow = false; im.frustumCulled = false; let ci = 0;
+      for (let c = 0; c < NC; c++) {
+        const a = hb(c, 21) * TAU, d = 6 + hb(c, 22) * 34, x = cx0 + Math.cos(a) * (RX + d), z = cz0 + Math.sin(a) * (RZ + d * 0.8) - 2, y = -3.5 + hb(c, 23) * 9, sc = 2.2 + hb(c, 24) * 3.4;
+        if (z > h + 1 && Math.abs(x - cx0) < RX + 10) continue;
+        for (let q = 0; q < 7; q++) {
+          const u = (q - 3) / 3, r = sc * (0.5 + 0.5 * (1 - u * u)) * (0.75 + hb(c * 9 + q, 25) * 0.5);
+          dummy.position.set(x + u * sc * 1.25 + (hb(c * 9 + q, 26) - 0.5) * sc * 0.3, y + (hb(c * 9 + q, 27) - 0.3) * sc * 0.3, z + (hb(c * 9 + q, 28) - 0.5) * sc * 0.7); dummy.rotation.set(0, hb(c * 9 + q, 29) * TAU, 0); dummy.scale.set(r, r * 0.62, r * 0.9); dummy.updateMatrix(); im.setMatrixAt(ci++, dummy.matrix);
+        }
+      }
+      im.count = ci; im.instanceMatrix.needsUpdate = true; g.add(im); rs.mats.push(cm); rs.anims.push((t) => { im.position.x = Math.sin(t * 0.021) * 2.6; im.position.z = Math.cos(t * 0.017) * 1.2; });
     }
     // 远景：云海里的几根石柱，柱顶有树有灯，天外飞瀑垂落 —— 把"盆景天地"从一方浮台扩成一片
     const FALL = [0xbfe0ff, 0xd86a78, 0, 0xcfeaff][ti];
@@ -838,6 +907,7 @@
       }
       g.add(isl);
     });
+    if (G.DH && !cave) backdrop();
     const mergedScn = mergeStatic(scn);
     if (mergedScn) { g.add(mergedScn); rs.geos.push(mergedScn.geometry); rs.mats.push(mergedScn.material); if (!G.DH) inkOutline(mergedScn, 0.03, g, rs, th.ink); }
     const mergedFar = mergeStatic(scnFar);
@@ -849,7 +919,6 @@
     if (mergedArch) { g.add(mergedArch); rs.geos.push(mergedArch.geometry); rs.mats.push(mergedArch.material); if (!G.DH) inkOutline(mergedArch, 0.018, g, rs, th.ink); }
     // 岩浆的光
     // （虚天殿的水面原先是熔池，带一团团橙红的光；现在是寒潭，不发光——橙红只留给敌人）
-    treeCards(room, rs, g);
     return rs;
   }
 
@@ -861,34 +930,7 @@
     float bn(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
       return mix(mix(mix(bh(i), bh(i + vec3(1, 0, 0)), f.x), mix(bh(i + vec3(0, 1, 0)), bh(i + vec3(1, 1, 0)), f.x), f.y),
                  mix(mix(bh(i + vec3(0, 0, 1)), bh(i + vec3(1, 0, 1)), f.x), mix(bh(i + vec3(0, 1, 1)), bh(i + vec3(1, 1, 1)), f.x), f.y), f.z); }`;
-  let dhTex = null;
-  function dhDetail() {
-    if (dhTex) return dhTex;
-    const mk = (n) => { const t = new THREE.Texture(Tx.img[n]); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso; t.needsUpdate = true; return t; }; // 细节贴图是 0.5 灰，按线性取值
-    return (dhTex = { rock: mk('rock'), leaf: mk('leaf') });
-  }
   function brushMat(m) {
-    if (G.DH) {
-      /* 写实画风：合并后的静态网格没有 UV，按世界坐标从三个方向把贴图投上去（哪个方向正对着面，就用哪个方向的）。
-         贴图是归一到 0.5 灰的"细节"，乘上去不改变顶点色定的颜色，只添石纹、叶片 */
-      if (!Tx.img.rock || !Tx.img.leaf) return m;
-      const D = dhDetail();
-      m.onBeforeCompile = (sh) => {
-        sh.uniforms.tRock = { value: D.rock }; sh.uniforms.tLeaf = { value: D.leaf };
-        sh.vertexShader = 'attribute float brush;\nvarying float vBrush;\nvarying vec3 vWP;\nvarying vec3 vWN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBrush = brush; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
-        sh.fragmentShader = 'varying float vBrush;\nvarying vec3 vWP;\nvarying vec3 vWN;\nuniform sampler2D tRock;\nuniform sampler2D tLeaf;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-        {
-          vec3 bw = pow(abs(normalize(vWN)), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
-          vec3 d;
-          if (vBrush > 1.5) { vec3 P = vWP * 0.8; d = texture2D(tLeaf, P.zy).rgb * bw.x + texture2D(tLeaf, P.xz).rgb * bw.y + texture2D(tLeaf, P.xy).rgb * bw.z; d = mix(vec3(0.5), d, 1.3); }
-          else if (vBrush > 0.5) { vec3 P = vWP * 0.42; d = texture2D(tRock, P.zy).rgb * bw.x + texture2D(tRock, P.xz).rgb * bw.y + texture2D(tRock, P.xy).rgb * bw.z; d = mix(vec3(0.5), d, 1.2); }
-          else { vec3 P = vWP * 0.9; d = texture2D(tRock, P.zy).rgb * bw.x + texture2D(tRock, P.xz).rgb * bw.y + texture2D(tRock, P.xy).rgb * bw.z; d = mix(vec3(0.5), d, 0.55); }
-          diffuseColor.rgb *= clamp(d * 2.0, 0.0, 2.0);
-        }`);
-      };
-      m.customProgramCacheKey = () => 'dh-detail';
-      return m;
-    }
     if (!G.PAPER) return m;
     m.onBeforeCompile = (sh) => {
       sh.vertexShader = 'attribute float brush;\nvarying float vBrush;\nvarying vec3 vWP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBrush = brush; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -912,89 +954,9 @@
     return m;
   }
 
-  /* 草木贴片：一张图集（2×2 四种草木），每丛是一片朝镜头后仰的四边形。镜头的朝向是固定的，所以不用每帧转向；
-     法线朝上，受光与地面一致；顶上两个顶点随风轻摆 */
-  const VEG_UP = [0, Math.cos(0.5), -Math.sin(0.5)], TREE_UP = [0, Math.cos(0.32), -Math.sin(0.32)], treeQ = [], v3b = new THREE.Vector3();
-  /* 树的贴片：做法同草木，只是大得多，而且投影（深度材质按贴图的透明度裁剪，影子是树的形状） */
-  function treeCards(room, rs, g) {
-    const ti = room.theme, n = treeQ.length / 9, TK = ti === 1 ? 0.86 : 1; if (!n) return; // 血色禁地的枫叶略压一点：最艳的红留给敌人
-    const pos = new Float32Array(n * 12), uv = new Float32Array(n * 8), col = new Float32Array(n * 12), sw = new Float32Array(n * 4), nor = new Float32Array(n * 12), idx = [];
-    for (let i = 0; i < n; i++) {
-      const q = i * 9, x = treeQ[q], y = treeQ[q + 1], z = treeQ[q + 2], sz = treeQ[q + 3], cell = treeQ[q + 4], flip = treeQ[q + 5], hw = sz / 2, cx = cell % 2, cy = (cell / 2) | 0, o = i * 12;
-      pos.set([x - hw, y, z, x + hw, y, z, x + hw, y + TREE_UP[1] * sz, z + TREE_UP[2] * sz, x - hw, y + TREE_UP[1] * sz, z + TREE_UP[2] * sz], o);
-      const u0 = (cx + (flip ? 1 : 0)) / 2, u1 = (cx + (flip ? 0 : 1)) / 2, v0 = 1 - (cy + 1) / 2 + 0.003, v1 = 1 - cy / 2 - 0.003;
-      uv.set([u0, v0, u1, v0, u1, v1, u0, v1], i * 8);
-      for (let k = 0; k < 4; k++) { col[o + k * 3] = treeQ[q + 6] * TK; col[o + k * 3 + 1] = treeQ[q + 7] * TK; col[o + k * 3 + 2] = treeQ[q + 8] * TK; nor[o + k * 3 + 1] = 1; }
-      sw[i * 4 + 2] = sw[i * 4 + 3] = 1; idx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3);
-    }
-    treeQ.length = 0;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); geo.setAttribute('sway', new THREE.BufferAttribute(sw, 1)); geo.setIndex(idx);
-    const tex = new THREE.Texture(Tx.img['tree' + ti]); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = maxAniso; tex.needsUpdate = true;
-    const uT = { value: 0 }, sway = (sh) => { sh.uniforms.uT = uT; sh.vertexShader = 'attribute float sway;\nuniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed.x += sway * sin(uT * 0.9 + position.x * 0.7 + position.z * 0.9) * 0.05;'); };
-    const mat = new THREE.MeshLambertMaterial({ map: tex, alphaTest: 0.5, vertexColors: true, side: THREE.DoubleSide }); mat.onBeforeCompile = sway; mat.customProgramCacheKey = () => 'tree-sway';
-    const dep = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: 0.5, side: THREE.DoubleSide }); dep.onBeforeCompile = sway; dep.customProgramCacheKey = () => 'tree-sway-d';
-    const m = new THREE.Mesh(geo, mat); m.customDepthMaterial = dep; m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false; g.add(m);
-    rs.geos.push(geo); rs.mats.push(mat, dep); rs.tex.push(tex); rs.anims.push((t) => { uT.value = t; });
-  }
-  function vegCards(room, rs, g) {
-    const ti = room.theme, w = room.w, h = room.h, tiles = room.tiles, at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 1 : tiles[y * w + x]);
-    const open = room.terrain && room.terrain !== 'court', cave = room.terrain === 'cave', wild = open && !cave, sd = (room.gx || 0) * 13 + (room.gy || 0) * 29 + ti * 5 + 1;
-    const pos = [], uv = [], col = [], sw = [], idx = [];
-    const skip = new Set();
-    for (const d in room.doors || {}) for (const [dx, dy] of room.doors[d].cells) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) skip.add((dy + b) * w + dx + a);
-    for (const pp of room.props || []) skip.add(pp.ty * w + pp.tx);
-    for (const dd of room.deco || []) skip.add(Math.floor(dd.y) * w + Math.floor(dd.x));
-    const card = (x, z, size, cell, k) => {
-      const y0 = hRoom(room, x, z), n = pos.length / 3, flip = U.hash(n, 3, sd) < 0.5, cx = cell % 2, cy = (cell / 2) | 0, hw = size / 2, ht = size;
-      pos.push(x - hw, y0, z, x + hw, y0, z, x + hw + VEG_UP[0] * ht, y0 + VEG_UP[1] * ht, z + VEG_UP[2] * ht, x - hw + VEG_UP[0] * ht, y0 + VEG_UP[1] * ht, z + VEG_UP[2] * ht);
-      const u0 = (cx + (flip ? 1 : 0)) / 2, u1 = (cx + (flip ? 0 : 1)) / 2, v0 = 1 - (cy + 1) / 2 + 0.004, v1 = 1 - cy / 2;
-      uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
-      for (let i = 0; i < 4; i++) col.push(k, k, k);
-      sw.push(0, 0, 1, 1); idx.push(n, n + 1, n + 2, n, n + 2, n + 3);
-    };
-    const mcx = w / 2, mcy = h / 2;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const t = at(x, y), hh = (i) => U.hash(x * 3 + i, y * 7 + i, sd + i);
-      if (t === 1) { // 山野：林缘、石脚下的灌草
-        if (!wild || !(at(x, y + 1) !== 1 || at(x - 1, y) !== 1 || at(x + 1, y) !== 1)) continue;
-        for (let i = 0; i < 2; i++) if (hh(i * 5) < 0.7) card(x + 0.15 + hh(i * 5 + 1) * 0.7, y + 0.45 + hh(i * 5 + 2) * 0.5, 0.75 + hh(i * 5 + 3) * 0.5, Math.floor(hh(i * 5 + 4) * 4), 0.62 + hh(i + 9) * 0.2);
-        continue;
-      }
-      if ((t !== 0 && t !== 2) || skip.has(y * w + x)) continue;
-      const edgeN = at(x, y - 1) === 1, edge = edgeN || at(x - 1, y) === 1 || at(x + 1, y) === 1 || at(x, y + 1) === 1, dc = Math.hypot(x + 0.5 - mcx, y + 0.5 - mcy);
-      if (edge) {
-        const p0 = wild ? 0.85 : cave ? 0.35 : 0.5, nn = wild ? 2 : 1;
-        for (let i = 0; i < nn; i++) if (hh(20 + i * 5) < p0) {
-          let px = x + 0.1 + hh(21 + i * 5) * 0.8, pz = y + 0.1 + hh(22 + i * 5) * 0.8;
-          if (edgeN) pz = y + 0.08 + hh(22 + i * 5) * 0.3; else if (at(x, y + 1) === 1) pz = y + 0.75 + hh(22 + i * 5) * 0.2; else if (at(x - 1, y) === 1) px = x + 0.05 + hh(21 + i * 5) * 0.3; else px = x + 0.65 + hh(21 + i * 5) * 0.3;
-          card(px, pz, 0.6 + hh(23 + i * 5) * 0.45, Math.floor(hh(24 + i * 5) * 4), 0.78 + hh(i + 30) * 0.22);
-        }
-      } else if (dc > 3.4 && hh(40) < (wild ? 0.12 : 0.025)) card(x + 0.2 + hh(41) * 0.6, y + 0.2 + hh(42) * 0.6, 0.42 + hh(43) * 0.28, hh(44) < 0.6 ? 1 : Math.floor(hh(45) * 4), 0.85 + hh(46) * 0.15);
-    }
-    if (!idx.length) return;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setAttribute('sway', new THREE.Float32BufferAttribute(sw, 1));
-    const nor = new Float32Array(pos.length); for (let i = 1; i < nor.length; i += 3) nor[i] = 1; geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-    geo.setIndex(idx);
-    const tex = new THREE.Texture(Tx.img['veg' + ti]); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = maxAniso; tex.needsUpdate = true;
-    const uT = { value: 0 }, mat = new THREE.MeshLambertMaterial({ map: tex, alphaTest: 0.5, vertexColors: true, side: THREE.DoubleSide });
-    mat.onBeforeCompile = (sh) => {
-      sh.uniforms.uT = uT;
-      sh.vertexShader = 'attribute float sway;\nuniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed.x += sway * sin(uT * 1.4 + position.x * 1.9 + position.z * 2.3) * 0.035;');
-    };
-    mat.customProgramCacheKey = () => 'veg-sway';
-    const m = new THREE.Mesh(geo, mat); m.receiveShadow = true; m.frustumCulled = false; g.add(m);
-    rs.geos.push(geo); rs.mats.push(mat); rs.tex.push(tex); rs.anims.push((t) => { uT.value = t; });
-  }
-
   /* 把一组静态网格烘焙成单个带顶点色的网格 */
   function mergeStatic(root) {
     root.updateMatrixWorld(true);
-    { const marks = []; root.traverse((o) => { if (o.userData.tree) marks.push(o); }); // 写实画风：树是贴片，先收走
-      for (const o of marks) { const t = o.userData.tree, c = t.tint.color; o.getWorldPosition(v3); treeQ.push(v3.x, v3.y, v3.z, t.size * o.getWorldScale(v3b).y, t.cell, t.flip ? 1 : 0, c.r, c.g, c.b); o.parent.remove(o); } }
     const pos = [], nor = [], colr = [], brush = [], dead = [], v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
     root.traverse((o) => {
       if (!o.isMesh) return;
@@ -1004,12 +966,14 @@
       if (m.flatShading) q.computeVertexNormals();
       const P2 = q.attributes.position, N2 = q.attributes.normal, C2 = m.vertexColors ? q.attributes.color : null; // 山石、叶团的颜色烘在顶点上
       nm.getNormalMatrix(o.matrixWorld);
-      const B = o.geometry.userData.brush || 0;
+      const B = o.geometry.userData.brush || 0, hz = m.userData.hz; // hz = [雾色, 几成]：空气透视
       for (let i = 0; i < P2.count; i++) {
         brush.push(B);
         v.fromBufferAttribute(P2, i).applyMatrix4(o.matrixWorld); pos.push(v.x, v.y, v.z);
         n.fromBufferAttribute(N2, i).applyMatrix3(nm).normalize(); nor.push(n.x, n.y, n.z);
-        if (C2) colr.push(m.color.r * C2.getX(i), m.color.g * C2.getY(i), m.color.b * C2.getZ(i)); else colr.push(m.color.r, m.color.g, m.color.b);
+        let cr = m.color.r, cg = m.color.g, cb = m.color.b; if (C2) { cr *= C2.getX(i); cg *= C2.getY(i); cb *= C2.getZ(i); }
+        if (hz) { cr += (hz[0].r - cr) * hz[1]; cg += (hz[0].g - cg) * hz[1]; cb += (hz[0].b - cb) * hz[1]; }
+        colr.push(cr, cg, cb);
       }
       q.dispose(); o.visible = false; dead.push(o);
     });
@@ -1057,39 +1021,32 @@
      这样不管模型多大、带不带骨骼，线都一样粗 */
   /* 描边的颜色就是身份（631 的"一"）：敌人一圈朱红，能交互的东西一圈金，自己人是墨色。
      不用看清模型，只看那一圈线的颜色就知道它是什么 */
-  const INKS = G.PAPER ? { ink: [0x2a2218, 0.0062], foe: [0xde341e, 0.0085], gold: [0xc8860c, 0.0078] } : { ink: [0x0a0c10, 0.003], foe: [0xd42c18, 0.0044], gold: [0xd8ac54, 0.0042] }, actorInks = {}; // 写实画风：线很细，身份主要靠轮廓光
-  /* 写实画风里人物与妖兽的材质：
+  const INKS = G.PAPER ? { ink: [0x2a2218, 0.0062], foe: [0xde341e, 0.0085], gold: [0xc8860c, 0.0078] } : { ink: [0x0a0c10, 0.003], foe: [0xd42c18, 0.0044], gold: [0xd8ac54, 0.0042] }, actorInks = {}; // 卡通画风：线很细，身份主要靠轮廓光
+  /* 卡通画风里人物与妖兽的材质：
      1. 一层皮毛 / 鳞 / 皮革 / 甲壳的细节——按模型自己的坐标三向投影，贴在它身上跟着它动（坐标乘上模型的缩放，疏密才一致）；
      2. 一圈轮廓光：越是侧对镜头的面越亮。敌人是朱红的，像身上腾着煞气；自己人是冷白的；能交互的是金的。
      3. 朝下的面压暗：肚腹、腋下、下巴底下比背上暗，模型才有分量（相当于一层很便宜的环境光遮蔽）。
      三样都只是在原有材质上加几行着色器，模型、动画都不动 */
-  const RIMS = { foe: [1.0, 0.13, 0.06, 0.62], ink: [0.6, 0.8, 0.76, 0.22], gold: [1.0, 0.7, 0.2, 0.6] }, skinTex = {};
-  const SKINS = { jiao: 'scale' }; // 人物与妖兽是卡通画法（平涂、分档的明暗、描边），不叠细节贴图；只有墨蛟那一身鳞留着
-  const PET_SKIN = { zhizhu: null, shuangwu: null, quhun: null, renxing: null, tihun: null, yinyue: null, tujia: null, baolin: null };
-  function dress(m, kind, skin) {
+  const RIMS = { foe: [1.0, 0.13, 0.06, 0.62], ink: [0.6, 0.8, 0.76, 0.22], gold: [1.0, 0.7, 0.2, 0.6] };
+  /* 卡通画风里，还用朗伯 / 冯氏材质的模型（墨蛟、交互物、傀儡）加两样：
+     一圈轮廓光——越是侧对镜头的面越亮（敌人朱红、自己人冷白、能交互的金）；朝下的面压暗——肚腹比背上暗，模型才有分量。
+     人物与妖兽用的是卡通材质（Mo.toonMat），不走这里 */
+  function dress(m, kind) {
     const R4 = RIMS[kind] || RIMS.ink, rim = new THREE.Vector3(R4[0] * R4[3], R4[1] * R4[3], R4[2] * R4[3]);
-    let tex = null;
-    if (skin && Tx.img[skin]) { tex = skinTex[skin]; if (!tex) { tex = skinTex[skin] = new THREE.Texture(Tx.img[skin]); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.needsUpdate = true; } }
     for (const mt of m.mats || []) {
       if (!mt || mt.userData.dressed || !(mt.isMeshLambertMaterial || mt.isMeshPhongMaterial || mt.isMeshStandardMaterial) || mt.blending !== THREE.NormalBlending) continue;
       mt.userData.dressed = true;
-      const useTex = tex && !mt.map, prev = mt.onBeforeCompile; // 自带贴图的（人形角色）不再叠细节
+      const prev = mt.onBeforeCompile;
       mt.onBeforeCompile = (sh, r) => {
         if (prev) prev(sh, r);
-        sh.uniforms.uRim = { value: rim }; if (useTex) sh.uniforms.tSkin = { value: tex };
-        sh.vertexShader = 'varying vec3 vOP;\nvarying vec3 vON;\nvarying float vUpN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vOP = position * vec3(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz), length(modelMatrix[2].xyz)); vON = normal;\n  vUpN = normalize((vec4(transformedNormal, 0.0) * viewMatrix).xyz).y;');
-        let f = sh.fragmentShader;
-        if (useTex) f = f.replace('#include <color_fragment>', `#include <color_fragment>
-          { vec3 bw = pow(abs(normalize(vON)) + 0.001, vec3(4.0)); bw /= (bw.x + bw.y + bw.z); vec3 P = vOP * 2.4;
-            vec3 d = texture2D(tSkin, P.zy).rgb * bw.x + texture2D(tSkin, P.xz).rgb * bw.y + texture2D(tSkin, P.xy).rgb * bw.z;
-            diffuseColor.rgb *= clamp(mix(vec3(0.5), d, 1.9) * 2.0, 0.0, 2.0); }`);
-        f = f.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= mix(0.5, 1.04, smoothstep(-0.75, 0.55, vUpN));');
-        f = f.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-          { float rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0); totalEmissiveRadiance += uRim * rimF; }`);
-        sh.fragmentShader = 'varying vec3 vOP;\nvarying vec3 vON;\nvarying float vUpN;\nuniform vec3 uRim;\n' + (useTex ? 'uniform sampler2D tSkin;\n' : '') + f;
+        sh.uniforms.uRim = { value: rim };
+        sh.vertexShader = 'varying float vUpN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vUpN = normalize((vec4(transformedNormal, 0.0) * viewMatrix).xyz).y;');
+        sh.fragmentShader = 'varying float vUpN;\nuniform vec3 uRim;\n' + sh.fragmentShader
+          .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= mix(0.5, 1.04, smoothstep(-0.75, 0.55, vUpN));')
+          .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  { float rimF = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0); totalEmissiveRadiance += uRim * rimF; }');
       };
       const ck = mt.customProgramCacheKey ? mt.customProgramCacheKey() : '';
-      mt.customProgramCacheKey = () => 'dress|' + (useTex ? skin : '') + '|' + ck;
+      mt.customProgramCacheKey = () => 'dress|' + ck;
       mt.needsUpdate = true;
     }
   }
@@ -1112,8 +1069,8 @@
     actorInk.customProgramCacheKey = () => 'actor-ink-' + kind;
     return actorInk;
   }
-  function inkActor(m, kind, skin) {
-    if (G.DH) dress(m, kind || 'ink', skin);
+  function inkActor(m, kind) {
+    if (G.DH) dress(m, kind || 'ink');
     const list = [], mat = inkMaterial(kind);
     m.g.traverse((o) => {
       if (!o.isMesh || !o.geometry || !o.geometry.attributes.normal || o.userData.ink) return;
@@ -1382,7 +1339,7 @@
         flatAt(P.circ, h.x, h.y, h.r, wc, 0.12 + k * 0.14, 0.02, 2);
         flatAt(P.circ, h.x, h.y, Math.max(1, h.r * k), wc, 0.3, 0.025, 3);
         flatAt(P.ring, h.x, h.y, h.r, wc, 0.75 + Math.sin(t * 20) * 0.25, 0.03, 4);
-        if (FXT) { const m = flatAt(P.warn, h.x, h.y, h.r / 0.93, wc, 0.5 + k * 0.5, 0.032, 4); m.rotation.z = t * 0.9 + h.x * 0.01; } // 写实画风：一圈带齿的预警纹，越近落下越亮
+        if (FXT) { const m = flatAt(P.warn, h.x, h.y, h.r / 0.93, wc, 0.5 + k * 0.5, 0.032, 4); m.rotation.z = t * 0.9 + h.x * 0.01; } // 卡通画风：一圈带齿的预警纹，越近落下越亮
         if (h.type === 'lob') {
           const b = P.ball.get(); place(b, U.lerp(h.sx, h.x, k), U.lerp(h.sy, h.y, k), 14 + Math.sin(k * PI) * 130);
           b.scale.setScalar(0.34); b.material.color.copy(c.col).multiplyScalar(0.3);
@@ -1395,7 +1352,7 @@
           if (!h.visual) bandAt(h.x1, h.y1, h.x2, h.y2, h.w * k, wc, 0.28, 0.025, 3);
         } else {
           const f = 1 - (h.t - h.delay) / h.stay;
-          if (FXT) { // 写实画风：一道流光，不是一块板
+          if (FXT) { // 卡通画风：一道流光，不是一块板
             lightLine(h.x1, h.y1, h.x2, h.y2, h.w * (0.55 + f * 0.45), c, Math.min(1, f * 1.6), 20, foe ? c.col : h.kind === 'rift' ? c.col : null);
           } else {
           bandAt(h.x1, h.y1, h.x2, h.y2, h.w, c, 0.55 + f * 0.3, 0.02, 2);
@@ -1468,7 +1425,7 @@
       flatAt(P.ring, h.x, h.y, h.r, c, 0.6 * f, 0.035, 4); flatAt(P.circ, h.x, h.y, h.r, c, 0.08 * f, 0.02, 2);
       for (let i = 0; i < 9; i++) {
         const a = (i / 9) * TAU, m = P.rock.get(), hh = 1.0 + (i % 3) * 0.16;
-        if (m.userData.rockH) { const sy = hh * 1.3; m.position.set((h.x + Math.cos(a) * h.r) * S, sy * (k - 1), (h.y + Math.sin(a) * h.r) * S); m.rotation.set(0, a + i, 0); m.scale.set(0.27, sy, 0.25); if (h.t < 0.3 && i % 3 === 0) dusts.push(m.position.x, 0.1, m.position.z, rgb('150,128,96'), 0.6, 0.5); } // 写实画风：拔地而起的山石
+        if (m.userData.rockH) { const sy = hh * 1.3; m.position.set((h.x + Math.cos(a) * h.r) * S, sy * (k - 1), (h.y + Math.sin(a) * h.r) * S); m.rotation.set(0, a + i, 0); m.scale.set(0.27, sy, 0.25); if (h.t < 0.3 && i % 3 === 0) dusts.push(m.position.x, 0.1, m.position.z, rgb('150,128,96'), 0.6, 0.5); } // 卡通画风：拔地而起的山石
         else { m.position.set((h.x + Math.cos(a) * h.r) * S, hh * (k - 0.5), (h.y + Math.sin(a) * h.r) * S); m.rotation.set(0, a + i, 0); m.scale.set(0.42, hh, 0.36); }
       }
     }
@@ -1498,7 +1455,7 @@
         const s = (pr.mini ? P.mini : pr.style === 2 ? P.sw2 : pr.style === 1 ? P.sw1 : P.sw0).get(); s.position.set(x, y, z); s.rotation.set(0, ry, 0);
         glows.push(x, y, z, c, pr.style ? 0.5 : 0.32, pr.mini ? 0.7 : 1.0);
         trail(pr, x, y, z, c, pr.mini ? 0.05 : pr.style ? 0.1 : 0.07, pr.style ? 0.95 : 0.55);
-        if (G.DH && !pr.mini) trail(pr, x, y, z, rgb('255,255,255'), pr.style ? 0.03 : 0.022, pr.style ? 0.9 : 0.6); // 写实画风：剑光中间一线白炽的芯
+        if (G.DH && !pr.mini) trail(pr, x, y, z, rgb('255,255,255'), pr.style ? 0.03 : 0.022, pr.style ? 0.9 : 0.6); // 卡通画风：剑光中间一线白炽的芯
         if (pr.style === 2 && !pr.mini && FXT && ((pr.t * 30 + pr.x * 0.3) | 0) % 5 === 0) { const a2 = a + U.rand(-0.7, 0.7), l2 = U.rand(16, 30); boltQuad([pr.x - Math.cos(a) * 12, pr.y - Math.sin(a) * 12, pr.z + U.rand(-4, 6)], [pr.x + Math.cos(a2) * l2, pr.y + Math.sin(a2) * l2, pr.z + U.rand(-6, 10)], GOLD_COL, 0.9, 0.36, Math.random() < 0.5 ? 1 : -1); } // 辟邪神雷：淡金的电芒
         if (pr.style === 2 && !pr.mini && ((pr.t * 40) | 0) % 2 === 0) glows.push(x + U.rand(-0.2, 0.2), y + U.rand(-0.1, 0.1), z + U.rand(-0.2, 0.2), GOLD, 0.95, 0.32); // 剑身游走的金色电弧
       } else if (pr.kind === 'fy') { // 蜂云剑阵：七十二口竹青小剑
@@ -1573,7 +1530,7 @@
         (p.add ? glows : dusts).push(p.x * S, p.z * S + 0.03, p.y * S, c, Math.min(1, k * 1.6) * (p.add ? 0.9 : 0.8), size);
       } else if (p.kind === 'ring') {
         const r = U.lerp(p.r1, p.r0, k), c = rgb(p.c);
-        if (FXT) { const m = P.shock.get(), sc = Math.max(0.02, (r * S) / 0.8); m.position.set(p.x * S, 0.06, p.y * S); m.scale.set(sc, sc, 1); m.rotation.z = p.x * 0.13 + p.y * 0.07; m.material.color.copy(c.col); m.material.opacity = Math.min(1, k * 1.5); m.renderOrder = 6; } // 写实画风：带着散逸光丝的冲击波
+        if (FXT) { const m = P.shock.get(), sc = Math.max(0.02, (r * S) / 0.8); m.position.set(p.x * S, 0.06, p.y * S); m.scale.set(sc, sc, 1); m.rotation.z = p.x * 0.13 + p.y * 0.07; m.material.color.copy(c.col); m.material.opacity = Math.min(1, k * 1.5); m.renderOrder = 6; } // 卡通画风：带着散逸光丝的冲击波
         else { const m = P.fxring.get(); m.position.set(p.x * S, 0.06, p.y * S); m.scale.set(Math.max(0.02, r * S), Math.max(0.02, r * S), 1); m.material.color.copy(c.col); m.material.opacity = k * 0.9; m.renderOrder = 6; }
       } else if (p.kind === 'boom') { // 爆炸：一闪、一团火、几缕烟
         const q = 1 - k, c = rgb(p.foe ? ZHU : p.c), R = p.r * S, cx = p.x * S, cz = p.y * S, by = p.z * S, sd = p.seed, hv = (i) => { const n = Math.sin(sd * 12.9898 + i * 78.233) * 43758.5453; return n - Math.floor(n); };
@@ -1633,7 +1590,7 @@
         if (e.stT > 0.25) continue;
       }
       let m = actors.get(e);
-      if (!m) { m = Mo.forEnemy(e); if (!m.world && !m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); actors.set(e, m); if (!NO_INK[e.def.draw]) inkActor(m, 'foe', m.gl ? null : SKINS[e.def.draw]); }
+      if (!m) { m = Mo.forEnemy(e); if (!m.world && !m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); actors.set(e, m); if (!NO_INK[e.def.draw]) inkActor(m, 'foe'); }
       m.seen = frame;
       if (!m.world) { m.g.position.set(e.x * S, e.z * S, e.y * S); m.g.rotation.y = PI / 2 - e.face; }
       m.update(e);
@@ -1642,7 +1599,7 @@
       if (e.invT > 0) alpha *= 0.6 + Math.sin(t * 30) * 0.3;
       m.setAlpha(alpha); m.g.visible = alpha > 0.03;
       if (e.elite) { const gc = rgb('255,200,80'); flatAt(P.ring, e.x, e.y, e.r * 1.6, gc, 0.6 + Math.sin(t * 5) * 0.2, 0.03, 4); flatAt(P.circ, e.x, e.y, e.r * 1.6, gc, 0.12, 0.02, 2); }
-      if (G.DH && alpha > 0.3 && !NO_INK[e.def.draw]) glows.push(e.x * S, (e.z || 0) * S + 0.42, e.y * S, rgb(ZHU), 0.2 + Math.sin(t * 2.3 + e.x * 0.05) * 0.04, e.r * S * 5.2); // 写实画风：身上腾着一团淡淡的朱红煞气
+      if (G.DH && alpha > 0.3 && !NO_INK[e.def.draw]) glows.push(e.x * S, (e.z || 0) * S + 0.42, e.y * S, rgb(ZHU), 0.2 + Math.sin(t * 2.3 + e.x * 0.05) * 0.04, e.r * S * 5.2); // 卡通画风：身上腾着一团淡淡的朱红煞气
       if (alpha > 0.3) flatAt(P.ring, e.x, e.y, e.r * 1.12 + 3, rgb(ZHU), G.PAPER ? 0.8 : 0.55, 0.03, 3); // 脚下一圈朱红：和主角脚下那圈青色对应，一眼分清敌我（鬼物、火灵这些不描边的也靠它）
       if (e.slowT > 0) flatAt(P.ring, e.x, e.y, e.r * 1.25, rgb('140,220,255'), 0.7, 0.035, 4);
       if (e.psn > 0) { const pc = rgb('154,200,50'); flatAt(P.circ, e.x, e.y, e.r * 1.15, pc, 0.1 + Math.min(0.2, e.psn * 0.02), 0.028, 3); if (((t * 9 + e.t * 3) | 0) % 3 === 0) glows.push(e.x * S + U.rand(-0.2, 0.2), e.z * S + U.rand(0.2, 0.9), e.y * S + U.rand(-0.15, 0.15), pc, 0.6, 0.5); } // 中毒：脚下一摊毒绿，身上冒泡
@@ -1708,7 +1665,7 @@
     // 灵宠灵虫
     for (const pt of Gm.pets) {
       let m = petM.get(pt);
-      if (!m) { m = (Mo.toon && Mo.toon('pet_' + pt.id)) || Mo.pet(pt.id); if (!m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); inkActor(m, undefined, m.gl ? null : PET_SKIN[pt.id] === undefined ? 'fur' : PET_SKIN[pt.id]); }
+      if (!m) { m = (Mo.toon && Mo.toon('pet_' + pt.id)) || Mo.pet(pt.id); if (!m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); inkActor(m); }
       m.seen = frame; m.g.visible = !(pt.hide > 0);
       const fly = pt.z ? pt.z + Math.sin(t * 3 + pt.slot) * 4 : 0;
       place(m.g, pt.x, pt.y, fly); m.g.rotation.y = PI / 2 - pt.face;
@@ -1792,7 +1749,7 @@
       c.lineJoin = c.lineCap = 'round';
       for (const q of G.FX.parts) {
         const k = q.life / q.max;
-        if (FXT && (q.kind === 'bolt' || q.kind === 'slash')) continue; // 写实画风：闪电与剑气在三维里用贴图画
+        if (FXT && (q.kind === 'bolt' || q.kind === 'slash')) continue; // 卡通画风：闪电与剑气在三维里用贴图画
         if (q.kind === 'bolt') {
           c.globalCompositeOperation = 'lighter';
           const path = (pts) => { c.beginPath(); for (let j = 0; j < pts.length; j++) { const s = proj(pts[j][0], pts[j][1], pts[j][2]); if (j) c.lineTo(s.x, s.y); else c.moveTo(s.x, s.y); } };
