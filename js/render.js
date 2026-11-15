@@ -1064,8 +1064,8 @@
      3. 朝下的面压暗：肚腹、腋下、下巴底下比背上暗，模型才有分量（相当于一层很便宜的环境光遮蔽）。
      三样都只是在原有材质上加几行着色器，模型、动画都不动 */
   const RIMS = { foe: [1.0, 0.13, 0.06, 0.62], ink: [0.6, 0.8, 0.76, 0.22], gold: [1.0, 0.7, 0.2, 0.6] }, skinTex = {};
-  const SKINS = { wolf: 'fur', bat: 'hide', toad: 'hide', centipede: 'shell', flower: 'leaf', jiao: 'scale', puppet: 'rock', monkey: 'fur', spider: 'shell' };
-  const PET_SKIN = { zhizhu: 'shell', shuangwu: 'shell', quhun: null, renxing: null };
+  const SKINS = { jiao: 'scale' }; // 人物与妖兽是卡通画法（平涂、分档的明暗、描边），不叠细节贴图；只有墨蛟那一身鳞留着
+  const PET_SKIN = { zhizhu: null, shuangwu: null, quhun: null, renxing: null, tihun: null, yinyue: null, tujia: null, baolin: null };
   function dress(m, kind, skin) {
     const R4 = RIMS[kind] || RIMS.ink, rim = new THREE.Vector3(R4[0] * R4[3], R4[1] * R4[3], R4[2] * R4[3]);
     let tex = null;
@@ -1113,8 +1113,7 @@
     return actorInk;
   }
   function inkActor(m, kind, skin) {
-    if (G.DH && !m.char) dress(m, kind || 'ink', skin); // 由设定图生成的人物自带完整的贴图，不再加轮廓光
-    if (m.char) { m.setKind(kind || 'ink'); m.inks = []; return m; } // 由设定图生成的人物不用描边壳，改用一圈轮廓光
+    if (G.DH) dress(m, kind || 'ink', skin);
     const list = [], mat = inkMaterial(kind);
     m.g.traverse((o) => {
       if (!o.isMesh || !o.geometry || !o.geometry.attributes.normal || o.userData.ink) return;
@@ -1667,7 +1666,7 @@
 
     // 主角
     if (p) {
-      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = (G.DH && Mo.char && Mo.char('hero')) || Mo.hero(p.look); if (!heroM.gl) heroM.g.scale.multiplyScalar(ACTOR); heroS0 = heroM.g.scale.x; inkActor(heroM); dyn.add(heroM.g); heroOwner = p; } // 写实画风：主角也是由设定图生成的模型
+      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = (Mo.toon && Mo.toon('hero')) || Mo.hero(p.look); if (!heroM.gl) heroM.g.scale.multiplyScalar(ACTOR); heroS0 = heroM.g.scale.x; inkActor(heroM); dyn.add(heroM.g); heroOwner = p; }
       heroM.g.scale.setScalar(heroS0 * (p.apeT > 0 ? 1.3 * Math.min(1, 0.8 + (p.apeT > 0.3 ? 0.2 : 0)) : 1)); // 惊蛰十二变：身形暴涨
       heroM.g.visible = !p.dead && !(p.inv > 0 && p.dashing <= 0 && Math.floor(t * 20) % 2 === 0);
       place(heroM.g, p.x, p.y, 0); heroM.g.rotation.y = PI / 2 - p.face;
@@ -1709,7 +1708,7 @@
     // 灵宠灵虫
     for (const pt of Gm.pets) {
       let m = petM.get(pt);
-      if (!m) { m = (G.DH && Mo.char && Mo.char('pet_' + pt.id)) || Mo.pet(pt.id); if (!m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); inkActor(m, undefined, m.gl ? null : PET_SKIN[pt.id] === undefined ? 'fur' : PET_SKIN[pt.id]); }
+      if (!m) { m = (Mo.toon && Mo.toon('pet_' + pt.id)) || Mo.pet(pt.id); if (!m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); inkActor(m, undefined, m.gl ? null : PET_SKIN[pt.id] === undefined ? 'fur' : PET_SKIN[pt.id]); }
       m.seen = frame; m.g.visible = !(pt.hide > 0);
       const fly = pt.z ? pt.z + Math.sin(t * 3 + pt.slot) * 4 : 0;
       place(m.g, pt.x, pt.y, fly); m.g.rotation.y = PI / 2 - pt.face;
@@ -1732,7 +1731,7 @@
     // 傀儡
     for (const a of Gm.allies) {
       let m = allyM.get(a);
-      if (!m) { m = (G.DH && Mo.char && Mo.char('ally_puppet')) || Mo.puppet({ body: '#d9b06a', dark: '#7a5a2a', eye: '#7dffea' }, { scale: 0.92 * ACTOR }); dyn.add(m.g); allyM.set(a, m); inkActor(m); }
+      if (!m) { m = Mo.puppet({ body: '#d9b06a', dark: '#7a5a2a', eye: '#7dffea' }, { scale: 0.92 * ACTOR }); dyn.add(m.g); allyM.set(a, m); inkActor(m); }
       m.seen = frame; place(m.g, a.x, a.y, 0); m.g.rotation.y = PI / 2 - a.face; m.update({ t: a.t, moving: false, atk: Math.max(0, a.atk || 0) });
     }
     for (const [a, m] of allyM) if (m.seen !== frame) { dyn.remove(m.g); m.dispose(); allyM.delete(a); }
@@ -1961,7 +1960,7 @@
       G.World.buildRoom(menuRoom, true);
     }
     setRoom(menuRoom);
-    if (!menuHero && G.Assets.settled) { menuHero = (G.DH && Mo.char && Mo.char('hero', { scale: 1.12 })) || Mo.hero({ robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' }); inkActor(menuHero); scene.add(menuHero.g); }
+    if (!menuHero && G.Assets.settled) { menuHero = (Mo.toon && Mo.toon('hero', { scale: ACTOR })) || Mo.hero({ robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' }); inkActor(menuHero); scene.add(menuHero.g); }
     if (heroM) heroM.g.visible = false;
     const cx = menuRoom.w / 2, cz = menuRoom.h / 2 + 0.6;
     if (menuHero) { menuHero.g.visible = true; menuHero.g.position.set(cx, 0, cz); menuHero.g.rotation.y = 0.5; menuHero.update({ t, moving: false }); }

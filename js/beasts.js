@@ -50,7 +50,14 @@
     put(geo, color, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], [w, len, d === undefined ? w : d], [Es.x, Es.y, Es.z]);
   }
   Mo.sculpt = sculpt; Mo.span = span; // 场景物件（scenery.js）也用
-  const skinOf = (c, o) => c.flat('#ffffff', Object.assign({ vertexColors: true, shininess: 5, flatShading: false }, o)); // 绢本：不要削面，明暗是晕开的
+  /* 卡通光照：明暗分成三档（背光 / 半明 / 受光），不是连续过渡。写实贴图画风下，人物与妖兽都用它 */
+  let ramp = null;
+  Mo.toonMat = function (c, o) {
+    if (!ramp) { ramp = new THREE.DataTexture(new Uint8Array([150, 150, 150, 255, 150, 150, 150, 255, 214, 214, 214, 255, 255, 255, 255, 255]), 4, 1, THREE.RGBAFormat); ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true; }
+    const m = new THREE.MeshToonMaterial(Object.assign({ color: 0xffffff, vertexColors: true, gradientMap: ramp }, o));
+    m.userData.o0 = m.opacity; m.userData.e0 = m.emissive.clone(); c.mats.push(m); return m;
+  };
+  const skinOf = (c, o) => (G.DH ? Mo.toonMat(c, o) : c.flat('#ffffff', Object.assign({ vertexColors: true, shininess: 5, flatShading: false }, o))); // 绢本：不要削面，明暗是晕开的
   const glowOf = (c, o) => c.glow('#ffffff', Object.assign({ vertexColors: true }, o));
   const part = (geo, mat, parent, p, shadow) => { const m = new THREE.Mesh(geo, mat); m.castShadow = shadow !== false; if (p) m.position.set(p[0], p[1], p[2]); parent.add(m); return m; };
 
@@ -720,138 +727,4 @@
       return g;
     };
   }
-  /* ============================ 人物（写实画风）：由正面设定图生成的立体模型 ============================
-     每个人物一张正面站姿的设定图（透明底，两臂略张开）。模型由这张图自己生成：
-     1. 轮廓：把图缩成一张网格，够不透明的格子算"在身上"，模型的边就是这圈格子的边；
-     2. 鼓起来：在轮廓里解一个泊松方程（边上是 0，里面处处往上鼓），开方之后——细长的部位（胳膊、腿、兵器）截面近乎圆，
-        宽的部位（躯干、袍子）鼓成扁圆；前后各一面，合成一个封闭的身子；
-     3. 贴图：正面直接把设定图投上去；背面另有一张背面的设定图（生成时以正面图为参考，姿势对得上），
-        没有背面图的就用正面图顶替，只是头的背面换成头发的颜色；
-     4. 骨架：按轮廓找出颈、肩、胯，分出头、躯干、两臂、两腿（穿袍子的，两腿就是两片会摆的下摆），七根骨头。
-        走路、蓄力、出手都只是转这几根骨头。
-     h 身高（格）/ float 没有腿、飘着 / still 立在原地不走 / glow 自己发光几成（鬼物、玄冰）/ cast 出手是抬手一指（主角：身静器动），不是抡起来劈 */
-  const CHARS = {
-    thug: { h: 1.3 }, archer: { h: 1.3 }, ironslave: { h: 1.62 }, disciple: { h: 1.26 }, ghostcult: { h: 1.34 }, bloodguard: { h: 1.38 }, ironcorpse: { h: 1.55 }, flamecult: { h: 1.3 },
-    puppetarcher: { h: 1.3 }, golem: { h: 1.9 }, corpse: { h: 1.45 }, modaifu: { h: 1.5 }, wangchan: { h: 1.5 }, jiyin: { h: 1.55 }, wraith: { h: 1.42, float: 1, glow: 0.5 }, yinhun: { h: 1.42, float: 1, glow: 0.5 }, icepuppet: { h: 1.5, still: 1, glow: 0.3 },
-    pet_quhun: { h: 1.5 }, pet_renxing: { h: 1.2 }, ally_puppet: { h: 0.92 }, hero: { h: 1.3, cast: 1 },
-  };
-  const chCache = {}, GW = 50, GH = 80, DEPTH = 1.12, DMAX = 0.082; // 前后的厚度：细的部位近乎圆（1 就是正圆），再宽也不超过身高的 8%（半厚）
-  const sm = (a, b2, x) => { const t = U.clamp((x - a) / (b2 - a), 0, 1); return t * t * (3 - 2 * t); };
-  function buildChar(key) {
-    if (chCache[key] !== undefined) return chCache[key];
-    const im = G.Tex.img['ch_' + key], P = CHARS[key]; if (!im || !P) return (chCache[key] = null);
-    const cv = document.createElement('canvas'); cv.width = GW; cv.height = GH;
-    const c2 = cv.getContext('2d', { willReadFrequently: true }); c2.drawImage(im, 0, 0, GW, GH);
-    const px = c2.getImageData(0, 0, GW, GH).data, N = GW * GH, raw = new Uint8Array(N), inM = new Uint8Array(N), at = (i, j) => (i < 0 || j < 0 || i >= GW || j >= GH ? 0 : raw[j * GW + i]);
-    for (let i = 0; i < N; i++) raw[i] = px[i * 4 + 3] > 96 ? 1 : 0;
-    // 外扩一格：这一圈的厚度是 0，前后两面在这里合拢成一条边（前后共用同一个顶点，法线才朝外，描边也才均匀）。
-    // 轮廓由模型自己的边决定，不靠贴图的透明度去裁（那样从侧面看，身体的侧面会被裁出锯齿形的洞）
-    for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) { let v = 0; for (let b2 = -1; b2 <= 1 && !v; b2++) for (let a = -1; a <= 1; a++) if (at(i + a, j + b2)) { v = 1; break; } inM[j * GW + i] = v; } // 八个方向都算：斜边上才不会漏格子、留下小洞
-    // 鼓起来：∇²h = -1，边上 h = 0；厚度 = √(2h)
-    const hgt = new Float32Array(N);
-    for (let it = 0; it < 170; it++) for (let j = 1; j < GH - 1; j++) for (let i = 1; i < GW - 1; i++) { const k = j * GW + i; if (!raw[k]) continue; hgt[k] += ((hgt[k - 1] + hgt[k + 1] + hgt[k - GW] + hgt[k + GW] + 1) * 0.25 - hgt[k]) * 1.8; }
-    // 身上的几个位置：头顶、脚底、颈、肩、胯、躯干半宽
-    let top = -1, bot = -1; for (let j = 0; j < GH; j++) { let any = 0; for (let i = 0; i < GW; i++) if (raw[j * GW + i]) { any = 1; break; } if (any) { if (top < 0) top = j; bot = j; } }
-    const Hc = bot - top + 1, cx = GW / 2 - 0.5;
-    const runs = (j) => { const r = []; let s0 = -1; for (let i = 0; i <= GW; i++) { const on = i < GW && raw[j * GW + i]; if (on && s0 < 0) s0 = i; if (!on && s0 >= 0) { r.push([s0, i - 1]); s0 = -1; } } return r; };
-    const mid = (j) => { const r = runs(j); let best = null, bd = 1e9; for (const q of r) { const d = cx < q[0] ? q[0] - cx : cx > q[1] ? cx - q[1] : 0; if (d < bd) { bd = d; best = q; } } return best; };
-    let neckJ = top + Math.round(Hc * 0.14), wMin = 1e9, wMax = 0, jMax = top;
-    for (let j = top; j <= top + Math.round(Hc * 0.13); j++) { const q = mid(j); if (q && q[1] - q[0] > wMax) { wMax = q[1] - q[0]; jMax = j; } }
-    for (let j = jMax + 1; j <= top + Math.round(Hc * 0.24); j++) { const q = mid(j); if (q && q[1] - q[0] < wMin) { wMin = q[1] - q[0]; neckJ = j; } }
-    const tws = []; for (let j = top + Math.round(Hc * 0.3); j <= top + Math.round(Hc * 0.46); j++) { const r = runs(j); if (r.length >= 3) { const q = mid(j); if (q) tws.push((q[1] - q[0] + 1) / 2); } }
-    tws.sort((a, b2) => a - b2); const tw = tws.length ? tws[tws.length >> 1] : Hc * 0.1, shJ = neckJ + Math.round(Hc * 0.025), hipJ = top + Math.round(Hc * 0.5);
-    // 两臂：去掉头和躯干那一柱，剩下的连通块里够得着肩膀高度的就是胳膊（连同手里的兵器）
-    const reg = new Int8Array(N); // 0 躯干与下摆  1 头  2 左臂（x<0）  3 右臂
-    for (let j = 0; j < GH; j++) { // 胯以下：中间连成一片的整段都是下摆（袍子比躯干宽，不能把它的两侧当成胳膊）
-      const q = j >= hipJ ? mid(j) : null;
-      for (let i = 0; i < GW; i++) { const k = j * GW + i; if (!raw[k]) continue; reg[k] = j < shJ ? 1 : Math.abs(i - cx) <= tw * 1.12 || (q && i >= q[0] && i <= q[1]) ? 0 : -1; }
-    }
-    const armN = [0, 0];
-    for (let k0 = 0; k0 < N; k0++) {
-      if (reg[k0] !== -1) continue;
-      const q = [k0]; reg[k0] = -2; let minJ = GH, sx = 0;
-      for (let qi = 0; qi < q.length; qi++) { const k = q[qi], i = k % GW, j = (k / GW) | 0; if (j < minJ) minJ = j; sx += i - cx; for (const d of [1, -1, GW, -GW]) { const k2 = k + d; if (k2 < 0 || k2 >= N || (d === 1 && i === GW - 1) || (d === -1 && i === 0)) continue; if (reg[k2] === -1) { reg[k2] = -2; q.push(k2); } } }
-      const arm = minJ <= top + Hc * 0.4, id = arm ? (sx < 0 ? 2 : 3) : 0;
-      for (const k of q) reg[k] = id; if (arm) armN[id - 2] += q.length;
-    }
-    // 顶点：每个格子前后各一个
-    const u = P.h / Hc, vid = new Int32Array(N).fill(-1), vbk = new Int32Array(N).fill(-1), regV = new Int8Array(N), pos = [], uv = [], si = [], sw = [], idx = [];
-    const X = (i) => (i - cx) * u, Y = (j) => (bot + 0.5 - j) * u, shY = Y(shJ + Hc * 0.02), sho = tw * u, legSw = Math.max(1.5, tw * 0.4);
-    const piv = [[0, Y(hipJ), 0], [0, Y(hipJ), 0], [0, Y(neckJ), 0], [-sho, shY, 0], [sho, shY, 0], [-sho * 0.45, Y(hipJ), 0], [sho * 0.45, Y(hipJ), 0]]; // 根、躯干、头、左臂、右臂、左腿、右腿
-    let nv = 0;
-    for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
-      const k = j * GW + i; if (!inM[k]) continue;
-      let r = reg[k]; if (!raw[k]) { for (const d of [1, -1, GW, -GW, GW + 1, GW - 1, -GW + 1, -GW - 1]) { const k2 = k + d; if (k2 >= 0 && k2 < N && raw[k2]) { r = reg[k2]; break; } } } // 外扩的那一圈跟着邻居走
-      const t = Math.min(Math.sqrt(2 * hgt[k]) * DEPTH, Hc * DMAX) * u, x = X(i), y = Y(j);
-      const w = [0, 0, 0, 0, 0, 0, 0];
-      if (r === 1) { const wh = 1 - sm(neckJ - 1, shJ + 0.5, j); w[2] = wh; w[1] = 1 - wh; }
-      else if (r === 2 || r === 3) { const pv = piv[r + 1], wa = sm(0, Hc * 0.06 * u, Math.hypot(x - pv[0], y - pv[1])); w[r + 1] = wa; w[1] = 1 - wa; }
-      else { const wl = P.float ? sm(hipJ, bot, j) * 0.9 : sm(hipJ - 2, hipJ + Hc * 0.06, j), sL = sm(cx + legSw, cx - legSw, i); w[5] = wl * sL; w[6] = wl * (1 - sL); w[1] = 1 - wl; }
-      const ord = [0, 1, 2, 3, 4, 5, 6].sort((a, b2) => w[b2] - w[a]), tot = w[ord[0]] + w[ord[1]] + w[ord[2]] || 1;
-      for (const z of raw[k] ? [t, -t] : [0]) { pos.push(x, y, z); uv.push((i + 0.5) / GW, 1 - (j + 0.5) / GH); si.push(ord[0], ord[1], ord[2], 0); sw.push(w[ord[0]] / tot, w[ord[1]] / tot, w[ord[2]] / tot, 0); }
-      vid[k] = nv; vbk[k] = raw[k] ? nv + 1 : nv; nv += raw[k] ? 2 : 1; // 边上那一圈：前后是同一个顶点
-      regV[k] = r;
-    }
-    for (let j = 0; j < GH - 1; j++) for (let i = 0; i < GW - 1; i++) {
-      const k = j * GW + i, a = vid[k], b2 = vid[k + 1], c = vid[k + GW], d = vid[k + GW + 1];
-      if (a < 0 || b2 < 0 || c < 0 || d < 0 || !(raw[k] || raw[k + 1] || raw[k + GW] || raw[k + GW + 1])) continue; // 四个角都在外扩圈上的格子不要：那是胳膊与身子之间的空当，补上就成了一层蹼
-      { // 胳膊与身子在这里切开（肩膀附近连着）：垂着的袖子挨着袍子，不切开的话一抬手就拉出一大片蹼
-        const rs4 = [regV[k], regV[k + 1], regV[k + GW], regV[k + GW + 1]], arm = rs4.find((q) => q >= 2);
-        if (arm && rs4.some((q) => q !== arm)) { const pv = piv[arm + 1]; if (Math.hypot(X(i + 0.5) - pv[0], Y(j + 0.5) - pv[1]) > Hc * 0.075 * u) continue; }
-      }
-      idx.push(a, c, b2, b2, c, d, vbk[k], vbk[k + 1], vbk[k + GW], vbk[k + 1], vbk[k + GW + 1], vbk[k + GW]);
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
-    geo.setIndex(idx); geo.computeVertexNormals();
-    // 头发的颜色：头顶那几行的平均
-    let hr = 0, hg = 0, hb = 0, hn = 0; for (let j = top; j <= top + Math.max(1, Math.round(Hc * 0.035)); j++) for (let i = 0; i < GW; i++) { const k = j * GW + i; if (raw[k]) { hr += px[k * 4]; hg += px[k * 4 + 1]; hb += px[k * 4 + 2]; hn++; } }
-    const hair = new THREE.Color().setRGB(hr / hn / 255, hg / hn / 255, hb / hn / 255).convertSRGBToLinear();
-    const mk = (img) => { const t = new THREE.Texture(img); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; t.needsUpdate = true; return t; };
-    const tex = mk(im), imB = G.Tex.img['chb_' + key];
-    // 穿袍子的（靠近脚的地方，中线上不是空的）：下摆只小幅摆动，不迈大步
-    let robeN = 0; for (let j = top + Math.round(Hc * 0.78); j <= top + Math.round(Hc * 0.9); j++) if (raw[j * GW + Math.round(cx)] || raw[j * GW + Math.floor(cx)]) robeN++;
-    const robe = robeN > Hc * 0.06;
-    return (chCache[key] = { geo, tex, texB: imB ? mk(imB) : null, piv, hair, headV: 1 - (shJ + 0.5) / GH, armSide: armN[0] >= armN[1] ? 0 : 1, stride: robe ? 0.2 : 0.4, P });
-  }
-  Mo.char = function (key, o = {}) {
-    const C = buildChar(key); if (!C) return null;
-    const P = C.P, sc = o.scale || 1, g = new THREE.Group();
-    const e0 = P.glow || 0, mat = new THREE.MeshLambertMaterial(Object.assign({ map: C.tex, side: THREE.DoubleSide }, e0 ? { emissiveMap: C.tex, emissive: new THREE.Color(e0, e0, e0) } : {})), rim = new THREE.Vector3();
-    mat.onBeforeCompile = (sh) => { // 朝后的面：有背面图就贴背面图；没有的话，头的背面换成头发的颜色（正面的脸不该出现在后脑勺上）
-      sh.uniforms.uHair = { value: C.hair }; sh.uniforms.uHeadV = { value: C.headV }; sh.uniforms.uRim = { value: rim }; if (C.texB) sh.uniforms.mapB = { value: C.texB };
-      sh.vertexShader = 'varying float vBackK;\n' + sh.vertexShader.replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  vBackK = smoothstep(0.2, -0.2, objectNormal.z);');
-      sh.fragmentShader = 'varying float vBackK;\nuniform vec3 uHair;\nuniform float uHeadV;\nuniform vec3 uRim;\n' + (C.texB ? 'uniform sampler2D mapB;\n' : '') + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n' +
-        (C.texB ? '  diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(mapB, vUv).rgb, vBackK);' : '  diffuseColor.rgb = mix(diffuseColor.rgb, uHair, vBackK * smoothstep(uHeadV - 0.012, uHeadV + 0.012, vUv.y) * 0.94);'))
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += uRim * pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 3.2);');
-    };
-    mat.customProgramCacheKey = () => (C.texB ? 'charB' : 'char');
-    const bones = C.piv.map(() => new THREE.Bone()), par = [-1, 0, 1, 1, 1, 0, 0];
-    bones.forEach((b2, i) => { const pp = par[i] < 0 ? [0, 0, 0] : C.piv[par[i]]; b2.position.set(C.piv[i][0] - pp[0], C.piv[i][1] - pp[1], 0); if (par[i] >= 0) bones[par[i]].add(b2); });
-    const mesh = new THREE.SkinnedMesh(C.geo, mat); mesh.add(bones[0]); mesh.bind(new THREE.Skeleton(bones)); mesh.castShadow = true; mesh.frustumCulled = false; g.add(mesh); g.scale.setScalar(sc);
-    const [root, spine, head, armL, armR, legL, legR] = bones, wArm = C.armSide ? armR : armL, oArm = C.armSide ? armL : armR, rootY = root.position.y, ph0 = Math.random() * 6.28;
-    const m = { g, mats: [mat], h: P.h * sc, gl: true, char: true, _f: 0, _a: 1 };
-    m.setKind = (k) => { if (k === 'foe') rim.set(0.95, 0.12, 0.05).multiplyScalar(0.5); else if (k === 'gold') rim.set(1, 0.7, 0.2).multiplyScalar(0.4); else rim.set(0.5, 0.8, 0.74).multiplyScalar(0.16); }; // 轮廓光：敌人朱红、自己人冷白
-    m.setKind(o.kind);
-    m.update = function (en) {
-      const t = (en.t || 0) + ph0, mv = en.moving && !P.still ? 1 : 0, wind = Math.min(1, en.wind || 0), atk = Math.min(1, en.atk || 0), dash = en.charge || en.dashing ? 1 : 0;
-      const stp = mv ? Math.sin(t * (dash ? 15 : 9.5)) : 0, br = Math.sin(t * 2.1);
-      if (P.float) { legL.rotation.x = legR.rotation.x = 0.18 + Math.sin(t * 2.4) * 0.16 + mv * 0.25; root.rotation.z = Math.sin(t * 1.3) * 0.05; root.position.y = rootY + 0.08 + br * 0.04; }
-      else { legL.rotation.x = -stp * C.stride; legR.rotation.x = stp * C.stride; root.position.y = rootY + (mv ? Math.abs(Math.cos(t * (dash ? 15 : 9.5))) * 0.035 : 0); root.rotation.z = stp * 0.03; }
-      // 两臂：设定图里是张开的，平时收回来一点；走路时前后摆，出手的那只手蓄力时举起、出手时劈下
-      const swing = P.cast ? (atk > 0.02 ? -1.1 * Math.min(1, atk * 1.3) : stp * 0.5 * (C.armSide ? 1 : -1)) : wind > 0 ? -2.4 * wind : atk > 0 ? U.lerp(0.45, -2.4, atk * atk) : stp * 0.5 * (C.armSide ? 1 : -1);
-      wArm.rotation.set(swing, 0, (C.armSide ? -1 : 1) * (0.14 - Math.min(1, Math.abs(swing)) * 0.12));
-      oArm.rotation.set(-stp * 0.5 * (C.armSide ? 1 : -1) + (wind > 0 ? 0.3 * wind : 0), 0, (C.armSide ? 1 : -1) * 0.14);
-      spine.rotation.x = dash ? 0.36 : P.cast ? mv * 0.1 + br * 0.012 : wind > 0 ? -0.16 * wind : atk > 0 ? 0.26 * atk : mv * 0.08 + br * 0.012;
-      spine.rotation.y = P.cast ? 0 : wind > 0 ? (C.armSide ? -0.3 : 0.3) * wind : atk > 0 ? (C.armSide ? 0.35 : -0.35) * atk : 0;
-      head.rotation.x = -spine.rotation.x * 0.5 + br * 0.02;
-    };
-    let fl = 0; // 挨打的一闪：没有自发光贴图的，直接加一层白
-    m.setFlash = function (f) { f = f > 0 ? 1 : 0; if (f === this._f) return; this._f = f; fl = f; if (e0) mat.emissive.setScalar(f ? e0 + 0.5 : e0); else mat.emissive.setScalar(f ? 0.42 : 0); };
-    m.setAlpha = function (a) { a = Math.round(a * 20) / 20; if (a === this._a) return; this._a = a; mat.opacity = a; mat.transparent = a < 0.999; mat.depthWrite = a > 0.5; mesh.castShadow = a > 0.6; };
-    m.dispose = function () { mat.dispose(); mesh.skeleton.dispose(); };
-    return m;
-  };
-  Mo.charFor = (e) => (G.DH ? Mo.char(e.key, { scale: e.elite ? 1.18 : 1, kind: 'foe' }) : null);
 })();

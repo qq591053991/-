@@ -478,7 +478,7 @@
 
   Mo.forEnemy = function (e) {
     const d = e.def, k = d.draw, o = { scale: e.scale || 1 };
-    const ch = Mo.charFor && Mo.charFor(e); if (ch) return ch; // 写实画风：有正面设定图的人物，由设定图生成立体模型
+    const tn = Mo.toonFor && Mo.toonFor(e, o); if (tn) return tn; // 写实贴图画风：人物用照着卡通设定图建的模型（js/chars.js）
     // 有同名的 Tripo 模型（assets/tripo/<角色键名>.glb）就用它
     const tm = G.Assets.makeRig(e.key, { atk: d.gl && d.gl.atk, walk: d.gl && d.gl.walk, scale: ((d.gl && d.gl.s) || d.scale || 1) * (e.elite ? 1.22 : 1) });
     if (tm) return tm;
