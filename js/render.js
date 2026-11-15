@@ -227,7 +227,7 @@
     // 弹幕 = 芯 + 外壳（外壳只画背面，于是在芯的外围露出一圈色边）。我方白芯，敌方暗芯
     orbs = mkInst(Mo.geo.sph(10), 900); orbRims = mkInst(Mo.geo.sph(10), 900, { side: THREE.BackSide });
     shards = mkInst(Mo.geo.oct(), 500); shardRims = mkInst(Mo.geo.oct(), 500, { side: THREE.BackSide });
-    fySw = mkInst(Mo.bladeGeo(), 240, { side: THREE.DoubleSide }); // 蜂云剑阵的小剑
+    fySw = Mo.fyGeo ? mkInst(Mo.fyGeo(), 240, { side: THREE.DoubleSide, vertexColors: true }) : mkInst(Mo.bladeGeo(), 240, { side: THREE.DoubleSide }); // 蜂云剑阵的小剑（写实画风：一口口翠竹剑）
     bugs = mkInst(Mo.geo.sph(10), 160);                             // 噬金虫
     initTrails();
     arrayTex = FXT ? FXT.array : ctex(Tx.array());
@@ -1263,6 +1263,9 @@
           const gsw = P.giant.get(); place(gsw, h.x, h.y, 520 * (1 - k * k)); gsw.rotation.y = t * 1.5;
           for (const mt of gsw.userData.mats) mt.opacity = mt.userData.o0 * (0.3 + k * 0.7);
           glows.push(gsw.position.x, gsw.position.y + 1.4, gsw.position.z, c, 0.5, 4);
+          if (FXT) { const zp = 520 * (1 - k * k);
+            for (let i = 0; i < 3; i++) { const z0 = zp + 30 + Math.random() * 170, dx = U.rand(-26, 26); boltQuad([h.x + dx, h.y, z0], [h.x + dx + U.rand(-34, 34), h.y + U.rand(-8, 8), z0 + U.rand(-70, 70)], GOLD_COL, 0.85, 0.32, i % 2 ? 1 : -1); }
+            for (let i = 0; i < 7; i++) { const a2 = i * 0.9 + t * 2.2, rr = (1 - ((t * 1.4 + i * 0.143) % 1)) * 120; glows.push((h.x + Math.cos(a2) * rr) * S, (zp + 40 + i * 26) * S, (h.y + Math.sin(a2) * rr) * S, c, 0.75, 0.45); } }
           continue;
         }
         if (!foe) { // 我方的落点：不用朱砂，只画一圈流派色的细环，再加上法宝本身
@@ -1397,6 +1400,7 @@
         glows.push(x, y, z, c, pr.style ? 0.5 : 0.32, pr.mini ? 0.7 : 1.0);
         trail(pr, x, y, z, c, pr.mini ? 0.05 : pr.style ? 0.1 : 0.07, pr.style ? 0.95 : 0.55);
         if (G.DH && !pr.mini) trail(pr, x, y, z, rgb('255,255,255'), pr.style ? 0.03 : 0.022, pr.style ? 0.9 : 0.6); // 写实画风：剑光中间一线白炽的芯
+        if (pr.style === 2 && !pr.mini && FXT && ((pr.t * 30 + pr.x * 0.3) | 0) % 5 === 0) { const a2 = a + U.rand(-0.7, 0.7), l2 = U.rand(16, 30); boltQuad([pr.x - Math.cos(a) * 12, pr.y - Math.sin(a) * 12, pr.z + U.rand(-4, 6)], [pr.x + Math.cos(a2) * l2, pr.y + Math.sin(a2) * l2, pr.z + U.rand(-6, 10)], GOLD_COL, 0.9, 0.36, Math.random() < 0.5 ? 1 : -1); } // 辟邪神雷：淡金的电芒
         if (pr.style === 2 && !pr.mini && ((pr.t * 40) | 0) % 2 === 0) glows.push(x + U.rand(-0.2, 0.2), y + U.rand(-0.1, 0.1), z + U.rand(-0.2, 0.2), GOLD, 0.95, 0.32); // 剑身游走的金色电弧
       } else if (pr.kind === 'fy') { // 蜂云剑阵：七十二口竹青小剑
         if (nf < 240) {
@@ -1442,6 +1446,7 @@
   }
   const WHITE = new THREE.Color(0xffffff), GOLD = [1, 0.92, 0.5], WHITE3 = [1, 1, 1], FLAME = [1, 0.62, 0.22];
 
+  const GOLD_COL = new THREE.Color(1, 0.9, 0.55);
   const WHITE_C = [1, 1, 1], SMOKE_C = [0.1, 0.09, 0.085], bA = new THREE.Vector3(), bB = new THREE.Vector3(), bS = new THREE.Vector3(), bV = new THREE.Vector3();
   // 一条正对镜头的带子，从 A 拉到 B（游戏坐标 [x, y, z]）；wk 是宽度占长度的几成
   function boltQuad(A, B, col, op, wk, flip, pool, hw) { // pool：贴哪张图（默认电光）；hw：直接给半宽（格），不按长度算
