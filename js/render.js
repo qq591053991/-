@@ -216,7 +216,7 @@
       fires = new TexCloud(700, Tx.img.fx_flame, 2, 'fire'); smokes = new TexCloud(500, Tx.img.fx_smoke, 2, 'smoke'); sparks = new TexCloud(400, Tx.img.fx_burst, 1, 'add');
       scene.add(fires.obj); scene.add(smokes.obj); scene.add(sparks.obj);
       const ft = (n) => { const t = new THREE.Texture(Tx.img['fx_' + n]); t.encoding = THREE.sRGBEncoding; t.anisotropy = maxAniso; t.needsUpdate = true; return t; };
-      FXT = { array: ft('array'), bagua: ft('bagua'), warn: ft('warn'), ring: ft('ring'), slash: ft('slash'), bolt: ft('bolt'), crack: ft('crack'), swirl: ft('swirl') };
+      FXT = { array: ft('array'), bagua: ft('bagua'), warn: ft('warn'), ring: ft('ring'), slash: ft('slash'), bolt: ft('bolt'), crack: ft('crack'), swirl: ft('swirl'), streak: Tx.img.fx_streak ? ft('streak') : ft('bolt') };
     }
 
     const mkInst = (geo, n, o) => {
@@ -274,6 +274,13 @@
         g2.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2)); g2.setIndex([0, 1, 2, 0, 2, 3]);
         const m = new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ map: FXT.bolt, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); m.frustumCulled = false; m.renderOrder = 30; m.userData.drape = true; return m;
       });
+      // 剑光、光束：同样是一条正对镜头的带子，贴的是流光（一头亮、拖着细丝）；两头各放一条、亮头朝外，中间就是匀的
+      P.beamq = new Pool(() => {
+        const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3).setUsage(THREE.DynamicDrawUsage));
+        g2.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2)); g2.setIndex([0, 1, 2, 0, 2, 3]);
+        const m = new THREE.Mesh(g2, new THREE.MeshBasicMaterial({ map: FXT.streak, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); m.frustumCulled = false; m.renderOrder = 30; m.userData.drape = true; return m;
+      });
+      P.streakF = new Pool(() => { const m = new THREE.Mesh(planeG, flatMat({ map: FXT.streak, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); m.rotation.order = 'YXZ'; m.userData.drape = true; return m; }); // 贴地的流光
     }
     P.wing = new Pool(() => Mo.wings()); P.plate = new Pool(() => Mo.shieldPlate());
     P.gem = new Pool(() => { const m = new THREE.Mesh(Mo.geo.oct(), new THREE.MeshBasicMaterial({ color: 0x8affd8 })); m.scale.set(0.15, 0.24, 0.15); return m; });
@@ -1286,12 +1293,16 @@
           if (!h.visual) bandAt(h.x1, h.y1, h.x2, h.y2, h.w * k, wc, 0.28, 0.025, 3);
         } else {
           const f = 1 - (h.t - h.delay) / h.stay;
+          if (FXT) { // 写实画风：一道流光，不是一块板
+            lightLine(h.x1, h.y1, h.x2, h.y2, h.w * (0.55 + f * 0.45), c, Math.min(1, f * 1.6), 20, foe ? c.col : h.kind === 'rift' ? c.col : null);
+          } else {
           bandAt(h.x1, h.y1, h.x2, h.y2, h.w, c, 0.55 + f * 0.3, 0.02, 2);
           const b = P.beam.get(), dx = h.x2 - h.x1, dy = h.y2 - h.y1, len = Math.hypot(dx, dy);
           b.position.set(((h.x1 + h.x2) / 2) * S, 0.45, ((h.y1 + h.y2) / 2) * S); b.rotation.set(0, -Math.atan2(dy, dx), 0);
           b.scale.set(len * S, 0.9, h.w * S * 0.8); b.material.color.copy(c.col); b.material.opacity = 0.3 + f * 0.25;
+          }
           if (h.kind === 'rift') bandAt(h.x1, h.y1, h.x2, h.y2, h.w * 0.45, rgb('8,4,20'), 0.92 * f, 0.03, 5);          // 空间裂缝：漆黑的缝
-          if (h.kind === 'xuantian') bandAt(h.x1, h.y1, h.x2, h.y2, h.w * 0.3, rgb('255,255,255'), 0.9 * f, 0.03, 5); // 玄天剑光：白炽的芯
+          if (h.kind === 'xuantian' && !FXT) bandAt(h.x1, h.y1, h.x2, h.y2, h.w * 0.3, rgb('255,255,255'), 0.9 * f, 0.03, 5); // 玄天剑光：白炽的芯
         }
       } else if (h.type === 'puddle') {
         const f = Math.min(1, h.life / 0.5) * Math.min(1, h.t / 0.25);
@@ -1302,7 +1313,8 @@
         if (h.t < h.delay) { const k = h.t / h.delay; bandAt(o.x, o.y, x2, y2, h.w, wc, 0.08 + k * 0.2, 0.02, 2); bandAt(o.x, o.y, x2, y2, 4, wc, 0.5 + k * 0.4, 0.03, 3); }
         else {
           const f = Math.min(1, (h.delay + h.life - h.t) / 0.3);
-          for (let i = 0; i < 2; i++) {
+          if (FXT) lightLine(o.x, o.y, x2, y2, h.w * (0.9 + Math.sin(t * 40) * 0.1), c, f, 16, foe ? c.col : null);
+          else for (let i = 0; i < 2; i++) {
             const b = P.beam.get(); b.position.set(((o.x + x2) / 2) * S, 0.34, ((o.y + y2) / 2) * S); b.rotation.set(0, -h.ang, 0);
             b.scale.set(h.len * S, i ? 0.14 : 0.36, h.w * S * (i ? 0.4 : 1) * (0.9 + Math.sin(t * 40) * 0.1));
             if (i) b.material.color.setRGB(0.1, 0.02, 0.03); else b.material.color.copy(c.col);
@@ -1432,12 +1444,22 @@
 
   const WHITE_C = [1, 1, 1], SMOKE_C = [0.1, 0.09, 0.085], bA = new THREE.Vector3(), bB = new THREE.Vector3(), bS = new THREE.Vector3(), bV = new THREE.Vector3();
   // 一条正对镜头的带子，从 A 拉到 B（游戏坐标 [x, y, z]）；wk 是宽度占长度的几成
-  function boltQuad(A, B, col, op, wk, flip) {
-    const m = P.boltq.get(), P3 = m.geometry.attributes.position;
+  function boltQuad(A, B, col, op, wk, flip, pool, hw) { // pool：贴哪张图（默认电光）；hw：直接给半宽（格），不按长度算
+    const m = (pool || P.boltq).get(), P3 = m.geometry.attributes.position;
     bA.set(A[0] * S, A[2] * S + hW(A[0] * S, A[1] * S), A[1] * S); bB.set(B[0] * S, B[2] * S + hW(B[0] * S, B[1] * S), B[1] * S);
-    camera.getWorldDirection(bV); bS.subVectors(bB, bA); const len = bS.length(); bS.cross(bV).normalize().multiplyScalar(Math.min(1.3, Math.max(0.22, len * wk)) * flip);
+    camera.getWorldDirection(bV); bS.subVectors(bB, bA); const len = bS.length(); bS.cross(bV).normalize().multiplyScalar((hw || Math.min(1.3, Math.max(0.22, len * wk))) * flip);
     P3.setXYZ(0, bA.x - bS.x, bA.y - bS.y, bA.z - bS.z); P3.setXYZ(1, bB.x - bS.x, bB.y - bS.y, bB.z - bS.z); P3.setXYZ(2, bB.x + bS.x, bB.y + bS.y, bB.z + bS.z); P3.setXYZ(3, bA.x + bS.x, bA.y + bS.y, bA.z + bS.z);
     P3.needsUpdate = true; m.material.color.copy(col); m.material.opacity = op;
+  }
+  function lightLine(x1, y1, x2, y2, w, c, f, z, core) {
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, hw = Math.max(0.26, w * S * 0.46), cc = core || WHITE;
+    for (const [ax, ay, bx, by] of [[mx, my, x2, y2], [mx, my, x1, y1]]) { // 从中间往两头各拉一条，亮头朝外
+      boltQuad([ax, ay, z], [bx, by, z], c.col, 0.6 * f, 0, 1, P.beamq, hw); boltQuad([ax, ay, z], [bx, by, z], cc, 0.85 * f, 0, 1, P.beamq, hw * 0.3);
+      const m = P.streakF.get(), dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+      m.position.set(((ax + bx) / 2) * S, 0.03, ((ay + by) / 2) * S); m.rotation.set(-PI / 2, -Math.atan2(dy, dx), 0); m.scale.set(len * S, w * S * 1.5, 1); m.material.color.copy(c.col); m.material.opacity = 0.5 * f; m.renderOrder = 4;
+    }
+    const n = Math.min(14, Math.max(3, Math.round(Math.hypot(x2 - x1, y2 - y1) / 70)));
+    for (let i = 0; i <= n; i++) { const u = i / n; glows.push(U.lerp(x1, x2, u) * S, z * S, U.lerp(y1, y2, u) * S, c, 0.13 * f, w * S * 1.9); }
   }
   function syncFx(t) {
     for (const p of G.FX.parts) {
