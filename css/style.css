@@ -154,7 +154,7 @@ html.paper #title-card b { color: #2a2218; text-shadow: 0 0 24px rgba(248, 240, 
 @keyframes toastin { from { opacity: 0; transform: translateY(8px); } }
 
 /* ---------- 弹层 ---------- */
-#overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); z-index: 10; }
+#overlay { position: fixed; inset: 0; display: none; align-items: center; align-items: safe center; overflow-y: auto; justify-content: center; padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); z-index: 10; }
 #overlay.show { display: flex; }
 #overlay.dim { background: rgba(4, 7, 12, 0.72); backdrop-filter: blur(2px); }
 #overlay.black { background: radial-gradient(ellipse at center, rgba(14, 24, 34, 0.96), rgba(2, 4, 8, 0.99)); cursor: pointer; }
@@ -177,9 +177,9 @@ html.paper #title-card b { color: #2a2218; text-shadow: 0 0 24px rgba(248, 240, 
 .choice { text-align: center; animation: fadein 0.3s ease; max-width: 100%; }
 .choice h2, .panel h2 { font-family: var(--kai); font-size: 34px; letter-spacing: 8px; color: #f4efe0; text-shadow: 0 0 20px rgba(227, 194, 122, 0.45); }
 .sub { font-family: var(--kai); font-size: 15px; letter-spacing: 2px; color: rgba(232, 228, 216, 0.7); margin: 6px 0 20px; }
-.cards { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+.cards { --gap: 18px; --cm: 4px; display: flex; gap: var(--gap); justify-content: center; flex-wrap: wrap; } /* --gap 牌与牌的间隔，--cm 每张牌左右的外边距：四张牌的宽度要靠它们来算 */
 /* 抉择卡：一幅挂起来的小立轴。宣纸为底、墨字；上下是天杆地轴；品阶看绫边与题签的颜色 */
-.card { --rc: #5f8f7c; --rt: #3d6e5c; position: relative; width: 224px; min-height: 270px; margin: 13px 4px; padding: 26px 18px 22px; border: 0; border-top: 5px solid var(--rc); border-bottom: 5px solid var(--rc); border-radius: 2px; cursor: pointer; color: #2a231b; text-align: center; font-family: var(--ui);
+.card { --rc: #5f8f7c; --rt: #3d6e5c; position: relative; width: 224px; min-height: 270px; margin: 13px var(--cm); padding: 26px 18px 22px; border: 0; border-top: 5px solid var(--rc); border-bottom: 5px solid var(--rc); border-radius: 2px; cursor: pointer; color: #2a231b; text-align: center; font-family: var(--ui);
   background: radial-gradient(130% 70% at 50% 0%, rgba(255, 252, 240, 0.6), transparent 62%), repeating-linear-gradient(92deg, rgba(110, 86, 52, 0.06) 0 1px, transparent 1px 4px), linear-gradient(180deg, #ece2ca, #d8caaa);
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55), inset 0 0 28px rgba(120, 92, 52, 0.24); transition: transform 0.15s, box-shadow 0.15s; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .card::before, .card::after { content: ''; position: absolute; left: -8px; right: -8px; height: 11px; border-radius: 6px; background: linear-gradient(180deg, #80593a, #3e2717 70%, #2a1a10); box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55); }
@@ -247,7 +247,7 @@ html.paper #title-card b { color: #2a2218; text-shadow: 0 0 24px rgba(248, 240, 
   #hud-tl { width: 200px; left: calc(10px + var(--sl)); top: calc(8px + var(--st)); } #realm { font-size: 16px; }
   #minimap { width: 150px; height: 102px; } #chap { font-size: 13px; }
   body.touch #t-pause { top: calc(142px + var(--st)); }
-  .card { width: 30%; min-width: 150px; min-height: 200px; padding: 14px 10px; } .card .glyph { width: 44px; height: 44px; font-size: 24px; } .card b { font-size: 18px; } .card p { font-size: 12px; }
+  .cards { --gap: 14px; --cm: 2px; } .card { width: 30%; min-width: 150px; min-height: 200px; margin-block: 8px; padding: 14px 10px; } .card .glyph { width: 44px; height: 44px; font-size: 24px; } .card b { font-size: 18px; } .card p { font-size: 12px; }
   .choice h2, .panel h2 { font-size: 24px; } .sub { margin-bottom: 10px; }
   .cols { grid-template-columns: 1fr; gap: 6px; } .panel { padding: 16px 14px; }
   #boss { top: calc(40px + var(--st)); width: 50vw; } #boss-name b { font-size: 16px; }
@@ -258,8 +258,13 @@ html.paper #title-card b { color: #2a2218; text-shadow: 0 0 24px rgba(248, 240, 
 .list.bag h4 { margin: 10px 0 4px; font-family: var(--kai); font-size: 15px; letter-spacing: 4px; color: #e3c27a; font-weight: normal; border-bottom: 1px solid rgba(227, 194, 122, 0.25); padding-bottom: 3px; }
 .list.bag h4:first-child { margin-top: 0; }
 .list.bag h4 small, .row .info b small { font-family: var(--ui); font-size: 11px; letter-spacing: 1px; opacity: 0.7; font-weight: normal; }
-/* 四张牌时（舍弃神通）收窄一点，保证一行放得下 */
-.cards:has(.card:nth-child(4)) .card { width: 196px; }
+/* 四张牌：一行放得下——牌宽按容器均分（扣掉间隔与外边距），最宽 196。
+   原先固定 196，四张要 870 宽；手机横屏扣掉两侧安全区不够（iPhone 15 Pro Max 只剩 814），第四张就被挤到下一行 */
+.cards:has(.card:nth-child(4)) .card { width: min(196px, calc((100% - 3 * var(--gap) - 8 * var(--cm)) / 4)); min-width: 0; }
+/* 竖着拿手机：一行两张（三张是 2 + 1，四张是 2 × 2） */
+@media (max-width: 560px) {
+  .cards .card, .cards:has(.card:nth-child(4)) .card { width: calc((100% - var(--gap) - 4 * var(--cm)) / 2); min-width: 0; min-height: 0; }
+}
 #relics { max-width: 300px; flex-wrap: wrap; }
 .list.scroll.bag { max-height: max(150px, calc(94vh - 540px)); }
 .panel h3 small { font-family: var(--ui); font-size: 12px; letter-spacing: 1px; opacity: 0.6; }
