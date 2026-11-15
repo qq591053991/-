@@ -320,7 +320,7 @@
       this.stats.bosses++;
       for (const o of room.enemies) if (o !== e && !o.dead) { o.dead = true; FX.burst(o.x, o.y, 10, 10, { c: '255,240,200' }); }
       this.clearHostile = true; // 延迟到下一帧清理，避免在遍历弹幕时改动数组
-      this.slowT = 1.6; this.shake(16); this.flash = 0.3;
+      this.slowT = 1.6; this.shake(16); this.flash = 0.3; G.FX.ink(e.x, e.y, 0.09); G.FX.shock(e.x, e.y, 420, 1);
       room.cleared = true; room.locked = false; this.stats.rooms++;
       G.UI.bossBar(null);
       Au.music(ch.music); Au.sfx('boom');

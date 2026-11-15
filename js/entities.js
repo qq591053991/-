@@ -8,7 +8,15 @@
   /* ============================ 特效 ============================ */
   const FX = (G.FX = {
     parts: [], texts: [],
-    clear() { this.parts.length = 0; this.texts.length = 0; },
+    darkA: 0, darkT: 0, darkD: 1, inkReq: null, inkCd: 0,
+    clear() { this.parts.length = 0; this.texts.length = 0; this.darkT = 0; this.inkReq = null; },
+    /* 下面三样只在写实画风的"收尾一趟"里看得见（青绿画风下什么也不做）：
+       shock 冲击波——爆炸那一圈空气把后面的景象折弯一下；
+       darken 大招蓄势——天色压暗（只压暗处，发光的不压），a 是几成，dur 是多久；
+       ink 落下的一瞬——一帧"墨"，画面只剩黑白两色，由落点放出几道白。不能连着用（隔一秒半） */
+    shock(x, y, r, power = 1) { if (this.parts.length < 880) this.parts.push({ kind: 'shock', x, y, z: 0, r, pw: power, life: 0.5, max: 0.5, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 }); },
+    darken(a, dur) { if (this.darkT <= 0 || a >= this.darkA) { this.darkA = a; this.darkT = this.darkD = dur; } },
+    ink(x, y, dur = 0.075) { if (this.inkCd > 0) return; this.inkCd = 1.5; this.inkReq = { x, y, dur }; },
     p(x, y, z, o) {
       if (this.parts.length > 900) return;
       this.parts.push({ kind: o.kind || 'dot', x, y, z, vx: o.vx || 0, vy: o.vy || 0, vz: o.vz || 0, g: o.g || 0,
@@ -67,6 +75,7 @@
     // 爆炸：一团火、几缕烟、一圈冲击波，地上留一片焦裂（由写实画风的贴图粒子来画；青绿画风下只有原来那圈环与火星）
     boom(x, y, r, c, o = {}) {
       if (this.parts.length > 860) return;
+      if (r >= 70 && !o.zap) this.shock(x, y, r * 1.7, Math.min(1, r / 120));
       this.parts.push({ kind: 'boom', x, y, z: o.z || 0, r, c, foe: !!o.foe, smoke: o.smoke !== false, zap: !!o.zap, seed: Math.random() * 100, life: 0.55, max: 0.55, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
       if (o.scorch !== false && r >= 36) this.parts.push({ kind: 'scorch', x, y, z: 0, r: r * 0.95, c, foe: !!o.foe, seed: Math.random() * 6.28, life: 2.6, max: 2.6, add: true, vx: 0, vy: 0, vz: 0, g: 0, drag: 0 });
     },
@@ -85,6 +94,7 @@
       this.texts.push({ x: x + U.rand(-8, 8), y, z, str: String(str), c, size, life: 0.75, max: 0.75, vx: U.rand(-18, 18), vz: 70 });
     },
     update(dt) {
+      if (this.darkT > 0) this.darkT -= dt; if (this.inkCd > 0) this.inkCd -= dt;
       const P = this.parts;
       for (let i = P.length - 1; i >= 0; i--) {
         const p = P[i];
@@ -197,7 +207,7 @@
   E.shieldBurst = function (p) {
     const Gm = G.Game;
     p.shield = 0; p.shieldT = 0;
-    FX.ring(p.x, p.y, 20, 150, '200,220,255', 0.35, 5); Au.sfx('boom');
+    FX.ring(p.x, p.y, 20, 150, '200,220,255', 0.35, 5); FX.shock(p.x, p.y, 190, 0.6); Au.sfx('boom');
     for (const e of Gm.room.enemies) {
       if (e.dead || U.dist(p.x, p.y, e.x, e.y) > 150) continue;
       const a = U.ang(p.x, p.y, e.x, e.y);
@@ -362,6 +372,7 @@
     const has = p.fy || p.wd || p.ky;
     if (!has || p.sp < 100 || p.dead) { if (has && !(p.noMpT > 0)) { FX.text(p.x, p.y, 58, p.wd ? '毒煞未满' : p.ky ? '神识未满' : '剑意未满', '#b8ff8a', 13); Au.sfx('deny'); p.noMpT = 0.6; } return false; }
     p.sp = 0;
+    FX.darken(0.6, 1.1); FX.shock(p.x, p.y, 300, 0.7); // 本命神通出手：天色一暗，一圈气浪自身周荡开
     if (p.wd) return E.castWandu();
     if (p.ky) return E.castKui();
     if (p.dageng) return E.castDageng();
@@ -558,7 +569,7 @@
             if (h.r >= 90) Gm.shake(4);
           } else {
             E.explode(h.x, h.y, h.r, h.dmg, h.c, { shake: h.shake || 0, stun: h.stun, tc: h.tc });
-            if (h.kind === 'giant') FX.array(h.x, h.y, h.r * 0.4, h.r * 1.25, h.c, 0.5, 2);
+            if (h.kind === 'giant') { FX.array(h.x, h.y, h.r * 0.4, h.r * 1.25, h.c, 0.5, 2); FX.ink(h.x, h.y, 0.05); FX.shock(h.x, h.y, h.r * 2.4, 1); } // 巨剑落地：一帧墨、一圈折弯空气的冲击波
           }
           if (h.onBoom) h.onBoom(h);
         }
@@ -649,6 +660,7 @@
     },
     giant(p, ax, ay, lv) {
       E.hazCircle(ax, ay, 92 + lv * 6, 0.55, 95 * (1 + 0.35 * (lv - 1)) * p.spellMul * p.dmgMul, { from: 0, kind: 'giant', c: '110,255,200', shake: 5 });
+      FX.darken(0.5, 0.8);
       Au.sfx('bigsword');
     },
     beetles(p, ax, ay, lv) { for (let i = 0; i < 5 + lv * 2; i++) E.spawnBeetle(p.x + U.rand(-10, 10), p.y + U.rand(-10, 10), lv); Au.sfx('bugs'); },

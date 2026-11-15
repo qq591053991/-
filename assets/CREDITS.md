@@ -34,10 +34,12 @@ CC0 不要求署名，这里列出是为了感谢作者。
 
 ## 贴图（写实画风）
 
-`assets/textures.js` 里的地面、岩石、树叶、墙面、水面、地台与草木贴图，以及法术特效的贴图（`fx_*`），是用图像生成模型（OpenAI `gpt-image-2.6-flare`）
+`assets/textures.js` 里的地面、岩石、树叶、墙面、水面、地台与草木贴图，法术特效的贴图（`fx_*`），以及人物的正面 / 背面设定图（`ch_*`、`chb_*`），是用图像生成模型（OpenAI `gpt-image-2.6-flare`）
 按为本作写的文字描述生成的，再用脚本处理成四方连续 / 抠成透明底 / 拼成图集。没有使用任何第三方素材或参考图片。
 
 ## 代码
+
+- 画面的"收尾一趟"（泛光、冲击波折弯、蓄势压暗、墨帧）与巨剑术半空叠阵图的想法，参考了开源游戏 [Small Magic](https://patch.gg/games/blendi/small-magic)（作者 blendi，代码 MIT 许可）；本作的实现是另写的，没有使用它的代码与素材。
 
 - [three.js](https://threejs.org) r147（MIT 许可）：`lib/three.min.js`，以及其示例目录中的 `lib/GLTFLoader.js`、`lib/SkeletonUtils.js`。
 - 模型精简工具（仅开发时使用）：[glTF-Transform](https://gltf-transform.dev)（MIT 许可）。

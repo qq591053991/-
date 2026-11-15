@@ -307,9 +307,103 @@
     else P.rock = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshLambertMaterial({ color: 0x8e7650, emissive: 0x1c140a })));
     P.shield = new Pool(() => new THREE.Mesh(Mo.geo.sph(14), Mo.inkBlend(new THREE.MeshBasicMaterial({ color: 0xbcd8ff, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }))));
 
+    initPost();
     window.addEventListener('resize', () => this.resize());
     this.resize();
   };
+
+
+  /* ============================ 收尾一趟（写实画风） ============================
+     整幅画面先画进一张高动态范围的图（发光的东西叠起来可以超过"白"，不被截掉），再过一遍：
+     1. 泛光：超过白的那部分向四周晕开——剑光、阵图、火才像是"自己在发亮"。做法是取出亮部画进一张半大的图，
+        用它的各级缩小图当作由近到远的模糊，叠回去；不需要一趟趟地模糊；
+     2. 冲击波：爆炸那一圈空气把后面的景象折弯一下，红色略微错开；
+     3. 大招蓄势：天色压暗、偏冷，只压暗处，发光的不压——法术因此更亮；
+     4. 落下的一瞬：一帧"墨"，画面只剩黑白两色，落点放出几道白；
+     5. 高光柔和地收住（不是硬切成一片白），略提一点饱和与反差。
+     画面仍在显示空间里叠加（各种发光的东西原先就是按显示空间调的），所以不开这一趟时看起来和原来一样。
+     这一趟的思路参考了开源游戏 Small Magic（MIT）的收尾处理；代码是另写的。 */
+  let post = null;
+  function initPost() {
+    if (!G.DH || !renderer.capabilities.isWebGL2) return;
+    const gl = renderer.getContext();
+    if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) return;
+    const sz = renderer.getDrawingBufferSize(new THREE.Vector2());
+    const rtS = new THREE.WebGLRenderTarget(sz.x, sz.y, { type: THREE.HalfFloatType, samples: R.lite ? 2 : 4, depthBuffer: true, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    const rtB = new THREE.WebGLRenderTarget(Math.max(2, sz.x >> 1), Math.max(2, sz.y >> 1), { type: THREE.HalfFloatType, depthBuffer: false, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
+    renderer.setRenderTarget(rtS); const okS = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    renderer.setRenderTarget(rtB); const okB = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    renderer.setRenderTarget(null);
+    if (!okS || !okB) { rtS.dispose(); rtB.dispose(); return; } // 这台设备画不了半浮点的图：不开这一趟
+    // 画进图里时也按显示空间输出（three 默认往图里画线性值）：叠加发光的结果才和直接画到屏幕上一致
+    THREE.ShaderChunk.encodings_fragment = 'gl_FragColor = LinearTosRGB( gl_FragColor );';
+    const VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+    const bright = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, uniforms: { tDrawn: { value: rtS.texture }, uPx: { value: new THREE.Vector2() }, uThr: { value: 0.96 } }, vertexShader: VS,
+      fragmentShader: `varying vec2 vUv; uniform sampler2D tDrawn; uniform vec2 uPx; uniform float uThr;
+        void main() { vec3 c = (texture2D(tDrawn, vUv + uPx * vec2(-0.5, -0.5)).rgb + texture2D(tDrawn, vUv + uPx * vec2(0.5, -0.5)).rgb + texture2D(tDrawn, vUv + uPx * vec2(-0.5, 0.5)).rgb + texture2D(tDrawn, vUv + uPx * vec2(0.5, 0.5)).rgb) * 0.25;
+          float l = max(c.r, max(c.g, c.b)); c *= max(l - uThr, 0.0) / max(l, 1e-4); // 只留超过门槛的部分，颜色不变
+          gl_FragColor = vec4(min(c, vec3(1.6)), 1.0); }` });
+    const U = { tDrawn: { value: rtS.texture }, tBright: { value: rtB.texture }, uSize: { value: new THREE.Vector2(sz.x, sz.y) }, uShock: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
+      uDoom: { value: 0 }, uDoomCol: { value: new THREE.Vector3(0.36, 0.44, 0.6) }, uInk: { value: 0 }, uInkAt: { value: new THREE.Vector2(0.5, 0.5) }, uBloom: { value: 0.3 }, uSquash: { value: Math.sin(PITCH) } };
+    const fin = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, uniforms: U, vertexShader: VS,
+      fragmentShader: `varying vec2 vUv; uniform sampler2D tDrawn; uniform sampler2D tBright; uniform vec2 uSize; uniform vec4 uShock[3]; uniform float uDoom; uniform vec3 uDoomCol; uniform float uInk; uniform vec2 uInkAt; uniform float uBloom; uniform float uSquash;
+        float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+        vec3 glowAt(float lod, float w) { vec2 px = exp2(lod + 1.0) / uSize * 0.6; // 每级取四处：缩小图直接放大是一格一格的，错开取一下就柔了
+          return (texture2DLodEXT(tBright, vUv + px * vec2(1.0, 0.4), lod).rgb + texture2DLodEXT(tBright, vUv + px * vec2(-0.4, 1.0), lod).rgb + texture2DLodEXT(tBright, vUv + px * vec2(-1.0, -0.4), lod).rgb + texture2DLodEXT(tBright, vUv + px * vec2(0.4, -1.0), lod).rgb) * 0.25 * w; }
+        void main() {
+          vec2 asp = vec2(uSize.x / uSize.y, 1.0 / uSquash), at = vUv, split = vec2(0.0); // 地上的圆在斜着看的镜头里是个扁圆
+          for (int i = 0; i < 3; i++) { vec4 s = uShock[i]; if (s.w <= 0.0) continue;
+            vec2 sd = (vUv - s.xy) * asp; float sl = length(sd), so = (sl - s.z) / (0.014 + s.z * 0.11), bend = exp(-so * so) * s.w; vec2 dir = sd / max(sl, 1e-4) / asp;
+            at -= dir * bend * 0.032; split += dir * bend * 0.011; }
+          vec3 c = texture2D(tDrawn, at).rgb;
+          if (dot(split, split) > 1e-9) c.r = texture2D(tDrawn, at - split).r;
+          c += (texture2DLodEXT(tBright, vUv, 0.0).rgb * 0.4 + glowAt(1.0, 0.6) + glowAt(2.0, 0.75) + glowAt(3.0, 0.8) + glowAt(4.0, 0.7) + glowAt(5.0, 0.45)) * uBloom;
+          float l = dot(c, vec3(0.299, 0.587, 0.114));
+          c = mix(c, c * uDoomCol, uDoom * (1.0 - smoothstep(0.62, 1.15, l)));
+          vec3 hi = max(c - 0.8, 0.0); c = min(c, vec3(0.8)) + 0.2 * (1.0 - exp(-hi * 5.0 * 0.62)); // 高光：过了八成亮就渐渐收住，再亮也只是趋近于白
+          l = dot(c, vec3(0.299, 0.587, 0.114)); c = mix(vec3(l), c, 1.07);
+          c = mix(c, c * c * (3.0 - 2.0 * c), 0.1);
+          if (uInk > 0.0) {
+            vec2 sd = (vUv - uInkAt) * vec2(uSize.x / uSize.y, 1.0); float sl = length(sd), k = smoothstep(0.3, 0.38, dot(c, vec3(0.299, 0.587, 0.114))), cell = floor(atan(sd.y, sd.x) * 7.0);
+            float ray = step(0.7, hash(vec2(cell, 3.0))) * smoothstep(0.1, 0.2, sl - 0.16 * hash(vec2(cell, 9.0)));
+            k = max(k, 1.0 - smoothstep(0.0, 0.01, sl - 0.055)); // 落点：一个实心的白点
+            k = mix(k, 1.0 - k, ray * 0.9);
+            c = mix(c, vec3(k) * vec3(0.97, 0.95, 0.9), uInk);
+          }
+          gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+        }` });
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fin); quad.frustumCulled = false;
+    const stage = new THREE.Scene(); stage.add(quad); const flat = new THREE.Camera();
+    renderer.info.autoReset = false;
+    let doom = 0, inkT = 0, inkD = 0.08;
+    post = {
+      resize() { renderer.getDrawingBufferSize(sz); rtS.setSize(sz.x, sz.y); rtB.setSize(Math.max(2, sz.x >> 1), Math.max(2, sz.y >> 1)); U.uSize.value.set(sz.x, sz.y); },
+      render(dt, inGame) {
+        const FXg = G.FX;
+        // 压暗：渐入渐出
+        const want = inGame && FXg.darkT > 0 ? FXg.darkA * Math.min(1, FXg.darkT / 0.3) * Math.min(1, (FXg.darkD - FXg.darkT) / 0.12 + 0.2) : 0;
+        doom += (want - doom) * Math.min(1, dt * 14); U.uDoom.value = doom;
+        // 墨帧：按真实时间算（慢动作里也只是一瞬）
+        if (inGame && FXg.inkReq) { const q = FXg.inkReq, sp = proj(q.x, q.y, 0); FXg.inkReq = null; inkT = inkD = q.dur; U.uInkAt.value.set(sp.x / W, 1 - sp.y / H); }
+        if (inkT > 0) { inkT -= dt; U.uInk.value = inkT > 0 ? Math.min(1, inkT / (inkD * 0.35)) : 0; } else U.uInk.value = 0;
+        // 冲击波：最多三圈
+        let n = 0;
+        if (inGame) for (const q of FXg.parts) {
+          if (q.kind !== 'shock' || n >= 3) continue;
+          const k = 1 - q.life / q.max, sp = proj(q.x, q.y, 0), sp2 = proj(q.x + q.r, q.y, 0);
+          U.uShock.value[n++].set(sp.x / W, 1 - sp.y / H, (Math.abs(sp2.x - sp.x) / H) * (0.12 + 0.88 * Math.pow(k, 0.7)), q.pw * (1 - k) * (1 - k));
+        }
+        for (; n < 3; n++) U.uShock.value[n].w = 0;
+        renderer.info.reset();
+        renderer.setRenderTarget(rtS); renderer.render(scene, camera);
+        bright.uniforms.uPx.value.set(1 / sz.x, 1 / sz.y); quad.material = bright;
+        renderer.setRenderTarget(rtB); renderer.render(stage, flat);
+        quad.material = fin; renderer.setRenderTarget(null); renderer.render(stage, flat);
+      },
+    };
+  }
+  // 把这一帧画出来：有收尾一趟就走它，没有就直接画
+  function present(dt, inGame) { if (post && R.quality !== 'low' && !R.noPost) post.render(dt, inGame); else { if (post) renderer.info.reset(); renderer.render(scene, camera); } }
 
   R.resize = function () {
     if (!this.ok) return;
@@ -319,6 +413,7 @@
     this.cv.style.width = W + 'px'; this.cv.style.height = H + 'px';
     ov.width = Math.round(W * dpr); ov.height = Math.round(H * dpr); ov.style.width = W + 'px'; ov.style.height = H + 'px';
     camera.aspect = W / H; camera.updateProjectionMatrix();
+    if (post) post.resize();
   };
 
   /* 画质自适应：帧率撑不住就降渲染分辨率（一档一成，最低六成），稳住之后再慢慢升回去。
@@ -1018,7 +1113,8 @@
     return actorInk;
   }
   function inkActor(m, kind, skin) {
-    if (G.DH) dress(m, kind || 'ink', skin);
+    if (G.DH && !m.char) dress(m, kind || 'ink', skin); // 由设定图生成的人物自带完整的贴图，不再加轮廓光
+    if (m.char) { m.setKind(kind || 'ink'); m.inks = []; return m; } // 由设定图生成的人物不用描边壳，改用一圈轮廓光
     const list = [], mat = inkMaterial(kind);
     m.g.traverse((o) => {
       if (!o.isMesh || !o.geometry || !o.geometry.attributes.normal || o.userData.ink) return;
@@ -1259,6 +1355,10 @@
         if (h.kind === 'giant') { // 巨剑术：阵图 + 光柱 + 自天而降的巨剑
           const m = P.arr.get(); m.position.set(h.x * S, 0.045, h.y * S); m.scale.set(h.r * S, h.r * S, 1); m.rotation.z = t * 2.2; m.material.color.copy(c.col); m.material.opacity = 0.35 + k * 0.6; m.renderOrder = 5;
           flatAt(P.circ, h.x, h.y, Math.max(1, h.r * k), c, 0.16, 0.025, 3);
+          if (FXT) for (let i = 1; i <= 2; i++) { // 半空里再叠两层阵图，一层比一层小、反着转；巨剑穿过哪一层，哪一层就亮一下
+            const m2 = P.arr.get(), hy = i * 1.5, rr = h.r * S * (1 - i * 0.27), pass = (520 * (1 - k * k)) * S < hy ? 1 : 0;
+            m2.position.set(h.x * S, 0.045 + hy, h.y * S); m2.scale.set(rr, rr, 1); m2.rotation.z = (i % 2 ? -1 : 1) * t * (2.4 + i); m2.material.color.copy(c.col); m2.material.opacity = Math.min(1, 0.22 + k * 0.4 + pass * 0.5); m2.renderOrder = 6;
+          }
           const b = P.beam.get(); b.position.set(h.x * S, 4, h.y * S); b.rotation.set(0, t * 3, 0); b.scale.set(0.2 + k * 0.5, 8, 0.2 + k * 0.5); b.material.color.copy(c.col); b.material.opacity = 0.1 + k * 0.22;
           const gsw = P.giant.get(); place(gsw, h.x, h.y, 520 * (1 - k * k)); gsw.rotation.y = t * 1.5;
           for (const mt of gsw.userData.mats) mt.opacity = mt.userData.o0 * (0.3 + k * 0.7);
@@ -1567,7 +1667,7 @@
 
     // 主角
     if (p) {
-      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = Mo.hero(p.look); if (!heroM.gl) heroM.g.scale.multiplyScalar(ACTOR); heroS0 = heroM.g.scale.x; inkActor(heroM); dyn.add(heroM.g); heroOwner = p; }
+      if (heroOwner !== p) { if (heroM) { dyn.remove(heroM.g); heroM.dispose(); } heroM = (G.DH && Mo.char && Mo.char('hero')) || Mo.hero(p.look); if (!heroM.gl) heroM.g.scale.multiplyScalar(ACTOR); heroS0 = heroM.g.scale.x; inkActor(heroM); dyn.add(heroM.g); heroOwner = p; } // 写实画风：主角也是由设定图生成的模型
       heroM.g.scale.setScalar(heroS0 * (p.apeT > 0 ? 1.3 * Math.min(1, 0.8 + (p.apeT > 0.3 ? 0.2 : 0)) : 1)); // 惊蛰十二变：身形暴涨
       heroM.g.visible = !p.dead && !(p.inv > 0 && p.dashing <= 0 && Math.floor(t * 20) % 2 === 0);
       place(heroM.g, p.x, p.y, 0); heroM.g.rotation.y = PI / 2 - p.face;
@@ -1609,7 +1709,7 @@
     // 灵宠灵虫
     for (const pt of Gm.pets) {
       let m = petM.get(pt);
-      if (!m) { m = Mo.pet(pt.id); if (!m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); inkActor(m, undefined, m.gl ? null : PET_SKIN[pt.id] === undefined ? 'fur' : PET_SKIN[pt.id]); }
+      if (!m) { m = (G.DH && Mo.char && Mo.char('pet_' + pt.id)) || Mo.pet(pt.id); if (!m.gl) m.g.scale.multiplyScalar(ACTOR); dyn.add(m.g); petM.set(pt, m); inkActor(m, undefined, m.gl ? null : PET_SKIN[pt.id] === undefined ? 'fur' : PET_SKIN[pt.id]); }
       m.seen = frame; m.g.visible = !(pt.hide > 0);
       const fly = pt.z ? pt.z + Math.sin(t * 3 + pt.slot) * 4 : 0;
       place(m.g, pt.x, pt.y, fly); m.g.rotation.y = PI / 2 - pt.face;
@@ -1632,7 +1732,7 @@
     // 傀儡
     for (const a of Gm.allies) {
       let m = allyM.get(a);
-      if (!m) { m = Mo.puppet({ body: '#d9b06a', dark: '#7a5a2a', eye: '#7dffea' }, { scale: 0.92 * ACTOR }); dyn.add(m.g); allyM.set(a, m); inkActor(m); }
+      if (!m) { m = (G.DH && Mo.char && Mo.char('ally_puppet')) || Mo.puppet({ body: '#d9b06a', dark: '#7a5a2a', eye: '#7dffea' }, { scale: 0.92 * ACTOR }); dyn.add(m.g); allyM.set(a, m); inkActor(m); }
       m.seen = frame; place(m.g, a.x, a.y, 0); m.g.rotation.y = PI / 2 - a.face; m.update({ t: a.t, moving: false, atk: Math.max(0, a.atk || 0) });
     }
     for (const [a, m] of allyM) if (m.seen !== frame) { dyn.remove(m.g); m.dispose(); allyM.delete(a); }
@@ -1848,7 +1948,7 @@
     syncFx(t);
     endPools();
     liftDyn();
-    renderer.render(scene, camera);
+    present(dt, true);
     drawOverlay(Gm, room, p, t, true);
   };
 
@@ -1861,7 +1961,7 @@
       G.World.buildRoom(menuRoom, true);
     }
     setRoom(menuRoom);
-    if (!menuHero && G.Assets.settled) { menuHero = Mo.hero({ robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' }); inkActor(menuHero); scene.add(menuHero.g); }
+    if (!menuHero && G.Assets.settled) { menuHero = (G.DH && Mo.char && Mo.char('hero', { scale: 1.12 })) || Mo.hero({ robe: '#3f8f86', trim: '#d9f2e6', skin: '#f2d2b0', hat: 'player', backSword: true, weapon: 'none' }); inkActor(menuHero); scene.add(menuHero.g); }
     if (heroM) heroM.g.visible = false;
     const cx = menuRoom.w / 2, cz = menuRoom.h / 2 + 0.6;
     if (menuHero) { menuHero.g.visible = true; menuHero.g.position.set(cx, 0, cz); menuHero.g.rotation.y = 0.5; menuHero.update({ t, moving: false }); }
@@ -1880,7 +1980,7 @@
     camera.position.set(cx + Math.sin(a) * d, 5.6 * wide, cz + Math.cos(a) * d);
     camera.lookAt(cx - 2.2 * Math.cos(a) * (W / H > 1.2 ? 1 : 0), 1.6, cz);
     camera.updateMatrixWorld();
-    renderer.render(scene, camera);
+    present(dt, false);
     drawOverlay(Gm, menuRoom, null, t, false);
   };
 
