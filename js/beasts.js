@@ -1,5 +1,6 @@
 /* 妖兽与灵宠的造型
-   和山石、树木用同一套语言：削面、下深上浅、描墨线。
+   绢本画风：和山石、树木用同一套语言——削面、下深上浅、描墨线。
+   卡通画风：和人物一个路子——零件一律是圆的（见"卡通画风下，妖兽用圆的零件"），大头、亮眼黑瞳。
    做法是"雕塑"——把一个刚体部件（躯干、头、一条腿）里的所有小块烘成一个几何体，
    颜色写进顶点色，再乘一层从下到上由深变浅的明暗。一只妖兽因此只有七八个网格。 */
 (function () {
@@ -61,13 +62,30 @@
   const glowOf = (c, o) => c.glow('#ffffff', Object.assign({ vertexColors: true }, o));
   const part = (geo, mat, parent, p, shadow) => { const m = new THREE.Mesh(geo, mat); m.castShadow = shadow !== false; if (p) m.position.set(p[0], p[1], p[2]); parent.add(m); return m; };
 
+  /* 卡通画风下，妖兽用圆的零件：球更圆、锥与柱不再是四五棱的、方块是磨圆了角的——
+     和人物一样是圆润的块面，不是削面的低模。这一段（狼……墨蛟）里的 ico / cone / cyl / box / oct 都换成圆的；
+     后面的交互物（宝匣、石碑、摊子）仍用原来的 */
+  const RAW = Mo.geo, HI = G.DH;
+  const rbox = () => SC.rbox || (SC.rbox = (() => { const q = new THREE.BoxGeometry(1, 1, 1, 3, 3, 3), P = q.attributes.position, v = new V3(), w = new V3(); for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); w.copy(v).normalize().multiplyScalar(0.6); v.lerp(w, 0.5); P.setXYZ(i, v.x, v.y, v.z); } return q; })());
+  {
+  const ico = HI ? (d = 0) => RAW.ico(Math.min(2, d + 1)) : RAW.ico, cone = HI ? (n = 10) => RAW.cone(n < 6 ? 9 : n) : RAW.cone, cyl = HI ? (rt, rb, n) => RAW.cyl(rt, rb, !n || n < 6 ? 10 : n) : RAW.cyl, box = HI ? rbox : RAW.box, oct = HI ? () => RAW.ico(1) : RAW.oct;
+
   /* ============================ 狼 ============================
      胸高臀低、脊上一排鬃、尖吻獠牙。几个开关给灵宠用：
      fox 狐相（大耳大尾）、mark 额上的印记、horn 独角、armor 一片压一片的背甲 */
   Mo.wolf = function (L, o = {}) {
     const c = ctx(), g = c.g, skin = skinOf(c), glo = glowOf(c), k = 'wolf:' + sig(L);
     const fur = L.fur, dark = L.dark, lite = tint(L.fur, 0.2), paw = tint(L.dark, -0.3), fox = !!L.fox, ts = fox ? 1.5 : L.armor ? 1.25 : 1;
+    const belly = tint(L.fur, 0.36);
     const bodyG = sculpt(k + ':body', (put) => {
+      if (HI) { // 卡通：一个圆滚滚的身子，胸前一圈浅色的毛，肚皮是浅的；脊上三撮短鬃（土甲龙是一片压一片的背甲）
+        put(ico(1), fur, [0, 0.03, -0.02], [0.37, 0.35, 0.62]);
+        put(ico(0), lite, [0, -0.03, 0.2], [0.31, 0.3, 0.26]);
+        put(ico(0), belly, [0, -0.1, -0.05], [0.27, 0.18, 0.46]);
+        if (L.armor) for (let i = 0; i < 5; i++) put(box(), i % 2 ? tint(L.armor, 0.12) : L.armor, [0, 0.2 - i * 0.014, 0.23 - i * 0.125], [0.38 - i * 0.028, 0.07, 0.19], [0.3, 0, 0]);
+        else for (let i = 0; i < 3; i++) put(cone(4), dark, [0, 0.2 - i * 0.03, 0.14 - i * 0.17], [0.11, 0.17 - i * 0.03, 0.15], [-0.75, 0, 0]);
+        return;
+      }
       put(ico(1), fur, [0, 0.05, 0.13], [0.31, 0.31, 0.38]);                 // 胸
       put(ico(1), fur, [0, 0, -0.2], [0.25, 0.25, 0.34]);                    // 臀
       put(ico(0), dark, [0, -0.08, -0.03], [0.2, 0.14, 0.46]);               // 腹
@@ -76,6 +94,20 @@
       else for (let i = 0; i < 4; i++) put(cone(4), dark, [0, 0.21 - i * 0.024, 0.2 - i * 0.135], [0.07, 0.2 - i * 0.032, 0.12], [-0.6, 0, 0]);
     });
     const headG = sculpt(k + ':head', (put) => {
+      if (HI) { // 卡通：大圆头、短吻、鼓鼓的腮、一对大耳（耳里是浅的）、两颗小獠牙、压低的眉——凶，但是圆的
+        put(ico(1), fur, [0, 0.02, 0], [0.35, 0.31, 0.31]);
+        put(ico(0), lite, [0, -0.055, 0.17], [0.18, 0.15, 0.21]);
+        put(ico(0), INK, [0, -0.03, 0.28], [0.06, 0.05, 0.05]);
+        for (const sx of [-1, 1]) {
+          put(ico(0), lite, [sx * 0.135, -0.06, 0.05], [0.13, 0.12, 0.13]);
+          put(cone(4), dark, [sx * 0.115, 0.2, -0.03], [fox ? 0.15 : 0.13, fox ? 0.3 : 0.21, 0.07], [0, 0, -sx * 0.3]);
+          put(cone(4), belly, [sx * 0.115, 0.185, 0.0], [fox ? 0.09 : 0.075, fox ? 0.2 : 0.13, 0.04], [0, 0, -sx * 0.3]);
+          put(cone(4), BONE, [sx * 0.05, -0.125, 0.2], [0.03, 0.065, 0.03], [PI, 0, 0]);
+          put(box(), INK, [sx * 0.088, 0.115, 0.128], [0.13, 0.04, 0.05], [0, 0, sx * 0.5]);
+        }
+        if (L.horn) put(cone(5), L.horn, [0, 0.24, 0.05], [0.07, 0.32, 0.07], [0.5, 0, 0]);
+        return;
+      }
       put(ico(1), fur, [0, 0, 0], [0.25, 0.22, 0.26]);
       put(cone(4), lite, [0, -0.03, 0.18], [0.14, 0.26, 0.12], [PI / 2, 0, 0]);       // 吻
       put(ico(0), INK, [0, -0.012, 0.305], 0.05);                                      // 鼻
@@ -88,18 +120,24 @@
       if (L.horn) put(cone(5), L.horn, [0, 0.21, 0.05], [0.06, 0.32, 0.06], [0.5, 0, 0]);
     });
     const eyeG = sculpt(k + ':eye', (put) => {
+      if (HI) { // 卡通：一对发亮的杏眼，里头一点黑瞳
+        for (const sx of [-1, 1]) { put(ico(0), L.eye, [sx * 0.085, 0.05, 0.135], [0.1, 0.08, 0.04]); put(ico(0), INK, [sx * 0.08, 0.045, 0.152], [0.04, 0.055, 0.02]); }
+        if (L.mark) { put(oct(), L.mark, [0, 0.135, 0.108], [0.08, 0.035, 0.03]); put(oct(), L.mark, [0, 0.162, 0.086], [0.04, 0.024, 0.03]); }
+        return;
+      }
       for (const sx of [-1, 1]) put(oct(), L.eye, [sx * 0.075, 0.035, 0.114], [0.075, 0.036, 0.03], [0, 0, sx * 0.45]);
       if (L.mark) { put(oct(), L.mark, [0, 0.1, 0.088], [0.075, 0.03, 0.03]); put(oct(), L.mark, [0, 0.125, 0.07], [0.035, 0.02, 0.03]); }
     }, 1, 1);
-    const legF = sculpt(k + ':legF', (put) => { put(cyl(0.5, 0.34, 5), dark, [0, -0.11, 0], [0.09, 0.24, 0.09]); put(box(), paw, [0, -0.235, 0.025], [0.085, 0.05, 0.13]); });
-    const legH = sculpt(k + ':legH', (put) => { put(ico(0), fur, [0, -0.01, 0], [0.13, 0.2, 0.18]); put(cyl(0.5, 0.34, 5), dark, [0, -0.14, -0.02], [0.075, 0.2, 0.075]); put(box(), paw, [0, -0.235, 0.01], [0.085, 0.05, 0.13]); });
+    const legF = sculpt(k + ':legF', (put) => { if (HI) { put(cyl(0.5, 0.42, 5), dark, [0, -0.1, 0], [0.115, 0.22, 0.115]); put(ico(0), paw, [0, -0.21, 0.03], [0.14, 0.085, 0.18]); return; } put(cyl(0.5, 0.34, 5), dark, [0, -0.11, 0], [0.09, 0.24, 0.09]); put(box(), paw, [0, -0.235, 0.025], [0.085, 0.05, 0.13]); });
+    const legH = sculpt(k + ':legH', (put) => { if (HI) { put(ico(0), fur, [0, -0.01, 0], [0.17, 0.23, 0.21]); put(cyl(0.5, 0.42, 5), dark, [0, -0.13, -0.01], [0.105, 0.2, 0.105]); put(ico(0), paw, [0, -0.21, 0.02], [0.14, 0.085, 0.18]); return; } put(ico(0), fur, [0, -0.01, 0], [0.13, 0.2, 0.18]); put(cyl(0.5, 0.34, 5), dark, [0, -0.14, -0.02], [0.075, 0.2, 0.075]); put(box(), paw, [0, -0.235, 0.01], [0.085, 0.05, 0.13]); });
     const tailG = sculpt(k + ':tail', (put) => { // 蓬尾：一整条向后上方翘起的毛刷，根细、中段最粗、末梢收成一个尖
       const tip = L.tip || lite, a = [0, 0, 0.02], m = [0, 0.13 * ts, -0.3 * ts], e = [0, 0.2 * ts, -0.5 * ts];
+      if (HI) { span(put, ico(1), fur, a, m, 0.21 * ts, 0.23 * ts); span(put, ico(0), tip, [0, 0.1 * ts, -0.25 * ts], e, 0.16 * ts, 0.17 * ts); return; } // 卡通：一条蓬松的圆尾，尾梢一团浅色
       span(put, ico(1), fur, a, m, 0.17 * ts, 0.19 * ts);
       span(put, cone(5), tip, [0, 0.085 * ts, -0.2 * ts], e, 0.16 * ts, 0.17 * ts);
     });
     const body = c.grp([0, 0.3, 0]); part(bodyG, skin, body);
-    const head = c.grp([0, 0.12, 0.34], body); part(headG, skin, head); part(eyeG, glo, head, null, false);
+    const head = c.grp([0, 0.12, 0.34], body); part(headG, skin, head); part(eyeG, glo, head, null, false); if (HI) head.scale.setScalar(1.12); // 卡通：头大
     const tail = c.grp([0, 0.07, -0.34], body); part(tailG, skin, tail);
     const legs = [[-0.11, 0.2, legF], [0.11, 0.2, legF], [-0.11, -0.22, legH], [0.11, -0.22, legH]].map(([x, z, q]) => { const lg = c.grp([x, -0.05, z], body); part(q, skin, lg); return lg; });
     if (o.scale) g.scale.setScalar(o.scale);
@@ -121,7 +159,18 @@
     if (SC.batwing) return SC.batwing;
     const w = WING, pos = [], colr = [], nor = [], sh = { S: 0.7, B: 0.7, W: 0.9, T1: 1.25, T2: 1.25, T3: 1.2, M12: 1.0, M23: 1.0, M3B: 0.85 };
     const tri = (a, b, c2) => { for (const k of [a, b, c2]) { pos.push(w[k][0], w[k][1], w[k][2]); colr.push(sh[k], sh[k], sh[k]); nor.push(0, 1, 0); } };
+    if (HI) { // 卡通：指骨之间的后缘是一道道圆弧（不是折线），膜自腕向外由暗到亮
+      const pt = (q, k2) => { pos.push(q[0], 0, q[2]); colr.push(k2, k2, k2); nor.push(0, 1, 0); }, out = [[w.T1, 1.25]];
+      for (const [a, m, b] of [['T1', 'M12', 'T2'], ['T2', 'M23', 'T3'], ['T3', 'M3B', 'B']]) for (let i = 1; i <= 5; i++) {
+        const t = i / 5, A = w[a], Bq = w[b], M = w[m], cx = 2 * M[0] - (A[0] + Bq[0]) / 2, cz = 2 * M[2] - (A[2] + Bq[2]) / 2; // 过中点的二次曲线
+        out.push([[(1 - t) * (1 - t) * A[0] + 2 * (1 - t) * t * cx + t * t * Bq[0], 0, (1 - t) * (1 - t) * A[2] + 2 * (1 - t) * t * cz + t * t * Bq[2]], 1.2 - 0.3 * Math.sin(t * PI) - (b === 'B' ? 0.4 * t : 0)]);
+      }
+      out.push([w.S, 0.7]);
+      for (let i = 0; i < out.length - 1; i++) { pt(w.W, 0.92); pt(out[i + 1][0], out[i + 1][1]); pt(out[i][0], out[i][1]); }
+      pt(w.W, 0.92); pt(w.T1, 1.25); pt(w.S, 0.7);
+    } else {
     tri('W', 'M12', 'T1'); tri('W', 'T2', 'M12'); tri('W', 'M23', 'T2'); tri('W', 'T3', 'M23'); tri('W', 'M3B', 'T3'); tri('W', 'B', 'M3B'); tri('W', 'S', 'B');
+    }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
     return (SC.batwing = g);
@@ -130,6 +179,18 @@
     const c = ctx(), g = c.g, skin = skinOf(c), glo = glowOf(c), k = 'bat:' + sig(L);
     const mem = c.lam(L.wing, { side: THREE.DoubleSide, vertexColors: true }), lite = tint(L.body, 0.16), bone = tint(L.wing, -0.25);
     const bodyG = sculpt(k + ':body', (put) => {
+      if (HI) { // 卡通：一团圆滚滚的毛球，一对大得过分的耳朵（耳里是浅的），两颗小獠牙
+        put(ico(1), L.body, [0, 0, 0], [0.27, 0.27, 0.25]);
+        put(ico(0), lite, [0, -0.05, 0.07], [0.2, 0.17, 0.15]);
+        put(ico(0), bone, [0, -0.005, 0.118], [0.09, 0.065, 0.07]);
+        for (const sx of [-1, 1]) {
+          put(cone(4), L.body, [sx * 0.105, 0.2, -0.01], [0.14, 0.28, 0.07], [0, 0, -sx * 0.36]);
+          put(cone(4), tint(L.body, 0.4), [sx * 0.105, 0.185, 0.02], [0.085, 0.19, 0.04], [0, 0, -sx * 0.36]);
+          put(cone(4), BONE, [sx * 0.03, -0.06, 0.128], [0.026, 0.06, 0.026], [PI, 0, 0]);
+          put(cone(4), bone, [sx * 0.06, -0.15, 0], [0.04, 0.07, 0.04], [PI, 0, 0]);
+        }
+        return;
+      }
       put(ico(1), L.body, [0, 0, 0], [0.2, 0.23, 0.19]);
       put(ico(0), lite, [0, -0.03, 0.05], [0.18, 0.15, 0.14]);                                              // 胸毛
       put(ico(0), bone, [0, 0.0, 0.1], [0.085, 0.06, 0.07]);                                                 // 吻
@@ -139,7 +200,7 @@
         put(cone(4), bone, [sx * 0.045, -0.14, 0], [0.03, 0.07, 0.03], [PI, 0, 0]);                         // 爪
       }
     });
-    const eyeG = sculpt(k + ':eye', (put) => { for (const sx of [-1, 1]) put(oct(), L.eye, [sx * 0.048, 0.048, 0.088], [0.05, 0.03, 0.02], [0, 0, sx * 0.4]); }, 1, 1);
+    const eyeG = sculpt(k + ':eye', (put) => { for (const sx of [-1, 1]) { if (HI) { put(ico(0), L.eye, [sx * 0.07, 0.055, 0.1], [0.08, 0.075, 0.04]); put(ico(0), INK, [sx * 0.066, 0.05, 0.117], [0.032, 0.046, 0.02]); } else put(oct(), L.eye, [sx * 0.048, 0.048, 0.088], [0.05, 0.03, 0.02], [0, 0, sx * 0.4]); } }, 1, 1);
     const boneG = sculpt(k + ':bone', (put) => { const w = WING; span(put, cyl(0.5, 0.5, 4), bone, w.S, w.W, 0.05, 0.05); for (const t of ['T1', 'T2', 'T3']) span(put, cone(4), bone, w.W, w[t], 0.045, 0.045); }, 0.9, 1.1);
     const b = c.grp(); part(bodyG, skin, b); part(eyeG, glo, b, null, false);
     const wr = c.grp([0.07, 0.03, 0]), wl = c.grp([-0.07, 0.03, 0]); wr.scale.setScalar(0.52); wl.scale.set(-0.52, 0.52, 0.52);
@@ -183,8 +244,9 @@
   Mo.centipede = function (L, o = {}) {
     const c = ctx(), g = c.g, skin = skinOf(c), glo = glowOf(c), k = 'cent:' + sig(L);
     const plate = (kk, a, b2, extra) => sculpt(k + kk, (put) => {
-      put(cyl(0.5, 0.5, 6), a, [0, 0, 0], [1.0, 0.5, 0.95]);
-      put(box(), b2, [0, 0.27, 0], [0.3, 0.12, 0.8]);                                                       // 背脊
+      if (HI) { put(ico(0), a, [0, 0, 0], [1.08, 0.7, 1.02]); put(box(), b2, [0, 0.31, 0], [0.36, 0.14, 0.74]); } // 卡通：一节一颗圆珠子，背上压一道脊
+      else { put(cyl(0.5, 0.5, 6), a, [0, 0, 0], [1.0, 0.5, 0.95]);
+      put(box(), b2, [0, 0.27, 0], [0.3, 0.12, 0.8]); }                                                     // 背脊
       for (const sx of [-1, 1]) put(cone(4), a, [sx * 0.56, 0.02, 0], [0.3, 0.34, 0.6], [0, 0, -sx * PI / 2]); // 两侧的甲尖
       if (extra) extra(put);
     });
@@ -193,7 +255,7 @@
     const pTail = plate(':t', L.body, L.dark, (put) => { for (const sx of [-1, 1]) span(put, cone(4), L.leg, [sx * 0.2, 0.05, -0.4], [sx * 0.5, 0.2, -1.15], 0.16); });
     const legG = sculpt(k + ':legs', (put) => { for (const sx of [-1, 1]) { span(put, cyl(0.5, 0.5, 4), L.leg, [sx * 0.4, -0.05, 0], [sx * 0.82, 0.12, 0], 0.1); span(put, cone(4), L.leg, [sx * 0.8, 0.12, 0], [sx * 0.98, -0.44, 0], 0.11); } }, 0.75, 1.05);
     const pinG = sculpt(k + ':pin', (put) => { span(put, cone(4), L.leg, [0, 0, 0], [0, 0, 0.66], 0.2); }, 0.9, 1.1);
-    const eyeG = sculpt(k + ':eye', (put) => { for (const sx of [-1, 1]) put(oct(), L.eye, [sx * 0.24, 0.2, 0.43], [0.16, 0.1, 0.1]); }, 1, 1);
+    const eyeG = sculpt(k + ':eye', (put) => { for (const sx of [-1, 1]) { if (HI) { put(ico(0), L.eye, [sx * 0.25, 0.22, 0.4], [0.24, 0.2, 0.14]); put(ico(0), INK, [sx * 0.26, 0.21, 0.455], [0.1, 0.11, 0.06]); } else put(oct(), L.eye, [sx * 0.24, 0.2, 0.43], [0.16, 0.1, 0.1]); } }, 1, 1);
     const N = 7, segs = [];
     for (let i = 0; i < N; i++) {
       const r = i === 0 ? 0.3 : 0.27 - i * 0.02;
@@ -408,7 +470,7 @@
       for (let i = 0; i < 7; i++) { const a = (i / 7) * TAU + 0.2, l = 0.2 + (i % 3) * 0.07; put(cone(4), L.dark, [Math.cos(a) * 0.15, 0.14 - l / 2, Math.sin(a) * 0.13], [0.13, l, 0.1], [PI, 0, 0]); } // 撕破的下摆
       put(ico(0), '#06100d', [0, 0.52, 0.1], [0.22, 0.24, 0.16]);               // 脸：一个黑洞
     }, 0.5, 1.1);
-    const eyeG = sculpt(k + ':eye', (put) => { for (const sx of [-1, 1]) put(oct(), L.eye, [sx * 0.06, 0.55, 0.185], [0.05, 0.085, 0.02], [0, 0, -sx * 0.25]); }, 1, 1);
+    const eyeG = sculpt(k + ':eye', (put) => { for (const sx of [-1, 1]) put(oct(), L.eye, [sx * (HI ? 0.07 : 0.06), 0.55, 0.185], HI ? [0.075, 0.11, 0.03] : [0.05, 0.085, 0.02], [0, 0, -sx * 0.25]); }, 1, 1);
     const armG = sculpt(k + ':arm', (put) => { span(put, cyl(0.4, 0.5, 5), L.body, [0, 0, 0], [0, -0.02, 0.26], 0.08); for (let i = -1; i <= 1; i++) span(put, cone(4), L.body, [i * 0.025, -0.02, 0.25], [i * 0.06, -0.06, 0.36], 0.03); }, 0.8, 1.1);
     const b = c.grp([0, 0.2, 0]);
     part(bodyG, skin, b, null, false); part(eyeG, glo, b, null, false);
@@ -500,6 +562,8 @@
     m.world = true; // 自带世界坐标，不随实体整体平移
     return m;
   };
+
+  } // 妖兽的造型到此为止
 
   /* ============================ 交互物 ============================
      宝匣、药园、石碑、坊市的摊子：同样是雕塑出来的削面体，同样描墨线 */
