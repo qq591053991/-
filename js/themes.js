@@ -73,25 +73,29 @@
     { // 0 七玄门 —— 春日晴空下的山门：粉墙黛瓦，青石板，草色新
       void: '#2a3a44', mist: '240,248,255', dom: '#a0987f', floor: '#a49a82', floor2: '#988e78', line: 'rgba(52,46,34,0.32)', moss: '#7fa052', grass: '#84aa52',
       face: '#f0e8d6', faceDark: '#cfc5ae', base: '#6e685a', top: '#3e4c5a', topHi: '#5e6e7e', water: '#3f9a98', waterHi: '#dcf6ee',
-      bg: 0xa6c8e2, sky: 0x3f86d6, fog: [0xb4d0e6, 21, 64], cloudShadow: [0.15, 15], dark: 0.2, ink: 0x1c2228, hemi: [0xfff6e6, 0x6e8060, 0.74], sun: [0xffe2b4, 1.02],
+      bg: 0xa6c8e2, sky: 0x3f86d6, fog: [0xb4d0e6, 21, 64], cloudShadow: [0.15, 15], dark: 0.2, ink: 0x1c2228, hemi: [0xe4eeff, 0x7a8a5e, 0.66], sun: [0xffdca6, 1.2],
+      grade: { sh: [0.92, 0.97, 1.08], hi: [1.05, 1.01, 0.94], sat: 1.12, con: 0.16, vig: 0.16, wash: 0.05, ao: [0.4, 0.46, 0.58] },
       sea: [0xffffff, 0.92, 0xcfe0ee, 0.92], shaft: [0xfff2cc, 0.16], lamp: '255,204,128', lampHex: 0xffcc80,
     },
     { // 1 血色禁地 —— 深秋的密林：暮色偏冷，满山红叶
       void: '#1a1e26', mist: '196,210,228', dom: '#6e5c46', floor: '#72604a', floor2: '#685642', line: 'rgba(0,0,0,0)', moss: '#6a6e42', grass: '#8a6a3e',
       face: '#74685c', faceDark: '#52483e', base: '#3a342e', top: '#5a4436', topHi: '#7a5c46', water: '#2c4a56', waterHi: '#a8cad4',
-      bg: 0x7e8ea4, sky: 0x4a6aa6, fog: [0x8494aa, 19, 60], cloudShadow: [0.22, 8], dark: 0.28, ink: 0x14120f, hemi: [0xdce6f4, 0x4a3c30, 0.78], sun: [0xffdcb8, 1.05],
+      bg: 0x7e8ea4, sky: 0x4a6aa6, fog: [0x8494aa, 19, 60], cloudShadow: [0.22, 8], dark: 0.28, ink: 0x14120f, hemi: [0xc8d8f2, 0x54402e, 0.72], sun: [0xffcf9a, 1.25],
+      grade: { sh: [0.88, 0.96, 1.12], hi: [1.08, 1.0, 0.9], sat: 1.14, con: 0.18, vig: 0.2, wash: 0.06, ao: [0.42, 0.38, 0.5] },
       sea: [0xdfe6f0, 0.86, 0x8e9cb0, 0.9], shaft: [0xe6eefa, 0.15], lamp: '255,196,140', lampHex: 0xffc48c,
     },
     { // 2 燕翎堡 —— 围城：烽烟里的黄昏，天是橘红的
       void: '#1c1612', mist: '236,200,170', dom: '#7a7268', floor: '#7e766c', floor2: '#746c62', line: 'rgba(16,12,8,0.36)', moss: '#5e584e', grass: '#6a5e4a',
       face: '#8a8278', faceDark: '#625a52', base: '#38342f', top: '#3c3836', topHi: '#58524e', water: '#24282e', waterHi: '#9a9ea6',
-      bg: 0xc08e64, sky: 0x7a6a7c, fog: [0xb48660, 19, 58], cloudShadow: [0.24, 12], dark: 0.3, ink: 0x120f0c, hemi: [0xf6dcc0, 0x4c4038, 0.76], sun: [0xffb878, 1.08],
+      bg: 0xc08e64, sky: 0x7a6a7c, fog: [0xb48660, 19, 58], cloudShadow: [0.24, 12], dark: 0.3, ink: 0x120f0c, hemi: [0xd8c4c8, 0x4c3a34, 0.66], sun: [0xffb070, 1.22],
+      grade: { sh: [0.98, 0.93, 1.06], hi: [1.05, 1.0, 0.92], sat: 1.08, con: 0.2, vig: 0.22, wash: 0.07, ao: [0.46, 0.36, 0.38] },
       sea: [0xe8c8a8, 0.84, 0xa07a5c, 0.9], shaft: null, lamp: '255,190,120', lampHex: 0xffbe78,
     },
     { // 3 虚天殿 —— 雪中古殿：天光清冷，玉砖与积雪
       void: '#16222e', mist: '220,236,255', dom: '#a8bccc', floor: '#aabece', floor2: '#9eb2c2', line: 'rgba(40,64,88,0.36)', moss: '#d4e2ec', grass: '#dce8f0',
       face: '#4a6482', faceDark: '#344a64', base: '#243448', top: '#6a8098', topHi: '#92a8be', water: '#2e5672', waterHi: '#b4dcf2',
-      bg: 0x9cb8d4, sky: 0x4a84c8, fog: [0xa2bcd6, 21, 64], cloudShadow: [0.14, 16], dark: 0.2, ink: 0x101c2a, hemi: [0xe6f0ff, 0x56687a, 0.72], sun: [0xf4f8ff, 0.95],
+      bg: 0x9cb8d4, sky: 0x4a84c8, fog: [0xa2bcd6, 21, 64], cloudShadow: [0.14, 16], dark: 0.2, ink: 0x101c2a, hemi: [0xcfe0ff, 0x56687a, 0.64], sun: [0xf8f4ec, 0.98],
+      grade: { sh: [0.9, 0.96, 1.12], hi: [1.01, 1.01, 1.0], sat: 1.08, con: 0.16, vig: 0.16, wash: 0.02, ao: [0.38, 0.46, 0.64] },
       sea: [0xffffff, 0.92, 0xb4cade, 0.92], shaft: [0xe6f2ff, 0.13], lamp: '255,206,150', lampHex: 0xffce96,
     },
   ].forEach((o, i) => Object.assign(G.Themes[i], o));

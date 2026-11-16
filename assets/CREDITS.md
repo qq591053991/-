@@ -39,7 +39,7 @@ CC0 不要求署名，这里列出是为了感谢作者。
 
 ## 代码
 
-- 场景的纵深（一层层自雾里拔起的石峰、空气透视、谷底的雾、成团的云、峰顶的亭子与飞瀑）参考了开源作品 [赤龍 Crimson Loong](https://github.com/ChetasLua/crimson-loong)（作者 ChetasLua，纯 three.js、不用素材）的搭法；本作的实现是另写的，没有使用它的代码。
+- 场景的纵深（一层层自雾里拔起的石峰、空气透视、谷底的雾、成团的云、峰顶的亭子与飞瀑），以及建筑上的灯笼与幡旗、收尾时加环境遮蔽与调色的做法，参考了开源作品 [赤龍 Crimson Loong](https://github.com/ChetasLua/crimson-loong)（作者 ChetasLua，纯 three.js、不用素材）的搭法；本作的实现是另写的，没有使用它的代码。
 - 画面的"收尾一趟"（泛光、冲击波折弯、蓄势压暗、墨帧）与巨剑术半空叠阵图的想法，参考了开源游戏 [Small Magic](https://patch.gg/games/blendi/small-magic)（作者 blendi，代码 MIT 许可）；本作的实现是另写的，没有使用它的代码与素材。
 
 - [three.js](https://threejs.org) r147（MIT 许可）：`lib/three.min.js`，以及其示例目录中的 `lib/GLTFLoader.js`、`lib/SkeletonUtils.js`。

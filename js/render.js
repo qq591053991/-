@@ -353,10 +353,21 @@
   let post = null;
   function initPost() {
     if (!G.DH || !renderer.capabilities.isWebGL2) return;
+    if (R.noAO === undefined) R.noAO = /[?&]ao=0\b/.test(location.search); // 网址加 ?ao=0 关掉环境遮蔽（排查用）
     const gl = renderer.getContext();
     if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) return;
     const sz = renderer.getDrawingBufferSize(new THREE.Vector2());
-    const rtS = new THREE.WebGLRenderTarget(sz.x, sz.y, { type: THREE.HalfFloatType, samples: R.lite ? 2 : 4, depthBuffer: true, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    // 画场景的那张图带一张深度图：环境遮蔽要靠它知道每个像素有多远。深度图挂不上的设备就不开环境遮蔽
+    const mkS = (withDepth) => { const o = { type: THREE.HalfFloatType, samples: R.lite ? 2 : 4, depthBuffer: true, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter };
+      if (withDepth) { o.depthTexture = new THREE.DepthTexture(sz.x, sz.y, THREE.UnsignedIntType); o.depthTexture.minFilter = o.depthTexture.magFilter = THREE.NearestFilter; }
+      return new THREE.WebGLRenderTarget(sz.x, sz.y, o); };
+    let rtS = mkS(!R.noAO), hasDepth = !R.noAO;
+    if (hasDepth) { // 多重采样的图：深度图挂在"汇总"用的那只帧缓冲上，单独查一下它齐不齐
+      renderer.setRenderTarget(rtS); const fb = renderer.properties.get(rtS).__webglFramebuffer;
+      if (fb) { gl.bindFramebuffer(gl.FRAMEBUFFER, fb); if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) hasDepth = false; }
+      renderer.resetState(); renderer.setRenderTarget(null);
+      if (!hasDepth) { rtS.depthTexture.dispose(); rtS.dispose(); rtS = mkS(false); }
+    }
     const rtB = new THREE.WebGLRenderTarget(Math.max(2, sz.x >> 1), Math.max(2, sz.y >> 1), { type: THREE.HalfFloatType, depthBuffer: false, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
     renderer.setRenderTarget(rtS); const okS = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
     renderer.setRenderTarget(rtB); const okB = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
@@ -370,10 +381,58 @@
         void main() { vec3 c = (texture2D(tDrawn, vUv + uPx * vec2(-0.5, -0.5)).rgb + texture2D(tDrawn, vUv + uPx * vec2(0.5, -0.5)).rgb + texture2D(tDrawn, vUv + uPx * vec2(-0.5, 0.5)).rgb + texture2D(tDrawn, vUv + uPx * vec2(0.5, 0.5)).rgb) * 0.25;
           float l = max(c.r, max(c.g, c.b)); c *= max(l - uThr, 0.0) / max(l, 1e-4); // 只留超过门槛的部分，颜色不变
           gl_FragColor = vec4(min(c, vec3(1.6)), 1.0); }` });
-    const U = { tDrawn: { value: rtS.texture }, tBright: { value: rtB.texture }, uSize: { value: new THREE.Vector2(sz.x, sz.y) }, uShock: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
+    /* 环境遮蔽：东西挨着东西的地方（墙根、石脚、树下、人物脚边）天光照不进去，该暗一点。
+       每个像素从深度图还原出自己在镜头里的位置与朝向，在周围一小圈（世界里大约半格多）取八个点：
+       哪个点高出自己这片面，就挡掉一点天光。取点的方向每 4×4 个像素转一轮，再用 4×4 的均值抹平（隔着深度断层的不算）。半幅大小 */
+    const hw = () => Math.max(2, sz.x >> 1), hh = () => Math.max(2, sz.y >> 1);
+    const rtA = new THREE.WebGLRenderTarget(hw(), hh(), { depthBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    const rtA2 = new THREE.WebGLRenderTarget(hw(), hh(), { depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    const aoM = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, vertexShader: VS,
+      uniforms: { tDepth: { value: rtS.depthTexture }, uPx: { value: new THREE.Vector2() }, uNF: { value: new THREE.Vector2(1, 260) }, uTan: { value: new THREE.Vector2(1, 1) }, uRad: { value: 0.75 } },
+      fragmentShader: `precision highp float; varying vec2 vUv; uniform sampler2D tDepth; uniform vec2 uPx; uniform vec2 uNF; uniform vec2 uTan; uniform float uRad;
+        vec2 snap(vec2 uv) { return (floor(uv / uPx) + 0.5) * uPx; }
+        float vz(vec2 uv) { float d = texture2D(tDepth, uv).x; return uNF.x * uNF.y / (uNF.y - d * (uNF.y - uNF.x)); }
+        vec3 vp(vec2 uv, float z) { return vec3((uv * 2.0 - 1.0) * uTan * z, -z); }
+        void main() {
+          vec2 u0 = snap(vUv);
+          float z = vz(u0), zz = clamp(z / 128.0, 0.0, 1.0) * 255.0;
+          if (z > 110.0) { gl_FragColor = vec4(1.0, floor(zz) / 255.0, fract(zz), 1.0); return; }
+          vec3 p = vp(u0, z); vec2 ex = vec2(uPx.x, 0.0), ey = vec2(0.0, uPx.y);
+          float zl = vz(u0 - ex), zr = vz(u0 + ex), zd = vz(u0 - ey), zu = vz(u0 + ey);
+          vec3 dx = abs(zr - z) < abs(z - zl) ? vp(u0 + ex, zr) - p : p - vp(u0 - ex, zl);
+          vec3 dy = abs(zu - z) < abs(z - zd) ? vp(u0 + ey, zu) - p : p - vp(u0 - ey, zd);
+          vec3 n = normalize(cross(dx, dy));
+          vec2 fc = floor(mod(gl_FragCoord.xy, 4.0));
+          float ang = fract((fc.x + fc.y * 4.0) * 0.4375 + 0.03) * 6.2832, occ = 0.0;
+          vec2 rUv = min(uRad / (z * uTan * 2.0), vec2(0.07));
+          for (int i = 0; i < 8; i++) {
+            float t = (float(i) + 0.5) / 8.0, a = ang + float(i) * 2.4;
+            vec2 uv = snap(u0 + vec2(cos(a), sin(a)) * rUv * (0.2 + 0.8 * t));
+            vec3 v = vp(uv, vz(uv)) - p; float vv = dot(v, v);
+            occ += max(0.0, dot(v, n) / (sqrt(vv) + 1e-4) - 0.16) * max(0.0, 1.0 - vv / (uRad * uRad * 3.0));
+          }
+          float ao = clamp(1.0 - occ * 0.36, 0.0, 1.0);
+          ao = mix(ao, 1.0, smoothstep(50.0, 105.0, z));
+          gl_FragColor = vec4(ao, floor(zz) / 255.0, fract(zz), 1.0);
+        }` });
+    const aoB = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, vertexShader: VS, uniforms: { tA: { value: rtA.texture }, uPx: { value: new THREE.Vector2() } },
+      fragmentShader: `precision highp float; varying vec2 vUv; uniform sampler2D tA; uniform vec2 uPx;
+        float zOf(vec4 c) { return (c.g * 255.0 + c.b) * (128.0 / 255.0); }
+        void main() {
+          vec4 c0 = texture2D(tA, vUv); float z0 = zOf(c0), s = 0.0, ws = 0.0;
+          for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++) {
+            vec4 c = texture2D(tA, vUv + (vec2(float(x), float(y)) - 1.5) * uPx);
+            float wgt = max(0.0, 1.0 - abs(zOf(c) - z0) * 2.2 / (1.0 + z0 * 0.03)); s += c.r * wgt; ws += wgt;
+          }
+          gl_FragColor = vec4(ws > 1e-3 ? s / ws : c0.r, 0.0, 0.0, 1.0);
+        }` });
+    const GRADE = { sh: [0.93, 0.97, 1.07], hi: [1.04, 1.01, 0.95], sat: 1.1, con: 0.14, vig: 0.16, wash: 0.08, ao: [0.42, 0.46, 0.58] }; // 没写调色的主题用这一套
+    const U = { tDrawn: { value: rtS.texture }, tBright: { value: rtB.texture }, tAO: { value: rtA2.texture }, uAO: { value: 0 }, uAoTint: { value: new THREE.Vector3(0.42, 0.46, 0.58) },
+      uSh: { value: new THREE.Vector3(1, 1, 1) }, uHi: { value: new THREE.Vector3(1, 1, 1) }, uSat: { value: 1.07 }, uCon: { value: 0.1 }, uVig: { value: 0 }, uWash: { value: 0 }, uSunC: { value: new THREE.Color(1, 0.9, 0.7) }, uAoShow: { value: /[?&]ao=show\b/.test(location.search) ? 1 : 0 }, uSize: { value: new THREE.Vector2(sz.x, sz.y) }, uShock: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
       uDoom: { value: 0 }, uDoomCol: { value: new THREE.Vector3(0.36, 0.44, 0.6) }, uInk: { value: 0 }, uInkAt: { value: new THREE.Vector2(0.5, 0.5) }, uBloom: { value: 0.3 }, uSquash: { value: Math.sin(PITCH) } };
     const fin = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, uniforms: U, vertexShader: VS,
       fragmentShader: `varying vec2 vUv; uniform sampler2D tDrawn; uniform sampler2D tBright; uniform vec2 uSize; uniform vec4 uShock[3]; uniform float uDoom; uniform vec3 uDoomCol; uniform float uInk; uniform vec2 uInkAt; uniform float uBloom; uniform float uSquash;
+        uniform sampler2D tAO; uniform float uAO; uniform vec3 uAoTint; uniform vec3 uSh; uniform vec3 uHi; uniform float uSat; uniform float uCon; uniform float uVig; uniform float uWash; uniform vec3 uSunC; uniform float uAoShow;
         float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
         vec3 glowAt(float lod, float w) { vec2 px = exp2(lod + 1.0) / uSize * 0.6; // 每级取四处：缩小图直接放大是一格一格的，错开取一下就柔了
           return (texture2DLodEXT(tBright, vUv + px * vec2(1.0, 0.4), lod).rgb + texture2DLodEXT(tBright, vUv + px * vec2(-0.4, 1.0), lod).rgb + texture2DLodEXT(tBright, vUv + px * vec2(-1.0, -0.4), lod).rgb + texture2DLodEXT(tBright, vUv + px * vec2(0.4, -1.0), lod).rgb) * 0.25 * w; }
@@ -384,12 +443,17 @@
             at -= dir * bend * 0.032; split += dir * bend * 0.011; }
           vec3 c = texture2D(tDrawn, at).rgb;
           if (dot(split, split) > 1e-9) c.r = texture2D(tDrawn, at - split).r;
+          if (uAO > 0.0) { float ao = texture2D(tAO, at).r, lm = max(c.r, max(c.g, c.b)); ao = mix(ao, 1.0, smoothstep(0.8, 1.3, lm)); c *= mix(vec3(1.0), mix(uAoTint, vec3(1.0), ao), uAO); } // 发亮的东西不压
           c += (texture2DLodEXT(tBright, vUv, 0.0).rgb * 0.4 + glowAt(1.0, 0.6) + glowAt(2.0, 0.75) + glowAt(3.0, 0.8) + glowAt(4.0, 0.7) + glowAt(5.0, 0.45)) * uBloom;
           float l = dot(c, vec3(0.299, 0.587, 0.114));
           c = mix(c, c * uDoomCol, uDoom * (1.0 - smoothstep(0.62, 1.15, l)));
           vec3 hi = max(c - 0.8, 0.0); c = min(c, vec3(0.8)) + 0.2 * (1.0 - exp(-hi * 5.0 * 0.62)); // 高光：过了八成亮就渐渐收住，再亮也只是趋近于白
-          l = dot(c, vec3(0.299, 0.587, 0.114)); c = mix(vec3(l), c, 1.07);
-          c = mix(c, c * c * (3.0 - 2.0 * c), 0.1);
+          // 调色：暗部偏冷、亮部偏暖（分离色调），再提一点饱和与反差；四角略压暗；日头那一侧（左上）罩一层淡淡的暖光
+          l = dot(c, vec3(0.299, 0.587, 0.114)); c *= mix(uSh, uHi, smoothstep(0.06, 0.72, l));
+          l = dot(c, vec3(0.299, 0.587, 0.114)); c = clamp(mix(vec3(l), c, uSat), 0.0, 1.0);
+          c = mix(c, c * c * (3.0 - 2.0 * c), uCon);
+          c *= 1.0 - uVig * smoothstep(0.36, 0.92, length((vUv - 0.5) * vec2(1.0, 0.86)) * 1.25);
+          c += uSunC * (1.0 - c) * uWash * pow(clamp(1.0 - length((vUv - vec2(0.0, 1.0)) * vec2(0.7, 1.0)), 0.0, 1.0), 2.0);
           if (uInk > 0.0) {
             vec2 sd = (vUv - uInkAt) * vec2(uSize.x / uSize.y, 1.0); float sl = length(sd), k = smoothstep(0.3, 0.38, dot(c, vec3(0.299, 0.587, 0.114))), cell = floor(atan(sd.y, sd.x) * 7.0);
             float ray = step(0.7, hash(vec2(cell, 3.0))) * smoothstep(0.1, 0.2, sl - 0.16 * hash(vec2(cell, 9.0)));
@@ -397,14 +461,18 @@
             k = mix(k, 1.0 - k, ray * 0.9);
             c = mix(c, vec3(k) * vec3(0.97, 0.95, 0.9), uInk);
           }
+          if (uAoShow > 0.5) c = vec3(texture2D(tAO, vUv).r);
           gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
         }` });
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fin); quad.frustumCulled = false;
     const stage = new THREE.Scene(); stage.add(quad); const flat = new THREE.Camera();
     renderer.info.autoReset = false;
-    let doom = 0, inkT = 0, inkD = 0.08;
+    let doom = 0, inkT = 0, inkD = 0.08, aoOk = 0;
     post = {
-      resize() { renderer.getDrawingBufferSize(sz); rtS.setSize(sz.x, sz.y); rtB.setSize(Math.max(2, sz.x >> 1), Math.max(2, sz.y >> 1)); U.uSize.value.set(sz.x, sz.y); },
+      resize() { renderer.getDrawingBufferSize(sz); rtS.setSize(sz.x, sz.y); rtB.setSize(Math.max(2, sz.x >> 1), Math.max(2, sz.y >> 1)); rtA.setSize(hw(), hh()); rtA2.setSize(hw(), hh()); U.uSize.value.set(sz.x, sz.y); },
+      // 每章一套调色（themes.js 的 grade）；洞里不罩暖光
+      grade(th, inCave) { const q = Object.assign({}, GRADE, th.grade || {});
+        U.uSh.value.fromArray(q.sh); U.uHi.value.fromArray(q.hi); U.uSat.value = q.sat; U.uCon.value = q.con; U.uVig.value = q.vig; U.uWash.value = inCave ? 0 : q.wash; U.uAoTint.value.fromArray(q.ao); U.uSunC.value.set(th.sun[0]); },
       render(dt, inGame) {
         const FXg = G.FX;
         // 压暗：渐入渐出
@@ -422,7 +490,17 @@
         }
         for (; n < 3; n++) U.uShock.value[n].w = 0;
         renderer.info.reset();
+        if (hasDepth && aoOk === 0) while (gl.getError() !== gl.NO_ERROR) { /* 清掉旧账：下面只看这一帧汇总深度时出不出错 */ }
         renderer.setRenderTarget(rtS); renderer.render(scene, camera);
+        if (hasDepth && aoOk === 0) aoOk = gl.getError() === gl.NO_ERROR ? 1 : -1; // 头一帧查一次：深度汇总不下来的设备就不开环境遮蔽
+        const useAO = hasDepth && aoOk === 1 && !R.noAO && qScale > 0.7;
+        if (useAO) {
+          const th2 = Math.tan((FOV * Math.PI) / 360);
+          aoM.uniforms.uPx.value.set(1 / sz.x, 1 / sz.y); aoM.uniforms.uNF.value.set(camera.near, camera.far); aoM.uniforms.uTan.value.set(th2 * camera.aspect, th2);
+          quad.material = aoM; renderer.setRenderTarget(rtA); renderer.render(stage, flat);
+          aoB.uniforms.uPx.value.set(1 / rtA.width, 1 / rtA.height); quad.material = aoB; renderer.setRenderTarget(rtA2); renderer.render(stage, flat);
+        }
+        U.uAO.value = useAO ? 0.9 : 0;
         bright.uniforms.uPx.value.set(1 / sz.x, 1 / sz.y); quad.material = bright;
         renderer.setRenderTarget(rtB); renderer.render(stage, flat);
         quad.material = fin; renderer.setRenderTarget(null); renderer.render(stage, flat);
@@ -1421,6 +1499,7 @@ vec2 wCell(vec2 p, float t) {
     const inCave = room.terrain === 'cave';
     for (const m of seas) m.visible = !inCave; for (const s of mists) s.visible = !inCave; cshadow.visible = !inCave;
     if (inCave) { scene.background = new THREE.Color(0x050304); scene.fog.color.set(0x140a0b); hemi.intensity *= 0.72; }
+    if (post) post.grade(th, inCave);
     if (sky) { sky.visible = !inCave; sky.position.set(w / 2, 0, h / 2); sky.material.uniforms.uTop.value.set(th.sky || th.bg); sky.material.uniforms.uHor.value.set(th.fog[0]); sky.material.uniforms.uSunC.value.set(th.sun[0]); }
     seas[0].material.color.setHex(th.sea[2]); seas[0].material.opacity = th.sea[3]; seas[0].position.set(w / 2, -11, h / 2);
     seas[1].material.color.setHex(th.sea[0]); seas[1].material.opacity = th.sea[1]; seas[1].position.set(w / 2, -6.5, h / 2);
