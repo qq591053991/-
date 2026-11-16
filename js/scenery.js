@@ -81,13 +81,58 @@
     for (let i = 0; i < P.count; i++) { const k = U.clamp(P.getY(i) * 0.6 + 0.55, 0, 1); col[i * 3] = 0.8 + 0.2 * k; col[i * 3 + 1] = 0.83 + 0.17 * k; col[i * 3 + 2] = 0.9 + 0.1 * k; } // 云底只比云顶暗一点、偏蓝一点
     g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
   });
+  /* 飘落的小东西（卡通画风）：一片枫叶 / 一瓣花 / 一片灰 / 一朵雪。都是一张小薄片，中间沿叶脉略略折起，翻转时才有明有暗 */
+  Mo.flakeGeo = (ti) => gg('flake' + ti, () => {
+    const P = ti === 1 ? [[0, 0.5], [0.12, 0.2], [0.42, 0.3], [0.24, 0.05], [0.44, -0.16], [0.14, -0.1], [0.03, -0.2], [0.03, -0.44], [-0.03, -0.44], [-0.03, -0.2], [-0.14, -0.1], [-0.44, -0.16], [-0.24, 0.05], [-0.42, 0.3], [-0.12, 0.2]] // 枫叶：五裂，带一根叶柄
+      : ti === 0 ? [[0, 0.5], [0.2, 0.22], [0.25, -0.08], [0.13, -0.38], [0, -0.46], [-0.13, -0.38], [-0.25, -0.08], [-0.2, 0.22]]   // 花瓣：水滴形
+        : ti === 2 ? [[0.05, 0.42], [0.36, 0.1], [0.2, -0.36], [-0.22, -0.3], [-0.4, 0.06]]                                            // 灰：不规则的一小片
+          : [[0, 0.5], [0.13, 0.22], [0.43, 0.25], [0.26, 0], [0.43, -0.25], [0.13, -0.22], [0, -0.5], [-0.13, -0.22], [-0.43, -0.25], [-0.26, 0], [-0.43, 0.25], [-0.13, 0.22]]; // 雪：六角
+    const v = [], fold = ti === 3 ? 0 : 0.1, at = (q) => [q[0], q[1], Math.abs(q[0]) * fold * 2];
+    for (let i = 0; i < P.length; i++) v.push(0, 0, 0, ...at(P[i]), ...at(P[(i + 1) % P.length]));
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals(); return g;
+  });
+  /* 飞鸟（卡通画风）：朝 +X 飞，两翼沿 ±Z 展开。wing 记每个顶点离身子多远（身子是 0）——顶点着色器按它扇翅膀。
+     白身、黑翅尖、头顶一点红的是鹤；通体乌黑的是鸦 */
+  Mo.birdGeo = (crow) => gg('bird' + (crow ? 1 : 0), () => {
+    const pos = [], colr = [], wing = [], C = (h) => new THREE.Color(h), W = C(crow ? '#2a2630' : '#f6f4ee'), K = C(crow ? '#18161c' : '#26242a'), R = C(crow ? '#3a3440' : '#d8402e'), L = C(crow ? '#1c1a20' : '#4a4640');
+    const tri = (a, b, c, ca, cb, cc, wa, wb, wc) => { pos.push(...a, ...b, ...c); for (const q of [ca, cb, cc]) colr.push(q.r, q.g, q.b); wing.push(wa || 0, wb || 0, wc || 0); };
+    const spindle = (x0, x1, y0, y1, r, c0, c1) => { // 一根两头尖的梭子：身子、颈、腿都用它
+      const xm = (x0 + x1) / 2, ym = (y0 + y1) / 2, ring = [[xm, ym + r, 0], [xm, ym, r], [xm, ym - r, 0], [xm, ym, -r]];
+      for (let i = 0; i < 4; i++) { const a = ring[i], b = ring[(i + 1) % 4]; tri([x1, y1, 0], b, a, c1, c0, c0); tri([x0, y0, 0], a, b, c0, c0, c0); }
+    };
+    spindle(-0.4, 0.32, 0, 0.02, 0.14, W, W);                        // 身子
+    spindle(0.22, crow ? 0.5 : 0.76, 0.02, 0.06, crow ? 0.065 : 0.04, W, crow ? W : R);  // 颈与头（鹤的头顶是红的）
+    spindle(crow ? 0.46 : 0.72, crow ? 0.64 : 0.92, 0.05, 0.05, 0.02, L, L);             // 喙
+    if (!crow) spindle(-0.9, -0.34, -0.03, 0, 0.024, L, L);          // 鹤飞的时候两腿向后拖着
+    else { tri([-0.36, 0.01, 0.09], [-0.36, 0.01, -0.09], [-0.66, 0.01, 0.06], K, K, K); tri([-0.36, 0.01, -0.09], [-0.66, 0.01, -0.06], [-0.66, 0.01, 0.06], K, K, K); } // 鸦的尾
+    /* 翼：自翼根到翼尖分四站，每站一个前缘、一个后缘。鹤是白翼、外三成与后缘是黑的；鸦通体黑 */
+    const span = crow ? 0.78 : 1.0, ST = [[0.06, 0.17, -0.19, W, W], [0.36 * span, 0.17, -0.21, W, K], [0.64 * span, 0.12, -0.19, W, K], [0.86 * span, 0.04, -0.14, K, K], [span, -0.06, -0.1, K, K]];
+    for (const sgn of [1, -1]) for (let i = 0; i < ST.length - 1; i++) {
+      const A = ST[i], Bq = ST[i + 1], f0 = [A[1], 0.03, sgn * A[0]], b0 = [A[2], 0.03, sgn * A[0]], f1 = [Bq[1], 0.03, sgn * Bq[0]], b1 = [Bq[2], 0.03, sgn * Bq[0]];
+      tri(f0, f1, b0, A[3], Bq[3], A[4], A[0], Bq[0], A[0]); tri(b0, f1, b1, A[4], Bq[3], Bq[4], A[0], Bq[0], Bq[0]);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3)); g.setAttribute('wing', new THREE.Float32BufferAttribute(wing, 1)); g.computeVertexNormals(); return g;
+  });
+  /* 锦鲤：平躺在水面下的一尾，朝 +X 游。白底、几块橘红；tail 记离尾巴多近——顶点着色器按它摆尾 */
+  Mo.koiGeo = () => gg('koi', () => {
+    const pos = [], colr = [], tail = [], C = (h) => new THREE.Color(h), W = C('#f4ece0'), O = C('#f0742a'), T = C('#f6b890');
+    const body = [[0.5, 0], [0.34, 0.11], [0.08, 0.15], [-0.2, 0.1], [-0.38, 0.04], [-0.38, -0.04], [-0.2, -0.1], [0.08, -0.15], [0.34, -0.11]], bc = [O, O, W, O, W, W, W, O, W];
+    const tk = (x) => U.clamp((0.1 - x) / 0.7, 0, 1);
+    const tri = (a, b, c, ca, cb, cc) => { pos.push(a[0], 0, a[1], b[0], 0, b[1], c[0], 0, c[1]); for (const q of [ca, cb, cc]) colr.push(q.r, q.g, q.b); tail.push(tk(a[0]), tk(b[0]), tk(c[0])); };
+    for (let i = 0; i < body.length; i++) { const j = (i + 1) % body.length; tri([0.05, 0], body[j], body[i], W, bc[j], bc[i]); }
+    tri([-0.36, 0], [-0.62, -0.17], [-0.62, 0.17], T, T, T);                                  // 尾鳍
+    tri([0.16, 0.13], [-0.02, 0.13], [0.02, 0.26], T, T, T); tri([0.16, -0.13], [0.02, -0.26], [-0.02, -0.13], T, T, T); // 胸鳍
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3)); g.setAttribute('tail', new THREE.Float32BufferAttribute(tail, 1)); g.computeVertexNormals(); return g;
+  });
   /* 石灰岩（卡通画风的山石）：竖向的节理把石头切成一根根柱，水平的层理再把柱切成一块块；
      每一块比邻块凸出或凹进一点，上一层比下一层收进去一点，于是有了台阶一样的石棱和可以长草的石台。
      做法：绕一圈分成几瓣（竖缝），自下而上分成几层（层理）；每一瓣每一层各有自己的半径——
      外面一块立面，瓣与瓣之间一道竖缝的侧壁，层与层之间一圈朝天的石台，顶上封一个略鼓的盖。
      颜色烘在顶点上：自下而上由暗到亮，凹进去的块暗一点，每层的色调略有不同，朝天的面是草（苔 / 灰 / 雪）。
      表面更细的层理线、竖缝、水渍由着色器按世界坐标逐像素画（render.js 的 brushMat） */
-  function karst(key, seed, pal) {
+  function karst(key, seed, pal, fine) {
     return gg(key, () => {
       const N = 7 + (seed % 3), B = 4, H = 1.07, hh = (i, j) => U.hash(seed * 13 + i, j * 7 + 3, seed + 11);
       const ang = [], ys = [0], prof = [1.0, 0.95, 0.86, 0.72];
@@ -104,22 +149,38 @@
       // 有的瓣矮一层（顶上那一块塌了）：石头的顶因此高高低低，不是一个平平的多边形
       const tb = []; for (let i = 0; i < N; i++) tb.push(hh(i, 13) < 0.38 ? B - 1 : B); if (tb.every((v) => v < B)) tb[0] = B;
       const rad = (i, j) => (j < tb[i] ? R[i][j] : 0);
+      /* 细的一档（近处的石头用）：每一块的立面从中间折成两片（中棱略略鼓出去），上沿削一道斜棱——
+         石头不再是一截截切出来的棱柱，而是一块块磨圆了边的石块叠起来的；远景的石峰用粗的一档，省面 */
+      const BV = fine ? 0.9 : 0.965, K1 = 0.985, amid = (i) => { const a0 = ang[i], a1 = ang[i + 1]; return (a0 + a1) / 2 + (hh(i, 15) - 0.5) * (a1 - a0) * 0.3; }, bul = (i, j) => 1.02 + hh(i * 9 + j, 14) * 0.07;
       for (let i = 0; i < N; i++) {
-        const a0 = ang[i], a1 = ang[i + 1], i2 = (i + 1) % N;
+        const a0 = ang[i], a1 = ang[i + 1], i2 = (i + 1) % N, am = amid(i);
         for (let j = 0; j < B; j++) {
-          const r = rad(i, j), y0 = ys[j], y1 = ys[j + 1], rt = r * 0.965, r2 = rad(i2, j); // 立面略向里收
+          const r = rad(i, j), y0 = ys[j], y1 = ys[j + 1], yb = y1 - (y1 - y0) * 0.24, rt = r * BV, r2 = rad(i2, j); // 立面略向里收
           const cl = tone(i, j, y0), ch = tone(i, j, y1);
           if (Math.abs(r2 - r) > 0.02) { // 与下一瓣之间的竖缝：谁凸出来，侧壁就朝着凹的那一边
             const lo = Math.min(r, r2), hi = Math.max(r, r2), dk = cl.map((v) => v * 0.72), dk2 = ch.map((v) => v * 0.78);
-            if (r > r2) quad(P(a1, lo, y0), P(a1, hi, y0), P(a1, hi * 0.965, y1), P(a1, lo * 0.965, y1), dk, dk, dk2, dk2); else quad(P(a1, hi, y0), P(a1, lo, y0), P(a1, lo * 0.965, y1), P(a1, hi * 0.965, y1), dk, dk, dk2, dk2);
+            for (const [ya, yc, fa, fb] of fine ? [[y0, yb, 1, K1], [yb, y1, K1, BV]] : [[y0, y1, 1, BV]]) {
+              if (r > r2) quad(P(a1, lo * fa, ya), P(a1, hi * fa, ya), P(a1, hi * fb, yc), P(a1, lo * fb, yc), dk, dk, dk2, dk2); else quad(P(a1, hi * fa, ya), P(a1, lo * fa, ya), P(a1, lo * fb, yc), P(a1, hi * fb, yc), dk, dk, dk2, dk2);
+            }
           }
           if (!r) continue;
           const nb = (rad((i + N - 1) % N, j) + r2) / 2, ao = r < nb - 0.03 ? 0.8 : 1, top = j === tb[i] - 1; // 凹进去的块暗一点
           const up = top ? 0 : R[i][j + 1], ledge = top || up < rt - 0.02, lc = ledge ? capC(i, top ? B - 1 : j) : null;
           const c0a = cl.map((v) => v * ao), c1a = ch.map((v) => v * ao), chm = lc && hh(i * 11 + j, 10) < pal.capK ? c1a.map((v, k) => v + (lc[k] - v) * 0.4) : c1a; // 石台有草的，立面顶上也挂下来一点
-          quad(P(a0, r, y0), P(a0, rt, y1), P(a1, rt, y1), P(a1, r, y0), c0a, chm, chm, c0a);
-          if (top) { const lc2 = lc.map((v) => v * 1.07); tri([0, y1 + 0.05, 0], P(a1, rt, y1), P(a0, rt, y1), lc2, lc, lc); } // 这一瓣的顶：中间略鼓、略亮
-          else if (ledge) quad(P(a0, up, y1), P(a1, up, y1), P(a1, rt, y1), P(a0, rt, y1), lc);              // 朝天的石台
+          if (!fine) {
+            quad(P(a0, r, y0), P(a0, rt, y1), P(a1, rt, y1), P(a1, r, y0), c0a, chm, chm, c0a);
+            if (top) { const lc2 = lc.map((v) => v * 1.07); tri([0, y1 + 0.05, 0], P(a1, rt, y1), P(a0, rt, y1), lc2, lc, lc); } // 这一瓣的顶：中间略鼓、略亮
+            else if (ledge) quad(P(a0, up, y1), P(a1, up, y1), P(a1, rt, y1), P(a0, rt, y1), lc);              // 朝天的石台
+            continue;
+          }
+          const rm = r * bul(i, j), k2 = 0.93 + hh(i * 5 + j, 16) * 0.12, cm = c0a.map((v, k) => v + (chm[k] - v) * 0.76), cbv = chm.map((v) => Math.min(1, v * 1.1)); // 斜棱迎着天光，亮一点
+          const sh = (c) => c.map((v) => v * k2); // 两片立面深浅不一
+          quad(P(a0, r, y0), P(a0, r * K1, yb), P(am, rm * K1, yb), P(am, rm, y0), c0a, cm, cm, c0a);
+          quad(P(am, rm, y0), P(am, rm * K1, yb), P(a1, r * K1, yb), P(a1, r, y0), sh(c0a), sh(cm), sh(cm), sh(c0a));
+          quad(P(a0, r * K1, yb), P(a0, rt, y1), P(am, rm * BV, y1), P(am, rm * K1, yb), cm, cbv, cbv, cm);
+          quad(P(am, rm * K1, yb), P(am, rm * BV, y1), P(a1, rt, y1), P(a1, r * K1, yb), sh(cm), sh(cbv), sh(cbv), sh(cm));
+          if (top) { const lc2 = lc.map((v) => v * 1.08), ce = [0, y1 + 0.09, 0]; tri(ce, P(am, rm * BV, y1), P(a0, rt, y1), lc2, lc, lc); tri(ce, P(a1, rt, y1), P(am, rm * BV, y1), lc2, lc, lc); }
+          else if (ledge) { const upm = up * bul(i, j + 1); quad(P(a0, up, y1), P(am, upm, y1), P(am, rm * BV, y1), P(a0, rt, y1), lc); quad(P(am, upm, y1), P(a1, up, y1), P(a1, rt, y1), P(am, rm * BV, y1), lc); }
         }
       }
       const g = new THREE.BufferGeometry();
@@ -129,7 +190,7 @@
     });
   }
   // 山石（四种形状 × 四章配色）；g.userData.h 是它的高
-  const rockGeo = (Mo.rockGeo = (vr, ti) => { const p = PAL[ti]; if (G.DH) return karst(`ks${vr}_${ti}`, vr * 17 + ti + 1, p); return lump(`rk${vr}_${ti}`, vr * 17 + ti + 1, { rough: 0.58, top: 0.34, flat: 0.38, bot: 0.3, sy: 1, dark: p.dark, lite: p.rock, cap: p.cap, cap2: p.cap2, capAt: 0.66, capK: p.capK, brush: 1 }); });
+  const rockGeo = (Mo.rockGeo = (vr, ti, coarse) => { const p = PAL[ti]; if (G.DH) return karst(`ks${vr}_${ti}${coarse ? 'c' : ''}`, vr * 17 + ti + 1, p, !coarse); /* coarse：远景用粗的一档 */ return lump(`rk${vr}_${ti}`, vr * 17 + ti + 1, { rough: 0.58, top: 0.34, flat: 0.38, bot: 0.3, sy: 1, dark: p.dark, lite: p.rock, cap: p.cap, cap2: p.cap2, capAt: 0.66, capK: p.capK, brush: 1 }); });
   // 叶团：松是扁的云片，花树是圆的团
   const padGeo = (vr, ti, kind) => { const p = PAL[ti], bl = kind === 'bloom'; return lump(`pad${vr % 3}_${ti}_${kind}`, (vr % 3) * 29 + ti + 3, { rough: 0.36, top: 0.5, flat: 0.7, bot: 0.22, sy: kind === 'pine' ? 0.5 : 0.8, dark: bl ? p.bloomD : p.leafD, lite: bl ? p.bloom : p.leaf, byNormal: true, brush: 2 }); };
 

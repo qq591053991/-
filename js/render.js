@@ -584,8 +584,8 @@
     const sd = (room.gx || 0) * 31 + (room.gy || 0) * 17 + ti * 7;
     // rk：放一块山石，top 是它顶面的高度
     const rockFg = new THREE.MeshLambertMaterial({ vertexColors: true, color: G.PAPER ? new THREE.Color(0.62, 0.6, 0.56) : new THREE.Color(0.5, 0.5, 0.52) }); rs.mats.push(rockFg); // 前景的山石压暗成剪影
-    const rk = (x, top, z, s, sy, k, fg) => {
-      const geo = Mo.rockGeo((k + sd) % 4, ti), m = new THREE.Mesh(geo, fg ? rockFg : rockM);
+    const rk = (x, top, z, s, sy, k, fg, fine) => { // fine：场内近处的石头用细的一档（磨圆了边的石块）；岛缘、山台、远景用粗的，省面
+      const geo = Mo.rockGeo((k + sd) % 4, ti, !fine), m = new THREE.Mesh(geo, fg ? rockFg : rockM);
       m.position.set(x, top - geo.userData.h * s * sy, z); m.scale.set(s, s * sy, s * (0.8 + U.hash(k, 3, sd) * 0.4)); m.rotation.y = U.hash(k, 7, sd) * TAU; scn.add(m); return m;
     };
     // 建筑构件（瓦顶、立柱、栏杆、角楼）：同样合并成一个网格
@@ -593,7 +593,7 @@
     const kit = Mo.archKit(archRoot, ti);
     // 一格山岩：顶面在 top，根部埋进地里
     let wk = 700;
-    const crag = (x, z, top, fg) => { wk++; const sc = 0.6 + U.hash(wk, 11, sd) * 0.17; rk(x + (U.hash(wk, 13, sd) - 0.5) * 0.2, top, z + (U.hash(wk, 15, sd) - 0.5) * 0.2, sc, (top + 0.3) / (1.1 * sc), wk, fg); return wk; };
+    const crag = (x, z, top, fg) => { wk++; const sc = 0.6 + U.hash(wk, 11, sd) * 0.17; rk(x + (U.hash(wk, 13, sd) - 0.5) * 0.2, top, z + (U.hash(wk, 15, sd) - 0.5) * 0.2, sc, (top + 0.3) / (1.1 * sc), wk, fg, true); return wk; };
     const treeOn = (x, top, z, kind, sc) => { const tr = Mo.tree(wk + sd, ti, kind, sc); tr.g.position.set(x, top - 0.1, z); tr.g.rotation.y = U.hash(wk, 17, sd) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); };
 
     const lant = [], pens = []; // 灯笼的挂点 [x, y, z]、幡旗的杆顶 [x, 杆脚 y, z, 杆长]（卡通画风）
@@ -1000,7 +1000,7 @@
         const lf = new THREE.MeshLambertMaterial({ vertexColors: true }); lf.userData.hz = [hzC, hk];
         const bk = new THREE.MeshLambertMaterial({ color: new THREE.Color(Mo.PAL[ti].trunk) }); bk.userData.hz = [hzC, hk];
         rs.mats.push(rm, lf, bk);
-        const col = (x, top, z, s, k) => { const geo = Mo.rockGeo(k % 4, ti), sy = (top + 13) / (geo.userData.h * s), m = new THREE.Mesh(geo, rm); m.position.set(x, -13, z); m.scale.set(s, s * sy, s * (0.8 + hb(k, 9) * 0.4)); m.rotation.y = hb(k, 8) * TAU; scnFar.add(m); };
+        const col = (x, top, z, s, k) => { const geo = Mo.rockGeo(k % 4, ti, true), sy = (top + 13) / (geo.userData.h * s), m = new THREE.Mesh(geo, rm); m.position.set(x, -13, z); m.scale.set(s, s * sy, s * (0.8 + hb(k, 9) * 0.4)); m.rotation.y = hb(k, 8) * TAU; scnFar.add(m); };
         for (let i = 0; i < n; i++) {
           const k = ri * 40 + i, a = (i / n) * TAU + hb(k, 1) * 0.5, d = d0 + hb(k, 2) * (d1 - d0), x = cx0 + Math.cos(a) * (RX + d), z = cz0 + Math.sin(a) * (RZ + d * 0.8);
           if (z > h + 1.5 && Math.abs(x - cx0) < RX + 9) continue;
@@ -1012,29 +1012,36 @@
           if (pav) { const pv = Mo.pavilion(ti), ps = (1.5 + ri * 0.9) * (0.85 + hb(k, 16) * 0.3); for (const pm of pv.mats) { pm.userData.hz = [hzC, hk]; rs.mats.push(pm); } pv.g.scale.setScalar(ps); pv.g.position.set(x, top - 0.12, z); pv.g.rotation.y = hb(k, 17) * 0.8; scnFar.add(pv.g); }
           else if (woods && ri < 2 && hb(k, 11) < 0.75) { const tr = Mo.tree(k + bs, ti, treeKind(hb(k, 12) * 0.7), (1.5 + hb(k, 13)) * (1 + ri * 0.5), { lite: true, bark: bk, leaf: lf }); tr.g.position.set(x, top - 0.15, z); tr.g.rotation.y = hb(k, 14) * TAU; scnFar.add(tr.g); } // 峰顶的树
           if (ti !== 2 && ri < 2 && hb(k, 18) < 0.34) { // 飞瀑：自峰腰垂进雾里的一道白，由几片细长的面叠成，一明一暗地闪
-            const wm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }), fh = top + 9, fw = 0.3 + hb(k, 19) * 0.3 + ri * 0.2;
+            const fh = top + 9, fw = 0.5 + hb(k, 19) * 0.4 + ri * 0.3, wm = fallMat(0.9 * (1 - hk * 0.5), fh);
             const wf = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), wm); wf.position.set(x + s * 0.2, top - 0.9 - fh / 2, z + s * 0.62); g.add(wf);
-            rs.geos.push(wf.geometry); rs.mats.push(wm); rs.anims.push((t) => { wm.opacity = (0.62 + Math.sin(t * 5 + k) * 0.08 + Math.sin(t * 12.3 + k * 2) * 0.05) * (1 - hk * 0.5); });
+            rs.geos.push(wf.geometry); rs.mats.push(wm);
           }
         }
       });
       // 北面的石壁：紧贴在场子后面的一排高峰，比场子高出许多——打斗时画面上沿看到的就是它的石壁、半腰的树与垂下的瀑布
-      { const rm = new THREE.MeshLambertMaterial({ vertexColors: true }), lf = new THREE.MeshLambertMaterial({ vertexColors: true }), bk = new THREE.MeshLambertMaterial({ color: new THREE.Color(Mo.PAL[ti].trunk) });
-        rs.mats.push(rm, lf, bk);
+      { const rm = new THREE.MeshLambertMaterial({ vertexColors: true }), lf = new THREE.MeshLambertMaterial({ vertexColors: true }), bk = new THREE.MeshLambertMaterial({ color: new THREE.Color(Mo.PAL[ti].trunk) }), iceM = new THREE.MeshLambertMaterial({ color: new THREE.Color('#d4ecfa') });
+        iceM.userData.hz = [hzC, 0.12]; rs.mats.push(rm, lf, bk, iceM);
         const NW = Math.max(4, Math.round((w + 12) / 6.2));
         for (let i = 0; i < NW; i++) {
           const k = 300 + i * 4, x = -6 + ((i + 0.5) / NW) * (w + 12) + (hb(k, 1) - 0.5) * 2.4, z = -4.6 - hb(k, 2) * 6, top = 5 + hb(k, 3) * 8, s2 = 2.0 + hb(k, 4) * 1.3, hk2 = U.clamp(0.1 + (-z - 4) * 0.035, 0, 0.4);
           rm.userData.hz = lf.userData.hz = bk.userData.hz = [hzC, 0.18];
-          const colN = (cx, tp, cz, sc, kk) => { const geo = Mo.rockGeo(kk % 4, ti), sy = (tp + 13) / (geo.userData.h * sc), m = new THREE.Mesh(geo, rm); m.position.set(cx, -13, cz); m.scale.set(sc, sc * sy, sc * (0.8 + hb(kk, 9) * 0.4)); m.rotation.y = hb(kk, 8) * TAU; scnFar.add(m); };
+          const colN = (cx, tp, cz, sc, kk) => { const geo = Mo.rockGeo(kk % 4, ti, true), sy = (tp + 13) / (geo.userData.h * sc), m = new THREE.Mesh(geo, rm); m.position.set(cx, -13, cz); m.scale.set(sc, sc * sy, sc * (0.8 + hb(kk, 9) * 0.4)); m.rotation.y = hb(kk, 8) * TAU; scnFar.add(m); };
           colN(x, top, z, s2, k);
+          if (ti < 2) for (let v = 0; v < 2; v++) { // 垂藤：从石棱上挂下来的一串叶，越往下越小
+            const vx = x + (hb(k, 40 + v) - 0.5) * s2 * 0.9, vy = top - 0.5 - hb(k, 42 + v) * 2.2, vz = z + s2 * (0.5 + hb(k, 44 + v) * 0.1), nv = 4 + Math.floor(hb(k, 46 + v) * 4);
+            for (let i = 0; i < nv; i++) scnFar.add(Mo.padMark(vx + Math.sin(i * 1.3 + k) * 0.12, vy - i * 0.5, vz + 0.06 + i * 0.015, 0.5 - i * 0.045, 'round', lf, 5, (k * 9 + v) * 7 + i));
+          }
+          else if (ti === 3) for (let v = 0; v < 5; v++) { // 冰凌：石棱下挂着的一排冰锥
+            const ic = new THREE.Mesh(Mo.geo.cone(5), iceM), il = 0.5 + hb(k, 50 + v) * 1.0; ic.rotation.x = PI; ic.scale.set(0.11 + hb(k, 56 + v) * 0.07, il, 0.11); ic.position.set(x + (hb(k, 62 + v) - 0.5) * s2 * 0.9, top - 0.9 - hb(k, 68 + v) * 2.4 - il / 2, z + s2 * 0.5); scnFar.add(ic);
+          }
           const sh = [[x + s2 * 0.9, 1.6 + hb(k, 5) * 2.2, z + s2 * 0.75, s2 * 0.55], [x - s2 * 0.85, 2.8 + hb(k, 6) * 2.6, z + s2 * 0.5, s2 * 0.5]]; // 两个矮一截的石肩，肩上有树
           sh.forEach(([sx2, st, sz2, ss], q) => { colN(sx2, st, sz2, ss, k + 1 + q);
             if (ti !== 1 && hb(k, 30 + q) < 0.34) { const hl = Mo.hall(ti); for (const pm of hl.mats) { pm.userData.hz = [hzC, 0.14]; rs.mats.push(pm); } hl.g.scale.setScalar(ss * 0.74); hl.g.position.set(sx2, st - 0.1, sz2 + ss * 0.1); hl.g.rotation.y = (hb(k, 32 + q) - 0.5) * 0.5; scnFar.add(hl.g); } // 有的石肩上是一座殿
             else if (woods && hb(k, 10 + q) < 0.8) { const tr = Mo.tree(k + bs + q, ti, treeKind(hb(k, 12 + q) * 0.8), 1.5 + hb(k, 14 + q) * 0.7, { bark: bk, leaf: lf }); tr.g.position.set(sx2, st - 0.12, sz2); tr.g.rotation.y = hb(k, 16 + q) * TAU; scnFar.add(tr.g); } });
           if (ti !== 2 && hb(k, 18) < 0.4) { // 瀑布
-            const wm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide }), fw = 0.35 + hb(k, 19) * 0.4, fh = top + 8;
+            const fw = 0.6 + hb(k, 19) * 0.5, fh = top + 8, wm = fallMat(0.95, fh);
             const wf = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), wm); wf.position.set(x + (hb(k, 20) - 0.5) * s2 * 0.6, top - 1.2 - fh / 2, z + s2 * 0.86); g.add(wf);
-            rs.geos.push(wf.geometry); rs.mats.push(wm); rs.anims.push((t) => { wm.opacity = 0.62 + Math.sin(t * 5 + k) * 0.08 + Math.sin(t * 12.3 + k * 2) * 0.05; });
+            rs.geos.push(wf.geometry); rs.mats.push(wm);
           }
         }
       }
@@ -1088,6 +1095,7 @@
     // 岩浆的光
     // （虚天殿的水面原先是熔池，带一团团橙红的光；现在是寒潭，不发光——橙红只留给敌人）
     if (G.DH) { g.updateMatrixWorld(true); takePads(g); leafCards(room, rs, g); }
+    if (G.DH && !cave) ambience(room, rs, g, ti, at);
     return rs;
   }
 
@@ -1217,6 +1225,89 @@
   }
 
   /* 把一组静态网格烘焙成单个带顶点色的网格 */
+  /* 瀑布（卡通画风）：一片细长的面，水是一道道往下淌的——每一竖条各有各的快慢；两边、上头、底下都化开（底下化进雾里） */
+  function fallMat(op, len) {
+    const m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide });
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uT = clothT; sh.uniforms.uLen = { value: len };
+      sh.vertexShader = 'varying vec2 vFuv;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFuv = uv;');
+      sh.fragmentShader = 'varying vec2 vFuv;\nuniform float uT;\nuniform float uLen;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+  { float col = floor(vFuv.x * 9.0), n1 = fract(sin(col * 91.7 + 3.1) * 43758.5), n2 = fract(sin(col * 37.3 + 1.7) * 24634.6);
+    float run = sin((vFuv.y * uLen * 0.55 + uT * (1.1 + n1 * 1.3)) * 6.2832 + n2 * 40.0) * 0.5 + 0.5;
+    float fine = sin((vFuv.y * uLen * 1.9 + uT * (2.4 + n2 * 1.5)) * 6.2832 + n1 * 17.0 + vFuv.x * 30.0) * 0.5 + 0.5;
+    float edge = smoothstep(0.0, 0.22, vFuv.x) * smoothstep(1.0, 0.78, vFuv.x) * smoothstep(1.0, 0.95, vFuv.y) * smoothstep(0.0, 0.3, vFuv.y);
+    diffuseColor.a *= edge * (0.4 + 0.42 * run + 0.18 * fine); }`);
+    };
+    m.customProgramCacheKey = () => 'fall';
+    return m;
+  }
+
+  /* 活物与飘落物（卡通画风）——让场子"活"起来的小东西，都不参与玩法：
+     飘落物：七玄门落花、血色禁地落枫叶、燕翎堡飘灰、虚天殿下雪。一片片真的薄片，边落边翻；
+     飞鸟：七玄门与虚天殿是鹤，另两章是鸦。几只一队，绕着北墙外的山谷盘旋，翅膀在顶点着色器里扇；
+     锦鲤：七玄门的池子里，一尾尾兜着小圈游 */
+  function ambience(room, rs, g, ti, at) {
+    const w = room.w, h = room.h; let seed = ((room.gx || 0) * 97 + (room.gy || 0) * 31 + ti * 7 + 11) >>> 0;
+    const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296; // 自己的随机数：不去动玩法用的那一串
+    { const N = [34, 46, 24, 54][ti], size = [0.2, 0.3, 0.14, 0.11][ti], fall = [0.5, 0.6, 0.38, 0.85][ti];
+      const cols = [['#ffd6e4', '#fff2f6', '#f8b4ca'], ['#d8402a', '#ec8a2c', '#f2bc3c', '#b83424'], ['#3a3634', '#58524e', '#2a2624'], ['#ffffff', '#eaf4ff']][ti].map((c) => new THREE.Color(c));
+      const mat = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide }); rs.mats.push(mat);
+      const im = new THREE.InstancedMesh(Mo.flakeGeo(ti), mat, N); im.frustumCulled = false; g.add(im);
+      const F = [];
+      for (let i = 0; i < N; i++) { F.push({ x: -2 + rnd() * (w + 4), y: rnd() * 5.5, z: -1 + rnd() * (h + 2), ph: rnd() * TAU, v: 0.7 + rnd() * 0.6, s: size * (0.75 + rnd() * 0.5), sx: 1 + rnd() * 2, sz: 1 + rnd() * 2 }); im.setColorAt(i, cols[i % cols.length]); }
+      im.instanceColor.needsUpdate = true;
+      let last = -1;
+      rs.anims.push((t) => {
+        const dt = last < 0 ? 0 : Math.min(0.05, Math.max(0, t - last)); last = t;
+        for (let i = 0; i < N; i++) { const f = F[i];
+          f.y -= fall * f.v * dt; f.x += (0.3 + Math.sin(t * 0.9 + f.ph) * 0.5) * dt; f.z += Math.cos(t * 0.7 + f.ph * 1.7) * 0.3 * dt;
+          if (f.y < 0.03 || f.x > w + 3) { f.y = 4.5 + rnd() * 1.5; f.x = -3 + rnd() * (w + 4); f.z = -1 + rnd() * (h + 2); }
+          dummy.position.set(f.x, f.y, f.z); dummy.rotation.set(t * f.sx * 0.9 + f.ph, f.ph * 2 + t * 0.3, t * f.sz * 0.7 + f.ph * 3); dummy.scale.setScalar(f.s); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); }
+        im.instanceMatrix.needsUpdate = true;
+      });
+    }
+    { const crow = ti === 1 || ti === 2, flocks = ti === 2 ? [[6, 1]] : [[5, 1], [4, -1]], NB = flocks.reduce((a, f) => a + f[0], 0);
+      const bg = Mo.birdGeo(crow).clone(), phA = new Float32Array(NB); rs.geos.push(bg);
+      const bm = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); rs.mats.push(bm);
+      bm.onBeforeCompile = (sh) => { sh.uniforms.uT = clothT; sh.uniforms.uFlap = { value: crow ? 8.5 : 5.2 };
+        sh.vertexShader = 'attribute float wing;\nattribute float ph;\nuniform float uT;\nuniform float uFlap;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  { float fl = sin(uT * uFlap + ph); transformed.y += fl * wing * (0.22 + wing * 0.3); transformed.z *= 1.0 - 0.1 * fl * step(0.01, wing); }'); };
+      bm.customProgramCacheKey = () => 'bird';
+      const B = []; let bi = 0;
+      const open = room.terrain && room.terrain !== 'court';
+      flocks.forEach(([n, dir], fi) => { // 一队一个扁圈，绕着北墙（山野里是北面的树梢）：镜头是俯视的，飞高了、飞远了都出画，所以压得低、贴着墙头
+        const rx = w / 2 + 5 + fi * 3 + rnd() * 2, rz = 2.05 - fi * 0.5, cz = 0.55 - fi * 1.1, y0 = (open ? 3.7 : 3.3) + fi * 0.9 + rnd() * 0.3, a0 = rnd() * TAU, om = (0.1 + rnd() * 0.03) * dir;
+        for (let j = 0; j < n; j++) { const k = j - (n - 1) / 2; B.push({ rx, rz, cz, y0: y0 + Math.abs(k) * 0.1, a0, om, dir, back: Math.abs(k) * 0.7, side: k * 0.62, fi }); phA[bi++] = rnd() * TAU; } // 人字形：越靠边越落后
+      });
+      bg.setAttribute('ph', new THREE.InstancedBufferAttribute(phA, 1));
+      const bim = new THREE.InstancedMesh(bg, bm, NB); bim.frustumCulled = false; bim.castShadow = true; g.add(bim);
+      rs.anims.push((t) => {
+        for (let i = 0; i < NB; i++) { const b = B[i], a = b.a0 + t * b.om - (b.back / b.rx) * b.dir;
+          let tx = -Math.sin(a) * b.rx * b.dir, tz = Math.cos(a) * b.rz * b.dir; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+          dummy.position.set(w / 2 + Math.cos(a) * b.rx - tz * b.side, b.y0 + Math.sin(a * 2 + b.fi) * 0.25 + Math.sin(t * 0.8 + i) * 0.07, b.cz + Math.sin(a) * b.rz + tx * b.side);
+          dummy.rotation.set(0, Math.atan2(-tz, tx), 0); dummy.scale.setScalar(crow ? 0.6 : 0.64); dummy.updateMatrix(); bim.setMatrixAt(i, dummy.matrix); }
+        bim.instanceMatrix.needsUpdate = true;
+      });
+    }
+    if (ti === 0) { const K = [];
+      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        if (at(x, y) !== 3 || rnd() > 0.5) continue;
+        const inner = at(x - 1, y) === 3 && at(x + 1, y) === 3 && at(x, y - 1) === 3 && at(x, y + 1) === 3;
+        K.push({ x: x + 0.5, z: y + 0.5, r: inner ? 0.26 + rnd() * 0.08 : 0.12, s: inner ? 0.36 + rnd() * 0.1 : 0.28, a0: rnd() * TAU, om: (0.5 + rnd() * 0.5) * (rnd() < 0.5 ? -1 : 1) });
+      }
+      if (K.length) {
+        const km = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.82, depthWrite: false }); rs.mats.push(km);
+        km.onBeforeCompile = (sh) => { sh.uniforms.uT = clothT; sh.vertexShader = 'attribute float tail;\nuniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed.z += sin(uT * 7.0 + instanceMatrix[3][0] * 5.0 + instanceMatrix[3][2] * 3.0) * tail * tail * 0.16;'); };
+        km.customProgramCacheKey = () => 'koi';
+        const kim = new THREE.InstancedMesh(Mo.koiGeo(), km, K.length); kim.frustumCulled = false; kim.renderOrder = 1; g.add(kim);
+        rs.anims.push((t) => {
+          for (let i = 0; i < K.length; i++) { const k = K[i], a = k.a0 + t * k.om, sg = k.om > 0 ? 1 : -1;
+            dummy.position.set(k.x + Math.cos(a) * k.r, 0.0165, k.z + Math.sin(a) * k.r); dummy.rotation.set(0, Math.atan2(-Math.cos(a) * sg, -Math.sin(a) * sg), 0); dummy.scale.setScalar(k.s); dummy.updateMatrix(); kim.setMatrixAt(i, dummy.matrix); }
+          kim.instanceMatrix.needsUpdate = true;
+        });
+      }
+    }
+  }
+
   /* 幡旗（卡通画风）：屋脊、角楼顶上的三角旗。一根细杆、一面顺风飘的旗——旗面是一张细分过的三角片，
      顶点着色器里让它离杆越远摆得越大，明暗跟着布的起伏走。整间屋子的旗合成一个网格 */
   const clothT = { value: 0 }; // 布料摆动的钟：所有幡共用
@@ -1459,6 +1550,7 @@ vec2 wCell(vec2 p, float t) {
     for (const t of rs.tex) t.dispose();
     for (const m of rs.mats) m.dispose();
     for (const q of rs.geos) q.dispose();
+    if (rs.g) rs.g.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); // 实例化网格（灯笼、飘落物、飞鸟、锦鲤、云）各有一份自己的缓冲
   }
 
   function clearActors() {
