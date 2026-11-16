@@ -73,25 +73,25 @@
     { // 0 七玄门 —— 春日晴空下的山门：粉墙黛瓦，青石板，草色新
       void: '#2a3a44', mist: '240,248,255', dom: '#a0987f', floor: '#a49a82', floor2: '#988e78', line: 'rgba(52,46,34,0.32)', moss: '#7fa052', grass: '#84aa52',
       face: '#f0e8d6', faceDark: '#cfc5ae', base: '#6e685a', top: '#3e4c5a', topHi: '#5e6e7e', water: '#3f9a98', waterHi: '#dcf6ee',
-      bg: 0xa6c8e2, fog: [0xb4d0e6, 21, 64], cloudShadow: [0.15, 15], dark: 0.2, ink: 0x1c2228, hemi: [0xfff6e6, 0x6e8060, 0.74], sun: [0xffe2b4, 1.02],
+      bg: 0xa6c8e2, sky: 0x3f86d6, fog: [0xb4d0e6, 21, 64], cloudShadow: [0.15, 15], dark: 0.2, ink: 0x1c2228, hemi: [0xfff6e6, 0x6e8060, 0.74], sun: [0xffe2b4, 1.02],
       sea: [0xffffff, 0.92, 0xcfe0ee, 0.92], shaft: [0xfff2cc, 0.16], lamp: '255,204,128', lampHex: 0xffcc80,
     },
     { // 1 血色禁地 —— 深秋的密林：暮色偏冷，满山红叶
       void: '#1a1e26', mist: '196,210,228', dom: '#6e5c46', floor: '#72604a', floor2: '#685642', line: 'rgba(0,0,0,0)', moss: '#6a6e42', grass: '#8a6a3e',
       face: '#74685c', faceDark: '#52483e', base: '#3a342e', top: '#5a4436', topHi: '#7a5c46', water: '#2c4a56', waterHi: '#a8cad4',
-      bg: 0x7e8ea4, fog: [0x8494aa, 19, 60], cloudShadow: [0.22, 8], dark: 0.28, ink: 0x14120f, hemi: [0xdce6f4, 0x4a3c30, 0.78], sun: [0xffdcb8, 1.05],
+      bg: 0x7e8ea4, sky: 0x4a6aa6, fog: [0x8494aa, 19, 60], cloudShadow: [0.22, 8], dark: 0.28, ink: 0x14120f, hemi: [0xdce6f4, 0x4a3c30, 0.78], sun: [0xffdcb8, 1.05],
       sea: [0xdfe6f0, 0.86, 0x8e9cb0, 0.9], shaft: [0xe6eefa, 0.15], lamp: '255,196,140', lampHex: 0xffc48c,
     },
     { // 2 燕翎堡 —— 围城：烽烟里的黄昏，天是橘红的
       void: '#1c1612', mist: '236,200,170', dom: '#7a7268', floor: '#7e766c', floor2: '#746c62', line: 'rgba(16,12,8,0.36)', moss: '#5e584e', grass: '#6a5e4a',
       face: '#8a8278', faceDark: '#625a52', base: '#38342f', top: '#3c3836', topHi: '#58524e', water: '#24282e', waterHi: '#9a9ea6',
-      bg: 0xc08e64, fog: [0xb48660, 19, 58], cloudShadow: [0.24, 12], dark: 0.3, ink: 0x120f0c, hemi: [0xf6dcc0, 0x4c4038, 0.76], sun: [0xffb878, 1.08],
+      bg: 0xc08e64, sky: 0x7a6a7c, fog: [0xb48660, 19, 58], cloudShadow: [0.24, 12], dark: 0.3, ink: 0x120f0c, hemi: [0xf6dcc0, 0x4c4038, 0.76], sun: [0xffb878, 1.08],
       sea: [0xe8c8a8, 0.84, 0xa07a5c, 0.9], shaft: null, lamp: '255,190,120', lampHex: 0xffbe78,
     },
     { // 3 虚天殿 —— 雪中古殿：天光清冷，玉砖与积雪
       void: '#16222e', mist: '220,236,255', dom: '#a8bccc', floor: '#aabece', floor2: '#9eb2c2', line: 'rgba(40,64,88,0.36)', moss: '#d4e2ec', grass: '#dce8f0',
       face: '#4a6482', faceDark: '#344a64', base: '#243448', top: '#6a8098', topHi: '#92a8be', water: '#2e5672', waterHi: '#b4dcf2',
-      bg: 0x9cb8d4, fog: [0xa2bcd6, 21, 64], cloudShadow: [0.14, 16], dark: 0.2, ink: 0x101c2a, hemi: [0xe6f0ff, 0x56687a, 0.72], sun: [0xf4f8ff, 0.95],
+      bg: 0x9cb8d4, sky: 0x4a84c8, fog: [0xa2bcd6, 21, 64], cloudShadow: [0.14, 16], dark: 0.2, ink: 0x101c2a, hemi: [0xe6f0ff, 0x56687a, 0.72], sun: [0xf4f8ff, 0.95],
       sea: [0xffffff, 0.92, 0xb4cade, 0.92], shaft: [0xe6f2ff, 0.13], lamp: '255,206,150', lampHex: 0xffce96,
     },
   ].forEach((o, i) => Object.assign(G.Themes[i], o));
@@ -445,6 +445,16 @@
       if (at(x - 1, y) === 1) { const g = c.createLinearGradient(px, 0, px + 14, 0); g.addColorStop(0, SHD(0.15)); g.addColorStop(1, SHD(0)); c.fillStyle = g; c.fillRect(px, py, 14, T); }
       if (at(x + 1, y) === 1) { const g = c.createLinearGradient(px + T, 0, px + T - 14, 0); g.addColorStop(0, SHD(0.15)); g.addColorStop(1, SHD(0)); c.fillStyle = g; c.fillRect(px + T - 14, py, 14, T); }
       if (at(x, y + 1) === 1) { const g = c.createLinearGradient(0, py + T, 0, py + T - 10); g.addColorStop(0, SHD(0.12)); g.addColorStop(1, SHD(0)); c.fillStyle = g; c.fillRect(px, py + T - 10, T, 10); }
+    }
+    if (G.DH) { // 卡通画风：整片地面罩一层深浅不匀的斑（两层大小不同的噪声叠起来），免得一片死平；再顺着光的方向压一点明暗
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+      for (const [cell, al] of [[46, 0.16], [17, 0.1]]) {
+        const nw = Math.ceil(cv.width / cell) + 1, nh = Math.ceil(cv.height / cell) + 1, nc = document.createElement('canvas'); nc.width = nw; nc.height = nh;
+        const nx = nc.getContext('2d'), id = nx.createImageData(nw, nh);
+        for (let i = 0; i < nw * nh; i++) { const v = U.hash(i % nw, (i / nw) | 0, seed + cell) < 0.5 ? 0 : 255, a2 = Math.abs(U.hash(i % nw, (i / nw) | 0, seed + cell + 1) - 0.5) * 2; id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = v; id.data[i * 4 + 3] = a2 * 255; }
+        nx.putImageData(id, 0, 0); c.globalAlpha = al; c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high'; c.drawImage(nc, 0, 0, nw * cell, nh * cell);
+      }
+      c.restore(); c.globalAlpha = 1;
     }
     // 绢纹：经纬极细的丝缕、几处淡淡的旧渍。贴近了才看得见，远看只是让地面不那么"平"
     if (!G.DH) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); const W2 = cv.width, H2 = cv.height; let sd2 = (Math.abs(seed * 7 + 3) % 2147483646) + 1; const r = () => (sd2 = (sd2 * 16807) % 2147483647) / 2147483647; // 种子要是正数（房间坐标可能为负）

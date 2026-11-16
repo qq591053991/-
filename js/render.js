@@ -307,7 +307,7 @@
     else P.rock = new Pool(() => new THREE.Mesh(Mo.geo.box(), new THREE.MeshLambertMaterial({ color: 0x8e7650, emissive: 0x1c140a })));
     P.shield = new Pool(() => new THREE.Mesh(Mo.geo.sph(14), Mo.inkBlend(new THREE.MeshBasicMaterial({ color: 0xbcd8ff, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }))));
 
-    if (G.DH) heightMist();
+    if (G.DH) { heightMist(); initSky(); }
     initPost();
     window.addEventListener('resize', () => this.resize());
     this.resize();
@@ -334,6 +334,20 @@
     C.fog_vertex = '#ifdef USE_FOG\n\tvFogDepth = - mvPosition.z;\n\tvFogY = dot( viewMatrix[ 1 ].xyz, mvPosition.xyz - viewMatrix[ 3 ].xyz );\n#endif';
     C.fog_pars_fragment = C.fog_pars_fragment.replace('varying float vFogDepth;', 'varying float vFogDepth;\n\tvarying float vFogY;');
     C.fog_fragment = C.fog_fragment.replace('float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );', 'float fogFactor = max( smoothstep( fogNear, fogFar, vFogDepth ), smoothstep( -0.7, -7.0, vFogY ) * 0.93 );');
+  }
+
+  /* 天穹（卡通画风）：一只罩在外面的大球——地平线以上由淡到蓝，太阳那一边有一圈暖晕；地平线以下就是雾的颜色。
+     打斗时镜头朝下，看不到天；主菜单与远望的镜头里看得到 */
+  let sky = null;
+  function initSky() {
+    const m = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
+      uniforms: { uTop: { value: new THREE.Color(0x4f8fd0) }, uHor: { value: new THREE.Color(0xb4d0e6) }, uSun: { value: new THREE.Vector3(-0.4, 0.5, 0.3).normalize() }, uSunC: { value: new THREE.Color(0xfff0d0) } },
+      vertexShader: 'varying vec3 vD; void main() { vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `varying vec3 vD; uniform vec3 uTop; uniform vec3 uHor; uniform vec3 uSun; uniform vec3 uSunC;
+        void main() { vec3 d = normalize(vD); float h = max(d.y, 0.0); vec3 c = mix(uHor, uTop, 1.0 - pow(1.0 - h, 2.6));
+          float s = max(dot(d, uSun), 0.0); c += uSunC * (pow(s, 24.0) * 0.5 + pow(s, 3.0) * 0.14) * step(0.0, d.y + 0.05);
+          gl_FragColor = vec4(c, 1.0); }` });
+    sky = new THREE.Mesh(new THREE.SphereGeometry(215, 24, 14), m); sky.renderOrder = -20; sky.frustumCulled = false; scene.add(sky);
   }
 
   let post = null;
@@ -463,6 +477,7 @@
 
   /* ============================ 房间场景 ============================ */
   function buildRoom(room) {
+    padQ.length = 0;
     const ti = room.theme, th = G.Themes[ti], w = room.w, h = room.h, tiles = room.tiles;
     const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : tiles[y * w + x]);
     const g = new THREE.Group(), rs = { g, tex: [], mats: [], geos: [], anims: [], doors: {}, lights: [], sprites: [] };
@@ -534,7 +549,9 @@
         if (at(x, y) !== 1 || taken.has(y * w + x)) continue;
         if (!cave && far[y * w + x] > 3) { // 林子深处：隔一格放一团压暗的树冠
           if ((x + y) % 2) continue;
-          const fgc = northFloor(x, y, 8), cm = new THREE.Mesh(Mo.padGeo(x + y, ti, padKind), fgc ? leafFg : leafD), cs = (fgc ? 1.05 : 1.25) + U.hash(x, y, sd + 64) * 0.6;
+          const fgc = northFloor(x, y, 8), cs = (fgc ? 1.05 : 1.25) + U.hash(x, y, sd + 64) * 0.6;
+          if (G.DH) { scnFar.add(Mo.padMark(x + 0.5, (fgc ? 0.8 : 1.1) + U.hash(x, y, sd + 65) * 0.7, y + 0.5, cs * 0.95, padKind, fgc ? leafFg : leafD, 10, x * 31 + y * 17)); continue; }
+          const cm = new THREE.Mesh(Mo.padGeo(x + y, ti, padKind), fgc ? leafFg : leafD);
           cm.position.set(x + 0.5, (fgc ? 0.7 : 1.0) + U.hash(x, y, sd + 65) * 0.7, y + 0.5); cm.scale.set(cs, cs * 0.8, cs); cm.rotation.y = x * 1.3 + y; scnFar.add(cm); continue;
         }
         let edgeT = false;
@@ -872,15 +889,36 @@
           }
         }
       });
+      // 北面的石壁：紧贴在场子后面的一排高峰，比场子高出许多——打斗时画面上沿看到的就是它的石壁、半腰的树与垂下的瀑布
+      { const rm = new THREE.MeshLambertMaterial({ vertexColors: true }), lf = new THREE.MeshLambertMaterial({ vertexColors: true }), bk = new THREE.MeshLambertMaterial({ color: new THREE.Color(Mo.PAL[ti].trunk) });
+        rs.mats.push(rm, lf, bk);
+        const NW = Math.max(4, Math.round((w + 12) / 6.2));
+        for (let i = 0; i < NW; i++) {
+          const k = 300 + i * 4, x = -6 + ((i + 0.5) / NW) * (w + 12) + (hb(k, 1) - 0.5) * 2.4, z = -4.6 - hb(k, 2) * 6, top = 5 + hb(k, 3) * 8, s2 = 2.0 + hb(k, 4) * 1.3, hk2 = U.clamp(0.1 + (-z - 4) * 0.035, 0, 0.4);
+          rm.userData.hz = lf.userData.hz = bk.userData.hz = [hzC, 0.18];
+          const colN = (cx, tp, cz, sc, kk) => { const geo = Mo.rockGeo(kk % 4, ti), sy = (tp + 13) / (geo.userData.h * sc), m = new THREE.Mesh(geo, rm); m.position.set(cx, -13, cz); m.scale.set(sc, sc * sy, sc * (0.8 + hb(kk, 9) * 0.4)); m.rotation.y = hb(kk, 8) * TAU; scnFar.add(m); };
+          colN(x, top, z, s2, k);
+          const sh = [[x + s2 * 0.9, 1.6 + hb(k, 5) * 2.2, z + s2 * 0.75, s2 * 0.55], [x - s2 * 0.85, 2.8 + hb(k, 6) * 2.6, z + s2 * 0.5, s2 * 0.5]]; // 两个矮一截的石肩，肩上有树
+          sh.forEach(([sx2, st, sz2, ss], q) => { colN(sx2, st, sz2, ss, k + 1 + q);
+            if (woods && hb(k, 10 + q) < 0.8) { const tr = Mo.tree(k + bs + q, ti, treeKind(hb(k, 12 + q) * 0.8), 1.5 + hb(k, 14 + q) * 0.7, { bark: bk, leaf: lf }); tr.g.position.set(sx2, st - 0.12, sz2); tr.g.rotation.y = hb(k, 16 + q) * TAU; scnFar.add(tr.g); } });
+          if (ti !== 2 && hb(k, 18) < 0.4) { // 瀑布
+            const wm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide }), fw = 0.35 + hb(k, 19) * 0.4, fh = top + 8;
+            const wf = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), wm); wf.position.set(x + (hb(k, 20) - 0.5) * s2 * 0.6, top - 1.2 - fh / 2, z + s2 * 0.86); g.add(wf);
+            rs.geos.push(wf.geometry); rs.mats.push(wm); rs.anims.push((t) => { wm.opacity = 0.62 + Math.sin(t * 5 + k) * 0.08 + Math.sin(t * 12.3 + k * 2) * 0.05; });
+          }
+        }
+      }
       // 云：一团团的积云，由几只压扁的球攒成，顶上亮、底下偏灰蓝；高低远近都有，缓缓地飘
-      const pg = Mo.cloudGeo(), NC = 15, cm = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2a2a2a, color: new THREE.Color(th.sea[0]).lerp(new THREE.Color(0xffffff), 0.45) });
-      const im = new THREE.InstancedMesh(pg, cm, NC * 7); im.castShadow = false; im.receiveShadow = false; im.frustumCulled = false; let ci = 0;
+      const pg = Mo.cloudGeo(), NC = 17, NQ = 11, cm = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x303030, color: new THREE.Color(th.sea[0]).lerp(new THREE.Color(0xffffff), 0.45) });
+      cm.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vec3(0.34, 0.33, 0.3) * pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 1.6);'); }; // 云的边是亮的
+      cm.customProgramCacheKey = () => 'cloud';
+      const im = new THREE.InstancedMesh(pg, cm, NC * NQ); im.castShadow = false; im.receiveShadow = false; im.frustumCulled = false; let ci = 0;
       for (let c = 0; c < NC; c++) {
-        const a = hb(c, 21) * TAU, d = 6 + hb(c, 22) * 34, x = cx0 + Math.cos(a) * (RX + d), z = cz0 + Math.sin(a) * (RZ + d * 0.8) - 2, y = -3.5 + hb(c, 23) * 9, sc = 2.2 + hb(c, 24) * 3.4;
+        const a = hb(c, 21) * TAU, d = 11 + hb(c, 22) * 32, x = cx0 + Math.cos(a) * (RX + d), z = cz0 + Math.sin(a) * (RZ + d * 0.8) - 2, y = -4 + hb(c, 23) * 7.5, sc = 2.2 + hb(c, 24) * 3.4;
         if (z > h + 1 && Math.abs(x - cx0) < RX + 10) continue;
-        for (let q = 0; q < 7; q++) {
-          const u = (q - 3) / 3, r = sc * (0.5 + 0.5 * (1 - u * u)) * (0.75 + hb(c * 9 + q, 25) * 0.5);
-          dummy.position.set(x + u * sc * 1.25 + (hb(c * 9 + q, 26) - 0.5) * sc * 0.3, y + (hb(c * 9 + q, 27) - 0.3) * sc * 0.3, z + (hb(c * 9 + q, 28) - 0.5) * sc * 0.7); dummy.rotation.set(0, hb(c * 9 + q, 29) * TAU, 0); dummy.scale.set(r, r * 0.62, r * 0.9); dummy.updateMatrix(); im.setMatrixAt(ci++, dummy.matrix);
+        for (let q = 0; q < NQ; q++) { // 中间的团大而高，两边的小而低；底是平的，顶是一个个鼓包
+          const u = (q / (NQ - 1)) * 2 - 1, big = 1 - u * u, r = sc * (0.34 + 0.5 * big) * (0.75 + hb(c * 13 + q, 25) * 0.5);
+          dummy.position.set(x + u * sc * 1.5 + (hb(c * 13 + q, 26) - 0.5) * sc * 0.3, y + r * 0.42 + hb(c * 13 + q, 27) * sc * 0.28 * big, z + (hb(c * 13 + q, 28) - 0.5) * sc * 0.9); dummy.rotation.set(0, hb(c * 13 + q, 29) * TAU, 0); dummy.scale.set(r, r * 0.72, r * 0.95); dummy.updateMatrix(); im.setMatrixAt(ci++, dummy.matrix);
         }
       }
       im.count = ci; im.instanceMatrix.needsUpdate = true; g.add(im); rs.mats.push(cm); rs.anims.push((t) => { im.position.x = Math.sin(t * 0.021) * 2.6; im.position.z = Math.cos(t * 0.017) * 1.2; });
@@ -919,6 +957,7 @@
     if (mergedArch) { g.add(mergedArch); rs.geos.push(mergedArch.geometry); rs.mats.push(mergedArch.material); if (!G.DH) inkOutline(mergedArch, 0.018, g, rs, th.ink); }
     // 岩浆的光
     // （虚天殿的水面原先是熔池，带一团团橙红的光；现在是寒潭，不发光——橙红只留给敌人）
+    if (G.DH) { g.updateMatrixWorld(true); takePads(g); leafCards(room, rs, g); }
     return rs;
   }
 
@@ -931,6 +970,31 @@
       return mix(mix(mix(bh(i), bh(i + vec3(1, 0, 0)), f.x), mix(bh(i + vec3(0, 1, 0)), bh(i + vec3(1, 1, 0)), f.x), f.y),
                  mix(mix(bh(i + vec3(0, 0, 1)), bh(i + vec3(1, 0, 1)), f.x), mix(bh(i + vec3(0, 1, 1)), bh(i + vec3(1, 1, 1)), f.x), f.y), f.z); }`;
   function brushMat(m) {
+    if (G.DH) {
+      /* 卡通画风：合并后的静态网格按每个顶点的 brush 加细节，都是按世界坐标逐像素算的，不用贴图——
+         1 山石：水平的层理线（随位置起伏、时断时续）、层与层之间错开的竖缝、每一小块自己的深浅、顺着石壁流下来的水渍；朝天的面只有细碎的斑；
+         3 树皮：顺着树干的沟纹 */
+      m.onBeforeCompile = (sh) => {
+        sh.vertexShader = 'attribute float brush;\nvarying float vBrush;\nvarying vec3 vWP;\nvarying vec3 vWN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBrush = brush; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = mat3(modelMatrix) * objectNormal;');
+        sh.fragmentShader = 'varying float vBrush;\nvarying vec3 vWP;\nvarying vec3 vWN;\n' + BRUSH_GLSL + '\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        if (vBrush > 0.5 && vBrush < 1.5) {
+          vec3 P = vWP, Nw = normalize(vWN); float steep = 1.0 - smoothstep(0.3, 0.7, Nw.y);
+          float by = P.y * 2.1 + bn(vec3(P.x, 0.0, P.z) * 0.45) * 1.9 + bn(P * 1.7) * 0.5, row = floor(by);
+          float bed = (1.0 - smoothstep(0.0, 0.085, abs(fract(by) - 0.5))) * smoothstep(0.25, 0.55, bn(P * vec3(1.1, 0.25, 1.1) + 3.1));
+          float hx = abs(Nw.x) > abs(Nw.z) ? P.z : P.x, jx = hx * 1.1 + bh(vec3(row, 1.0, 2.0)) * 7.0 + bn(P * 1.3) * 0.7;
+          float jt = (1.0 - smoothstep(0.0, 0.045, abs(fract(jx) - 0.5))) * step(0.62, bh(vec3(floor(jx), row, 7.0)));
+          float blk = bh(vec3(floor(jx + 0.5), row, 3.0)), mott = bn(P * 2.2) * 0.6 + bn(P * 6.5) * 0.4;
+          float streak = smoothstep(0.5, 0.85, bn(vec3(P.x * 2.4, P.y * 0.3, P.z * 2.4)));
+          diffuseColor.rgb *= mix(1.0, 0.84 + blk * 0.26, steep) * (0.85 + mott * 0.3);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.72, 0.74, 0.72), streak * steep * 0.55);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.42, 0.41, 0.4), max(bed, jt * 0.8) * steep * 0.7);
+        } else if (vBrush > 2.5) {
+          float gr = bn(vec3(vWP.x * 15.0, vWP.y * 1.3, vWP.z * 15.0)); diffuseColor.rgb *= 0.72 + gr * 0.56;
+        }`);
+      };
+      m.customProgramCacheKey = () => 'dh-rock';
+      return m;
+    }
     if (!G.PAPER) return m;
     m.onBeforeCompile = (sh) => {
       sh.vertexShader = 'attribute float brush;\nvarying float vBrush;\nvarying vec3 vWP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBrush = brush; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -954,9 +1018,78 @@
     return m;
   }
 
+  /* ============================ 树叶（卡通画风） ============================
+     一团叶 = 十来片"叶枝"：每片是一个四边形，贴着叶枝图集里的一格（一根小枝带着十几片叶），
+     自叶团的中心向外、向上张开，大半像真树的枝那样一层层平铺，小半随意——从哪边看、从上往下看都是满的。
+     明暗不靠每片自己的朝向（那样会花），而是按它在叶团里的位置：朝外朝上的亮，靠里靠下的暗。
+     颜色一棵树一个调子（枫是深红到橘到金，偶尔一棵还绿着），片与片之间再有深浅。
+     整间屋子的叶合成一个网格，一次画完；随风轻摆，影子按叶的轮廓投 */
+  const padQ = [], pv = new THREE.Vector3(), ps = new THREE.Vector3();
+  function takePads(root) {
+    const marks = []; root.traverse((o) => { if (o.userData.pad) marks.push(o); });
+    for (const o of marks) {
+      const d = o.userData.pad, c = d.mat.color, hz = d.mat.userData.hz; o.getWorldPosition(pv); o.getWorldScale(ps);
+      padQ.push({ x: pv.x, y: pv.y, z: pv.z, r: d.r * ps.x, kind: d.kind, n: d.n, seed: d.seed, cr: c.r, cg: c.g, cb: c.b, hz });
+      o.parent.remove(o);
+    }
+  }
+  // 各章的叶色：每一类叶给几个"调子"（一棵树取一个），每个调子是 [暗处, 亮处]
+  const LEAF = [
+    { round: [['#2f6a2e', '#7fc24e'], ['#3a7430', '#a2cc56'], ['#27602e', '#62ac4a']], pine: [['#1f4a2e', '#4f9a52'], ['#24543a', '#62a85a']], bloom: [['#d887a4', '#ffd6e2'], ['#e4a0b6', '#fff0f4']] },
+    { round: [['#8a2a1a', '#e2642a'], ['#a03a1c', '#f08a34'], ['#b8721e', '#f6c64e'], ['#6a1e1a', '#c8402a'], ['#4a5a26', '#9aa63e']], pine: [['#2a4a30', '#5a8a4e']], bloom: [['#b8721e', '#f6c64e']] },
+    { round: [['#2e2a22', '#6a5e48'], ['#3a2e22', '#8a6a44']], pine: [['#2a2a24', '#5a5646']], bloom: [['#3a2e22', '#8a6a44']] },
+    { round: [['#4a7a80', '#f4f8fb'], ['#5a8a8e', '#ffffff']], pine: [['#2e5e58', '#f0f6fa'], ['#3a6a66', '#ffffff']], bloom: [['#9ab4c4', '#ffffff']] },
+  ];
+  let leafTex = null;
+  function leafCards(room, rs, g) {
+    const n0 = padQ.length; if (!n0) return;
+    const ti = room.theme, LP = LEAF[ti], pos = [], nor = [], uv = [], col = [], sw = [], idx = [], c0 = new THREE.Color(), c1 = new THREE.Color(), cc = new THREE.Color();
+    const up = new THREE.Vector3(0, 1, 0), d = new THREE.Vector3(), v = new THREE.Vector3(), u = new THREE.Vector3(), nn = new THREE.Vector3(), ce = new THREE.Vector3(), rv = new THREE.Vector3();
+    for (const q of padQ) {
+      const pine = q.kind === 'pine', bloom = q.kind === 'bloom', fam = LP[q.kind] || LP.round, tree = Math.floor(q.seed / 7), tone = fam[Math.floor(U.hash(tree, 3, ti + 9) * fam.length * 0.999)];
+      c0.set(tone[0]); c1.set(tone[1]);
+      const cell = bloom ? 3 : pine ? 2 : ti === 0 ? 1 : 0, cx = cell % 2, cy = (cell / 2) | 0, sy = pine ? 0.42 : 0.82, h = (i, k) => U.hash(q.seed * 31 + i, k * 7 + 1, tree + k);
+      for (let i = 0; i < q.n; i++) {
+        // 自中心向外的方向：偏向上半球
+        const a = h(i, 1) * TAU, yy = -0.3 + h(i, 2) * 1.3, rr = Math.sqrt(Math.max(0, 1 - Math.min(1, yy * yy)));
+        d.set(Math.cos(a) * rr, yy, Math.sin(a) * rr).normalize();
+        const rad = 0.2 + h(i, 3) * 0.55, size = q.r * (pine ? 1.25 : 1.1) * (0.8 + h(i, 4) * 0.45);
+        ce.set(q.x + d.x * q.r * rad, q.y + d.y * q.r * rad * sy, q.z + d.z * q.r * rad);
+        v.copy(d); v.y = v.y * (pine ? 0.25 : 0.6) + (pine ? 0.06 : 0.22); v.x += (h(i, 5) - 0.5) * 0.5; v.z += (h(i, 6) - 0.5) * 0.5; v.normalize(); // 枝往外、略往上长
+        if (h(i, 7) < (pine ? 0.9 : 0.62) && Math.abs(v.y) < 0.9) u.crossVectors(v, up); else { rv.set(h(i, 8) - 0.5, h(i, 9) - 0.5, h(i, 10) - 0.5); u.crossVectors(v, rv); } // 多数平铺成层，少数随意
+        if (u.lengthSq() < 1e-6) u.set(1, 0, 0); u.normalize().multiplyScalar(size * 0.5); v.multiplyScalar(size);
+        nn.copy(d).multiplyScalar(0.55).add(up).normalize(); // 明暗用的法线：朝外、朝上
+        const k = pos.length / 3, bx = ce.x - v.x * 0.35, by = ce.y - v.y * 0.35, bz = ce.z - v.z * 0.35;
+        pos.push(bx - u.x, by - u.y, bz - u.z, bx + u.x, by + u.y, bz + u.z, bx + u.x + v.x, by + u.y + v.y, bz + u.z + v.z, bx - u.x + v.x, by - u.y + v.y, bz - u.z + v.z);
+        const fl = h(i, 11) < 0.5, u0 = (cx + (fl ? 1 : 0)) / 2, u1 = (cx + (fl ? 0 : 1)) / 2, vb = (cy + 1) / 2 - 0.004, vt = cy / 2 + 0.004;
+        uv.push(u0, vb, u1, vb, u1, vt, u0, vt);
+        // 颜色：靠外靠上的亮，靠里靠下的暗；片与片再有深浅；跟着材质的颜色（前景压暗）与空气透视（远处褪色）
+        const lit = U.clamp(0.25 + d.y * 0.45 + rad * 0.45 + (h(i, 12) - 0.5) * 0.3, 0, 1), shade = (0.62 + 0.38 * U.clamp(d.y * 0.6 + 0.5, 0, 1)) * (0.9 + h(i, 13) * 0.2);
+        cc.copy(c0).lerp(c1, lit); let r2 = cc.r * shade * q.cr, g2 = cc.g * shade * q.cg, b2 = cc.b * shade * q.cb;
+        if (q.hz) { r2 += (q.hz[0].r - r2) * q.hz[1]; g2 += (q.hz[0].g - g2) * q.hz[1]; b2 += (q.hz[0].b - b2) * q.hz[1]; }
+        for (let m = 0; m < 4; m++) { nor.push(nn.x, nn.y, nn.z); col.push(r2, g2, b2); }
+        sw.push(0.35, 0.35, 1, 1); idx.push(k, k + 1, k + 2, k, k + 2, k + 3);
+      }
+    }
+    padQ.length = 0;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setAttribute('sway', new THREE.Float32BufferAttribute(sw, 1)); geo.setIndex(idx);
+    if (!leafTex) leafTex = Mo.leafAtlas();
+    const uT = { value: 0 }, sway = (sh) => { sh.uniforms.uT = uT; sh.vertexShader = 'attribute float sway;\nuniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  { float ph = position.x * 0.9 + position.z * 0.7; transformed.x += sway * (sin(uT * 1.1 + ph) * 0.05 + sin(uT * 3.7 + ph * 2.3) * 0.012); transformed.y += sway * sin(uT * 1.7 + ph * 1.3) * 0.02; }'); };
+    const mat = new THREE.MeshLambertMaterial({ map: leafTex, alphaTest: 0.42, vertexColors: true, side: THREE.DoubleSide });
+    mat.onBeforeCompile = (sh) => { sway(sh); sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal = normal * faceDirection;', '')); }; // 背面不翻法线：明暗只看它在叶团里的位置
+    mat.customProgramCacheKey = () => 'leaf';
+    const dep = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: leafTex, alphaTest: 0.42, side: THREE.DoubleSide }); dep.onBeforeCompile = sway; dep.customProgramCacheKey = () => 'leaf-d';
+    const m = new THREE.Mesh(geo, mat); m.customDepthMaterial = dep; m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false; g.add(m);
+    rs.geos.push(geo); rs.mats.push(mat, dep); rs.anims.push((t) => { uT.value = t; });
+    rs.leafN = idx.length / 6;
+  }
+
   /* 把一组静态网格烘焙成单个带顶点色的网格 */
   function mergeStatic(root) {
     root.updateMatrixWorld(true);
+    takePads(root);
     const pos = [], nor = [], colr = [], brush = [], dead = [], v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
     root.traverse((o) => {
       if (!o.isMesh) return;
@@ -1136,6 +1269,7 @@
     const inCave = room.terrain === 'cave';
     for (const m of seas) m.visible = !inCave; for (const s of mists) s.visible = !inCave; cshadow.visible = !inCave;
     if (inCave) { scene.background = new THREE.Color(0x050304); scene.fog.color.set(0x140a0b); hemi.intensity *= 0.72; }
+    if (sky) { sky.visible = !inCave; sky.position.set(w / 2, 0, h / 2); sky.material.uniforms.uTop.value.set(th.sky || th.bg); sky.material.uniforms.uHor.value.set(th.fog[0]); sky.material.uniforms.uSunC.value.set(th.sun[0]); }
     seas[0].material.color.setHex(th.sea[2]); seas[0].material.opacity = th.sea[3]; seas[0].position.set(w / 2, -11, h / 2);
     seas[1].material.color.setHex(th.sea[0]); seas[1].material.opacity = th.sea[1]; seas[1].position.set(w / 2, -6.5, h / 2);
     cshadow.position.set(w / 2, 0.012, h / 2); cshadow.scale.set(w - 1.2, h - 1.2, 1); cshadow.material.opacity = th.cloudShadow[0]; cshadow.material.map.repeat.set(w / th.cloudShadow[1], h / th.cloudShadow[1]);
@@ -1932,9 +2066,9 @@
     }
     for (const m of [orbs, orbRims, shards, shardRims, fySw, bugs]) m.count = 0;
     endPools();
-    const a = Math.sin(t * 0.13) * 0.55 + 0.25, wide = W / H < 1 ? 1.7 : 1, d = 12.5 * wide;
-    camera.position.set(cx + Math.sin(a) * d, 5.6 * wide, cz + Math.cos(a) * d);
-    camera.lookAt(cx - 2.2 * Math.cos(a) * (W / H > 1.2 ? 1 : 0), 1.6, cz);
+    const a = Math.sin(t * 0.13) * 0.55 + 0.25, wide = W / H < 1 ? 1.7 : 1, d = 12.5 * wide, low = G.DH ? 1 : 0; // 卡通画风：镜头压低、略仰，看得见天、云与一根根石峰
+    camera.position.set(cx + Math.sin(a) * d, (low ? 3.5 : 5.6) * wide, cz + Math.cos(a) * d);
+    camera.lookAt(cx - 2.2 * Math.cos(a) * (W / H > 1.2 ? 1 : 0), low ? 2.5 : 1.6, cz);
     camera.updateMatrixWorld();
     present(dt, false);
     drawOverlay(Gm, menuRoom, null, t, false);

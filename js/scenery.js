@@ -24,10 +24,10 @@
 
   // 卡通画风：削面的山石，自下而上由暗到亮，朝天的面是草（苔 / 灰 / 雪）；树冠的颜色各章不同，干净、明快
   if (G.DH) [
-    { rock: '#a6a294', dark: '#5a5448', cap: '#6f9a44', cap2: '#88b254', capK: 0.66, trunk: '#5a3c28', leaf: '#5e9a46', leafD: '#2e5a2c', bloom: '#f6bccc', bloomD: '#c47c94' }, // 七玄门：青石、绿树、桃花
-    { rock: '#8a8278', dark: '#443c34', cap: '#7a7440', cap2: '#8e8248', capK: 0.44, trunk: '#3a2a20', leaf: '#d2682e', leafD: '#7a3018', bloom: '#e8a03a', bloomD: '#a4662a' },  // 血色禁地：湿石、枫（橘红——朱红留给敌人）
-    { rock: '#8a847a', dark: '#403a34', cap: '#5c5850', cap2: '#6c665c', capK: 0.38, trunk: '#2a241e', leaf: '#5a5240', leafD: '#2e2a22', bloom: '#6e6452', bloomD: '#3a342a' },  // 燕翎堡：烟熏的石，焦枯的树
-    { rock: '#98aabc', dark: '#465668', cap: '#f2f6fa', cap2: '#ffffff', capK: 0.88, trunk: '#3c444c', leaf: '#e2ecf2', leafD: '#3e6a64', bloom: '#eaf2f6', bloomD: '#9ab4c0' }, // 虚天殿：寒石、雪松
+    { rock: '#b8b2a0', dark: '#7c7566', cap: '#6f9a44', cap2: '#88b254', capK: 0.66, trunk: '#5a3c28', leaf: '#5e9a46', leafD: '#2e5a2c', bloom: '#f6bccc', bloomD: '#c47c94' }, // 七玄门：青石、绿树、桃花
+    { rock: '#a09688', dark: '#665c50', cap: '#7a7440', cap2: '#8e8248', capK: 0.44, trunk: '#3a2a20', leaf: '#d2682e', leafD: '#7a3018', bloom: '#e8a03a', bloomD: '#a4662a' },  // 血色禁地：湿石、枫（橘红——朱红留给敌人）
+    { rock: '#9a9286', dark: '#5c544a', cap: '#5c5850', cap2: '#6c665c', capK: 0.38, trunk: '#2a241e', leaf: '#5a5240', leafD: '#2e2a22', bloom: '#6e6452', bloomD: '#3a342a' },  // 燕翎堡：烟熏的石，焦枯的树
+    { rock: '#a6b8c8', dark: '#5e7084', cap: '#f2f6fa', cap2: '#ffffff', capK: 0.88, trunk: '#3c444c', leaf: '#e2ecf2', leafD: '#3e6a64', bloom: '#eaf2f6', bloomD: '#9ab4c0' }, // 虚天殿：寒石、雪松
   ].forEach((o, i) => Object.assign(PAL[i], o));
 
   const n3 = (x, y, z, s) => U.hash(Math.round(x * 997) + s * 57, Math.round(y * 991) + Math.round(z * 983) * 3, s);
@@ -77,18 +77,112 @@
 
   // 云团用的球：低面数，顶上亮、底下偏灰蓝（颜色烘在顶点上）
   Mo.cloudGeo = () => gg('cloud', () => {
-    const g = new THREE.IcosahedronGeometry(1, 1), P = g.attributes.position, col = new Float32Array(P.count * 3); // 八十个面：削面的云，和山石、树冠是一种造型语言
-    for (let i = 0; i < P.count; i++) { const k = U.clamp(P.getY(i) * 0.6 + 0.55, 0, 1); col[i * 3] = 0.66 + 0.34 * k; col[i * 3 + 1] = 0.7 + 0.3 * k; col[i * 3 + 2] = 0.78 + 0.22 * k; }
+    const g = new THREE.IcosahedronGeometry(1, 2), P = g.attributes.position, col = new Float32Array(P.count * 3);
+    for (let i = 0; i < P.count; i++) { const k = U.clamp(P.getY(i) * 0.6 + 0.55, 0, 1); col[i * 3] = 0.8 + 0.2 * k; col[i * 3 + 1] = 0.83 + 0.17 * k; col[i * 3 + 2] = 0.9 + 0.1 * k; } // 云底只比云顶暗一点、偏蓝一点
     g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
   });
+  /* 石灰岩（卡通画风的山石）：竖向的节理把石头切成一根根柱，水平的层理再把柱切成一块块；
+     每一块比邻块凸出或凹进一点，上一层比下一层收进去一点，于是有了台阶一样的石棱和可以长草的石台。
+     做法：绕一圈分成几瓣（竖缝），自下而上分成几层（层理）；每一瓣每一层各有自己的半径——
+     外面一块立面，瓣与瓣之间一道竖缝的侧壁，层与层之间一圈朝天的石台，顶上封一个略鼓的盖。
+     颜色烘在顶点上：自下而上由暗到亮，凹进去的块暗一点，每层的色调略有不同，朝天的面是草（苔 / 灰 / 雪）。
+     表面更细的层理线、竖缝、水渍由着色器按世界坐标逐像素画（render.js 的 brushMat） */
+  function karst(key, seed, pal) {
+    return gg(key, () => {
+      const N = 7 + (seed % 3), B = 4, H = 1.07, hh = (i, j) => U.hash(seed * 13 + i, j * 7 + 3, seed + 11);
+      const ang = [], ys = [0], prof = [1.0, 0.95, 0.86, 0.72];
+      for (let i = 0; i <= N; i++) ang.push(((i + (i === 0 || i === N ? 0 : (hh(i, 1) - 0.5) * 0.7)) / N) * TAU);
+      for (let j = 1; j <= B; j++) ys.push(j === B ? H : H * (j / B + (hh(j, 2) - 0.5) * 0.12));
+      const R = []; for (let i = 0; i < N; i++) { R.push([]); const base = 0.72 + hh(i, 3) * 0.36; for (let j = 0; j < B; j++) R[i].push(prof[j] * base + (hh(i * 5 + j, 4) - 0.5) * 0.24); }
+      const pos = [], col = [], c0 = new THREE.Color(pal.dark), c1 = new THREE.Color(pal.rock), cap = new THREE.Color(pal.cap), cap2 = new THREE.Color(pal.cap2), t = new THREE.Color();
+      const P = (a, r, y) => [Math.cos(a) * r, y, Math.sin(a) * r];
+      const tone = (i, j, y) => { t.copy(c0).lerp(c1, U.clamp(Math.pow(y / H, 0.8) * 1.1 - 0.03, 0, 1)).multiplyScalar((0.92 + hh(j, 5) * 0.14) * (0.9 + hh(i * 3 + j, 6) * 0.2)); return [t.r, t.g, t.b]; };
+      const tri = (a, b, c, ca, cb, cc) => { pos.push(...a, ...b, ...c); col.push(...ca, ...(cb || ca), ...(cc || cb || ca)); };
+      const quad = (a, b, c, d, ca, cb, cc, cd) => { tri(a, b, c, ca, cb, cc); tri(a, c, d, ca, cc, cd); };
+      const topOn = hh(0, 8) < pal.capK + 0.25; // 顶上整片是草（苔 / 雪），或者整片是石——不要一瓣一个颜色
+      const capC = (i, j) => { if (j === B - 1 ? topOn : hh(i * 7 + j, 8) < pal.capK) { t.copy(cap).lerp(cap2, 0.3 + hh(i + j, 9) * 0.25); } else t.copy(c1).multiplyScalar(1.04 + hh(i, 12) * 0.05); return [t.r, t.g, t.b]; };
+      // 有的瓣矮一层（顶上那一块塌了）：石头的顶因此高高低低，不是一个平平的多边形
+      const tb = []; for (let i = 0; i < N; i++) tb.push(hh(i, 13) < 0.38 ? B - 1 : B); if (tb.every((v) => v < B)) tb[0] = B;
+      const rad = (i, j) => (j < tb[i] ? R[i][j] : 0);
+      for (let i = 0; i < N; i++) {
+        const a0 = ang[i], a1 = ang[i + 1], i2 = (i + 1) % N;
+        for (let j = 0; j < B; j++) {
+          const r = rad(i, j), y0 = ys[j], y1 = ys[j + 1], rt = r * 0.965, r2 = rad(i2, j); // 立面略向里收
+          const cl = tone(i, j, y0), ch = tone(i, j, y1);
+          if (Math.abs(r2 - r) > 0.02) { // 与下一瓣之间的竖缝：谁凸出来，侧壁就朝着凹的那一边
+            const lo = Math.min(r, r2), hi = Math.max(r, r2), dk = cl.map((v) => v * 0.72), dk2 = ch.map((v) => v * 0.78);
+            if (r > r2) quad(P(a1, lo, y0), P(a1, hi, y0), P(a1, hi * 0.965, y1), P(a1, lo * 0.965, y1), dk, dk, dk2, dk2); else quad(P(a1, hi, y0), P(a1, lo, y0), P(a1, lo * 0.965, y1), P(a1, hi * 0.965, y1), dk, dk, dk2, dk2);
+          }
+          if (!r) continue;
+          const nb = (rad((i + N - 1) % N, j) + r2) / 2, ao = r < nb - 0.03 ? 0.8 : 1, top = j === tb[i] - 1; // 凹进去的块暗一点
+          const up = top ? 0 : R[i][j + 1], ledge = top || up < rt - 0.02, lc = ledge ? capC(i, top ? B - 1 : j) : null;
+          const c0a = cl.map((v) => v * ao), c1a = ch.map((v) => v * ao), chm = lc && hh(i * 11 + j, 10) < pal.capK ? c1a.map((v, k) => v + (lc[k] - v) * 0.4) : c1a; // 石台有草的，立面顶上也挂下来一点
+          quad(P(a0, r, y0), P(a0, rt, y1), P(a1, rt, y1), P(a1, r, y0), c0a, chm, chm, c0a);
+          if (top) { const lc2 = lc.map((v) => v * 1.07); tri([0, y1 + 0.05, 0], P(a1, rt, y1), P(a0, rt, y1), lc2, lc, lc); } // 这一瓣的顶：中间略鼓、略亮
+          else if (ledge) quad(P(a0, up, y1), P(a1, up, y1), P(a1, rt, y1), P(a0, rt, y1), lc);              // 朝天的石台
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+      g.userData.h = H; g.userData.brush = 1;
+      return g;
+    });
+  }
   // 山石（四种形状 × 四章配色）；g.userData.h 是它的高
-  const rockGeo = (Mo.rockGeo = (vr, ti) => { const p = PAL[ti]; return lump(`rk${vr}_${ti}`, vr * 17 + ti + 1, { rough: 0.58, top: 0.34, flat: 0.38, bot: 0.3, sy: 1, dark: p.dark, lite: p.rock, cap: p.cap, cap2: p.cap2, capAt: 0.66, capK: p.capK, brush: 1 }); });
+  const rockGeo = (Mo.rockGeo = (vr, ti) => { const p = PAL[ti]; if (G.DH) return karst(`ks${vr}_${ti}`, vr * 17 + ti + 1, p); return lump(`rk${vr}_${ti}`, vr * 17 + ti + 1, { rough: 0.58, top: 0.34, flat: 0.38, bot: 0.3, sy: 1, dark: p.dark, lite: p.rock, cap: p.cap, cap2: p.cap2, capAt: 0.66, capK: p.capK, brush: 1 }); });
   // 叶团：松是扁的云片，花树是圆的团
   const padGeo = (vr, ti, kind) => { const p = PAL[ti], bl = kind === 'bloom'; return lump(`pad${vr % 3}_${ti}_${kind}`, (vr % 3) * 29 + ti + 3, { rough: 0.36, top: 0.5, flat: 0.7, bot: 0.22, sy: kind === 'pine' ? 0.5 : 0.8, dark: bl ? p.bloomD : p.leafD, lite: bl ? p.bloom : p.leaf, byNormal: true, brush: 2 }); };
 
   Mo.padGeo = padGeo;
+  /* 卡通画风里，一团叶不是一个块体，而是许多片带着小叶的"叶枝"（见 render.js 的 leafCards）。
+     这里只在叶团的位置留一个记号：半径 r、哪一种叶、跟着哪个材质的颜色走（前景压暗、远处褪色都靠它）、铺几片 */
+  Mo.padMark = function (x, y, z, r, kind, mat, n, seed) { const mk = new THREE.Object3D(); mk.position.set(x, y, z); mk.userData.pad = { r, kind, mat, n, seed }; return mk; };
+  /* 叶枝的图集（代码画的，2×2 四格，每格一枝，枝根在下、梢在上）：0 枫（五裂的叶，对生）/ 1 阔叶（卵形）/ 2 松针（一束束的细针）/ 3 花枝。
+     只画明暗（亮度），颜色由每片叶枝自己的顶点色来定。空白处的颜色填成中灰：缩小的时候叶边才不会发黑 */
+  Mo.leafAtlas = function () {
+    const C = 256, cv = document.createElement('canvas'); cv.width = cv.height = C * 2;
+    const c = cv.getContext('2d'); let sd = 7; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647, g8 = (k) => { const v = Math.round(255 * k); return `rgb(${v},${v},${v})`; };
+    const leafMaple = (x, y, a, z, k) => { c.save(); c.translate(x, y); c.rotate(a); c.fillStyle = g8(k); c.beginPath();
+      for (let i = 0; i < 5; i++) { const t = -PI / 2 + (i - 2) * 0.62, R1 = z * (i === 2 ? 1 : i === 1 || i === 3 ? 0.86 : 0.6), t2 = t + 0.31; if (!i) c.moveTo(0, z * 0.18); c.lineTo(Math.cos(t - 0.14) * R1 * 0.6, Math.sin(t - 0.14) * R1 * 0.6); c.lineTo(Math.cos(t) * R1, Math.sin(t) * R1); c.lineTo(Math.cos(t + 0.14) * R1 * 0.6, Math.sin(t + 0.14) * R1 * 0.6); if (i < 4) c.lineTo(Math.cos(t2) * z * 0.3, Math.sin(t2) * z * 0.3); }
+      c.closePath(); c.fill(); c.strokeStyle = g8(k * 0.72); c.lineWidth = 1; c.beginPath(); c.moveTo(0, z * 0.18); c.lineTo(0, -z * 0.8); c.stroke(); c.restore(); };
+    const leafOval = (x, y, a, z, k) => { c.save(); c.translate(x, y); c.rotate(a); c.fillStyle = g8(k); c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(z * 0.5, -z * 0.45, 0, -z); c.quadraticCurveTo(-z * 0.5, -z * 0.45, 0, 0); c.fill(); c.strokeStyle = g8(k * 0.74); c.lineWidth = 1; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -z * 0.9); c.stroke(); c.restore(); };
+    const twig = (pts, w, k) => { c.strokeStyle = g8(k); c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke(); };
+    const spray = (ox, oy, leaf, dense) => { // 一枝：主枝微弯，侧枝对生，节节有叶，越到梢越小
+      const pts = []; let x = ox + C / 2, y = oy + C - 6, a = -PI / 2 + (r() - 0.5) * 0.2;
+      for (let i = 0; i < 9; i++) { pts.push([x, y]); a += (r() - 0.5) * 0.22; x += Math.cos(a) * 26; y += Math.sin(a) * 26; }
+      twig(pts, 3, 0.34);
+      pts.forEach(([px, py], i) => { if (i < 1) return; const k = 1 - i / 11, z = (dense ? 30 : 38) * (0.55 + k * 0.6);
+        for (const sx of [-1, 1]) { const ba = -PI / 2 + sx * (0.95 + r() * 0.35), L = 20 + k * 58 * (0.6 + r() * 0.5), ex = px + Math.cos(ba) * L, ey = py + Math.sin(ba) * L;
+          twig([[px, py], [ex, ey]], 1.6, 0.36);
+          const n = dense ? 4 : 3; for (let q = 1; q <= n; q++) { const u = q / n, lx = px + (ex - px) * u, ly = py + (ey - py) * u; leaf(lx, ly, ba + PI / 2 + (q % 2 ? 1 : -1) * (0.7 + r() * 0.4) * (q === n ? 0 : 1), z * (0.75 + r() * 0.45) * (1 - u * 0.2), 0.6 + r() * 0.4); } }
+        leaf(px, py, (r() - 0.5) * 1.4, z * 0.8, 0.62 + r() * 0.38); });
+      leaf(x, y, a + PI / 2, 30, 0.9);
+    };
+    spray(0, 0, leafMaple, false); spray(C, 0, leafOval, true);
+    { // 松针：枝上一束束向上张开的细针
+      const ox = 0, oy = C, pts = []; let x = ox + C / 2, y = oy + C - 6, a = -PI / 2;
+      for (let i = 0; i < 7; i++) { pts.push([x, y]); a += (r() - 0.5) * 0.3; x += Math.cos(a) * 30; y += Math.sin(a) * 30; }
+      twig(pts, 4, 0.3);
+      const fan = (fx, fy, fa, L) => { for (let q = 0; q < 16; q++) { const t = fa + (q / 15 - 0.5) * 2.5; c.strokeStyle = g8(0.55 + r() * 0.45); c.lineWidth = 1.7; c.beginPath(); c.moveTo(fx, fy); c.lineTo(fx + Math.cos(t) * L * (0.75 + r() * 0.35), fy + Math.sin(t) * L * (0.75 + r() * 0.35)); c.stroke(); } };
+      pts.forEach(([px, py], i) => { if (!i) return; for (const sx of [-1, 1]) { const ba = -PI / 2 + sx * (0.9 + r() * 0.4), L = 30 + (1 - i / 8) * 50, ex = px + Math.cos(ba) * L, ey = py + Math.sin(ba) * L; twig([[px, py], [ex, ey]], 2.2, 0.32); fan(ex, ey, ba - sx * 0.5, 30); fan(px + (ex - px) * 0.55, py + (ey - py) * 0.55, ba - sx * 0.7, 26); } fan(px, py, -PI / 2, 26); });
+      fan(x, y, -PI / 2, 34);
+    }
+    { // 花枝：五瓣的花，零星几片小叶
+      const ox = C, oy = C, pts = []; let x = ox + C / 2, y = oy + C - 6, a = -PI / 2 + 0.1;
+      for (let i = 0; i < 8; i++) { pts.push([x, y]); a += (r() - 0.5) * 0.3; x += Math.cos(a) * 28; y += Math.sin(a) * 28; }
+      twig(pts, 3.4, 0.3);
+      const flower = (fx, fy, z, k) => { for (let q = 0; q < 5; q++) { const t = q * 1.257 + r(); c.fillStyle = g8(k * (0.88 + r() * 0.12)); c.beginPath(); c.ellipse(fx + Math.cos(t) * z * 0.5, fy + Math.sin(t) * z * 0.5, z * 0.5, z * 0.36, t, 0, TAU); c.fill(); } c.fillStyle = g8(0.62); c.beginPath(); c.arc(fx, fy, z * 0.18, 0, TAU); c.fill(); };
+      pts.forEach(([px, py], i) => { if (!i) return; for (const sx of [-1, 1]) { const ba = -PI / 2 + sx * (0.9 + r() * 0.5), L = 22 + (1 - i / 9) * 52, ex = px + Math.cos(ba) * L, ey = py + Math.sin(ba) * L; twig([[px, py], [ex, ey]], 1.8, 0.32);
+        flower(ex, ey, 17 + r() * 6, 0.92); flower(px + (ex - px) * 0.5 + (r() - 0.5) * 10, py + (ey - py) * 0.5 + (r() - 0.5) * 10, 15 + r() * 5, 0.84 + r() * 0.16); if (r() < 0.5) leafOval(px + (ex - px) * 0.3, py + (ey - py) * 0.3, ba + PI / 2 + sx * 0.8, 20, 0.5); } flower(px + (r() - 0.5) * 8, py + (r() - 0.5) * 8, 16, 0.9); });
+      flower(x, y, 20, 1);
+    }
+    const im = c.getImageData(0, 0, C * 2, C * 2), d = new Uint8Array(im.data.buffer.slice(0));
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] < 10) { d[i] = d[i + 1] = d[i + 2] = 170; d[i + 3] = 0; } else if (d[i + 3] < 255) { const a = d[i + 3] / 255; d[i] = Math.min(255, d[i] / a); d[i + 1] = Math.min(255, d[i + 1] / a); d[i + 2] = Math.min(255, d[i + 2] / a); }
+    const tex = new THREE.DataTexture(d, C * 2, C * 2, THREE.RGBAFormat); tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.needsUpdate = true;
+    return tex; // 第 0 行在上：贴图坐标的 v 自上而下
+  };
   function stick(parent, a, b, r, mat) { // 一截上细下粗的枝干，从 a 到 b
-    const m = new THREE.Mesh(gg('stk', () => { const q = new THREE.CylinderGeometry(0.38, 0.5, 1, 6, 1, true); q.userData.brush = 1; return q; }), mat); // 两端不封口：接缝被下一截或叶团盖住，省一半的面
+    const m = new THREE.Mesh(gg('stk', () => { const q = new THREE.CylinderGeometry(0.38, 0.5, 1, 6, 1, true); q.userData.brush = G.DH ? 3 : 1; return q; }), mat); // 两端不封口：接缝被下一截或叶团盖住，省一半的面
     D.subVectors(b, a); const len = D.length();
     m.position.copy(a).addScaledVector(D, 0.5); m.quaternion.setFromUnitVectors(UP, D.normalize()); m.scale.set(r * 2, len * 1.06, r * 2); m.castShadow = true;
     parent.add(m); return m;
@@ -115,7 +209,7 @@
     for (let i = 1; i <= segs; i++) { a += (h(3 + i) - 0.5) * 2.4; x += Math.cos(a) * lean; z += Math.sin(a) * lean; pts.push(new V3(x, (i / segs) * H, z)); }
     for (let i = 0; i < segs; i++) stick(g, pts[i], pts[i + 1], 0.135 * (1 - i * 0.17), bark);
     if (!o.lite) for (let i = 0; i < 3; i++) { const ra = h(20 + i) * TAU; stick(g, new V3(Math.cos(ra) * 0.3, -0.03, Math.sin(ra) * 0.3), new V3(0, 0.22, 0), 0.06, bark); } // 露出地面的根
-    const pad = (c, s, vr) => { const m = new THREE.Mesh(padGeo(vr, ti, kind), leaf); m.position.copy(c); m.scale.set(s, s * 0.95, s * (0.8 + h(vr + 30) * 0.3)); m.rotation.y = h(vr + 40) * TAU; m.castShadow = true; g.add(m); };
+    const pad = (c, s, vr) => { if (G.DH) { g.add(Mo.padMark(c.x, c.y, c.z, s, kind, leaf, o.lite ? 7 : pine ? 16 : 13, v * 7 + vr)); return; } const m = new THREE.Mesh(padGeo(vr, ti, kind), leaf); m.position.copy(c); m.scale.set(s, s * 0.95, s * (0.8 + h(vr + 30) * 0.3)); m.rotation.y = h(vr + 40) * TAU; m.castShadow = true; g.add(m); };
     const top = pts[segs]; pad(new V3(top.x, top.y - 0.02, top.z), pine ? 0.64 : 0.5, 0);
     const nB = o.lite ? 2 : pine ? 4 : 5;
     for (let j = 0; j < nB; j++) {
