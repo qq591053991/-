@@ -518,6 +518,7 @@
     const crag = (x, z, top, fg) => { wk++; const sc = 0.6 + U.hash(wk, 11, sd) * 0.17; rk(x + (U.hash(wk, 13, sd) - 0.5) * 0.2, top, z + (U.hash(wk, 15, sd) - 0.5) * 0.2, sc, (top + 0.3) / (1.1 * sc), wk, fg); return wk; };
     const treeOn = (x, top, z, kind, sc) => { const tr = Mo.tree(wk + sd, ti, kind, sc); tr.g.position.set(x, top - 0.1, z); tr.g.rotation.y = U.hash(wk, 17, sd) * TAU; scn.add(tr.g); rs.mats.push(...tr.mats); };
 
+    const lant = [], pens = []; // 灯笼的挂点 [x, y, z]、幡旗的杆顶 [x, 杆脚 y, z, 杆长]（卡通画风）
     // 墙体
     const topC = Tx.wallTop(ti), plainC = Tx.wallPlain(ti);
     const topT = (rx, ry) => { const t = tx(ctex(topC, true)); t.repeat.set(rx, ry); return t; };
@@ -597,7 +598,9 @@
         for (let cx = x0 + 0.45; cx <= x0 + len - 0.4; cx += 3.05) {
           kit.column(cx, 1.12, HN, 0.1);
           if (cx + 3.05 <= x0 + len - 0.4 && clear(cx + 1.525, 0.34)) kit.lattice(cx + 1.525, HN * 0.62, 1.02, 0.3); // 两柱之间开一扇漏窗
+          if (G.DH && cx + 3.05 <= x0 + len - 0.4) for (const q of [0.76, 2.29]) if (clear(cx + q, 0.14)) lant.push([cx + q, HN + 0.03, 1.53]); // 檐口挂一排红灯笼
         }
+        if (G.DH && dnF) for (const [ex, sg] of [[x0 + len, -1], [x0, 1]]) if (Math.abs(ex - (dcF + sg * 1.5)) < 0.01 && len > 3.4) pens.push([ex + sg * 2.4, HN + 0.6, 0.5, 1.3]); // 门两侧
         return;
       }
       const cap = lm({ map: topT(len, 1.3) });
@@ -606,6 +609,7 @@
         mesh(lm({ color: new THREE.Color('#a3a394') }), x0 + len / 2, HN + 0.2, 0.5, len + 0.04, 0.12, 0.22);
         for (let cx = x0 + 0.5; cx <= x0 + len - 0.4; cx += 3.05) {
           kit.column(cx, 1.16, HN + 0.14, 0.14, true);
+          if (G.DH && clear(cx + 0.42, 0.14)) lant.push([cx + 0.42, HN + 0.01, 1.25]);
           if (cx + 3.05 <= x0 + len - 0.4 && clear(cx + 1.525, 1.1)) kit.panel(cx + 1.525, HN * 0.56, 1.02, 2.2, HN * 0.5); // 两柱之间一方鎏金的玉板
         }
       } else {
@@ -642,6 +646,7 @@
     // 四角：角楼（山岩墙没有角楼）
     if (ti !== 1) for (const [cxx, czz, north] of [[0.5, 0.5, 1], [w - 0.5, 0.5, 1], [0.5, h - 0.5, 0], [w - 0.5, h - 0.5, 0]]) {
       if (at(Math.floor(cxx), Math.floor(czz)) !== 1) continue;
+      if (north && G.DH) pens.push([cxx, HN + 0.42 + 0.1 + 1.1 * 0.7, czz, 1.15]);
       if (north) kit.tower(cxx, czz, HN + 0.42, 1.1); else kit.tower(cxx, czz, ti === 2 ? 0.95 : 0.72, ti === 2 ? 1.04 : 0.62);
     }
     // 屋内的隔墙。七玄门：假山，山上偶尔立一棵小松；血色禁地：山岩；虚天殿：覆雪的冰岩；燕翎堡：残垣
@@ -711,7 +716,11 @@
         for (const sgn of [-1, 1]) { // 地标：桥头两根高出树冠的幡杆，隔着林子也望得见；幡的颜色随"未解 / 可走 / 去过"而变
           const fx = bx + out[1] * sgn * 1.75 + out[0] * 0.3, fz = bz + out[0] * sgn * 1.75 + out[1] * 0.3;
           kit.pole(fx, fz, 4.1);
-          const fm = new THREE.MeshBasicMaterial({ color: 0x3a2a2a, side: THREE.DoubleSide }), fl = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 1.7), fm);
+          const fm = new THREE.MeshBasicMaterial({ color: 0x3a2a2a, side: THREE.DoubleSide }), fl = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 1.7, 2, 9), fm);
+          if (G.DH) { // 幡是布：上头钉在横杆上，越往下摆得越大
+            fm.onBeforeCompile = (sh) => { sh.uniforms.uT = clothT; sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  { float k = 1.0 - uv.y, ph = modelMatrix[3][0] * 1.7 + modelMatrix[3][2];\n    transformed.z += (sin(uT * 3.1 + k * 5.5 + ph) * 0.13 + sin(uT * 5.3 + k * 9.0 + position.x * 3.0 + ph) * 0.04) * k;\n    transformed.x += sin(uT * 2.3 + k * 3.0 + ph) * 0.05 * k; }'); };
+            fm.customProgramCacheKey = () => 'banner';
+          }
           fl.position.set(fx + 0.32, 3.15, fz); g.add(fl); rs.geos.push(fl.geometry); rs.mats.push(fm); (rs.flags || (rs.flags = [])).push({ m: fl, d, x: fx, z: fz, ph: fx * 1.7 + fz });
         }
         rk(bx + out[0] * (L + 1.6), 0.04, bz + out[1] * (L + 1.6), 2.3, 2.0, dkey); rk(bx + out[0] * (L + 2.6) + out[1] * 1.8, 0.7, bz + out[1] * (L + 2.6) + out[0] * 1.8, 1.5, 2.2, dkey + 9);
@@ -719,13 +728,22 @@
       } else if (d === 'n') {
         const ag = Mo.archGate(ti); ag.g.position.set(cx, 0, 0.9); g.add(ag.g); rs.mats.push(...ag.mats); rs.tex.push(...ag.tex); // 青铜环门
         kit.slab(cx, 0.05, 1.2, 3.3, 0.1, 0.5, 'stone'); kit.slab(cx, 0.025, 1.62, 3.7, 0.05, 0.42, 'dark'); // 门前两级台阶
+        if (G.DH && ti !== 1) { // 牌楼：两根高柱、两道枋、枋间一块匾，顶上压一道飞檐（燕翎堡是城门：石过梁上压垛口），枋下挂一对大灯笼。比院墙高出一头，隔着半个场子就认得出口在哪
+          const pz = 1.36, ph = 2.5, beam = ti === 2 ? 'dark' : 'wood';
+          for (const sx of [-2.1, 2.1]) kit.column(cx + sx, pz, ph, 0.14, ti === 3);
+          kit.slab(cx, ph - 0.09, pz, 4.6, 0.16, 0.15, beam); kit.slab(cx, ph - 0.63, pz, 4.34, 0.1, 0.11, beam);
+          if (ti === 2) { kit.slab(cx, ph + 0.1, pz - 0.26, 4.9, 0.22, 0.6, 'stone'); for (let i = -2; i <= 2; i++) kit.crenel(cx + i, ph + 0.2, pz - 0.26, 0.5, 0.56); }
+          else kit.roofX(cx - 2.45, 4.9, pz - 0.6, ph + 0.02, 1.2, 0.42); // 屋顶压在墙线上，前檐只比枋探出一点——镜头在南边高处，檐探得多了会把匾挡住
+          const pq = Mo.plaque(ti, ['七玄门', '', '燕翎堡', '虚天殿'][ti]); pq.g.position.set(cx, ph - 0.36, pz + 0.09); pq.g.rotation.x = -0.22; g.add(pq.g); rs.mats.push(...pq.mats); rs.tex.push(...pq.tex);
+          if (ti !== 2) lant.push([cx - 1.5, ph - 0.68, pz + 0.04, 1.45], [cx + 1.5, ph - 0.68, pz + 0.04, 1.45]);
+        }
       } else {
         if (d === 's') { for (const sx of [-1.78, 1.78]) kit.tower(cx + sx, cz, 0.62, 0.52); } // 南门：两只带攒尖顶的门墩，不挡视线
         else { // 东西两侧：门楼 —— 两根立柱托着一道横在门上的屋顶（燕翎堡是城门：石过梁上压垛口）
           for (const sz of [-1.72, 1.72]) kit.column(cx, cz + sz, 1.55, 0.13, ti === 3);
           mesh(postM, cx, 1.5, cz, 0.2, 0.16, 3.7);
           if (ti === 2) { mesh(postM, cx, 1.66, cz, 0.9, 0.2, 3.9); for (let i = -1; i <= 1; i++) kit.crenel(cx, 1.74, cz + i * 1.3, 0.9, 0.6); }
-          else kit.roofZ(cx, cz - 2.05, 4.1, 1.58, 1.3, 0.36);
+          else { kit.roofZ(cx, cz - 2.05, 4.1, 1.58, 1.3, 0.36); if (G.DH) for (const sz of [-1.15, 1.15]) lant.push([cx + (d === 'w' ? 0.66 : -0.66), 1.57, cz + sz]); }
         }
       }
       const bm = new THREE.MeshBasicMaterial({ color: 0xff4a32, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
@@ -772,6 +790,14 @@
       const sp = new THREE.Sprite(sm); sp.position.set(x, y, z); sp.scale.set(s, s, 1); g.add(sp); rs.mats.push(sm); rs.sprites.push(sp); return sp;
     };
     const lampM = new THREE.MeshBasicMaterial({ color: new THREE.Color(th.lampHex) }); rs.mats.push(lampM);
+    if (lant.length) { // 灯笼：一种模型画许多盏，各自轻轻地晃
+      const lmat = new THREE.MeshBasicMaterial({ vertexColors: true }); lmat.color.setRGB(1.3, 1.3, 1.3); rs.mats.push(lmat);
+      const im = new THREE.InstancedMesh(Mo.lanternGeo(ti), lmat, lant.length); im.frustumCulled = false; g.add(im);
+      const hex = ti === 3 ? 0x9fd8ff : 0xff7a3a;
+      lant.forEach((L) => glowSprite(L[0], L[1] - 0.33 * (L[3] || 1), L[2] + 0.06, hex, 1.15 * (L[3] || 1), 0.2));
+      rs.anims.push((t) => { for (let i = 0; i < lant.length; i++) { const L = lant[i]; dummy.position.set(L[0], L[1], L[2]); dummy.rotation.set(Math.sin(t * 1.1 + i * 1.7) * 0.07, 0, Math.sin(t * 1.45 + i * 2.3) * 0.1); dummy.scale.setScalar(L[3] || 1); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); } im.instanceMatrix.needsUpdate = true; });
+    }
+    if (pens.length) pennants(pens, rs, g, kit, ti);
     for (const L of room.lights) {
       const x = L.x * S, y = L.z * S, z = L.y * S;
       if (L.sconce) { // 北墙壁灯
@@ -845,6 +871,31 @@
         }
       }
     }
+    /* 水（卡通画风）：水面是真的面；七玄门的池子里浮着荷叶、开着荷花，虚天殿的寒潭里漂着碎冰 */
+    if (G.DH && waterMesh(room, rs, g, th, ti, at)) {
+      const padG = Mo.padGeoFlat(), padM = [lm({ color: new THREE.Color('#4f9a52') }), lm({ color: new THREE.Color('#6cb45c') })], flM = new THREE.MeshLambertMaterial({ vertexColors: true }), iceM = lm({ color: new THREE.Color('#e8f4fa') }); rs.mats.push(flM);
+      const reedM = [['#5f9440', '#86b85a', '#a8a696'], ['#7a6a3a', '#a08a4a', '#8a8478'], ['#4a443c', '#6a5e4e', '#6a645c'], ['#b8cede', '#e0ecf4', '#c4d0da']][ti].map((cc) => lm({ color: new THREE.Color(cc) }));
+      for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+        if (at(x, y) !== 3) continue;
+        const hw = (i) => U.hash(x * 3 + i, y * 5 + i, sd + 90 + i), inner = at(x - 1, y) === 3 && at(x + 1, y) === 3 && at(x, y - 1) === 3 && at(x, y + 1) === 3, k = inner ? 0.36 : 0.16;
+        if (open && !cave) [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dx, dy], q) => { // 山野里的水没有石沿：岸上长一丛丛芦苇，卧几块卵石
+          if (at(x + dx, y + dy) !== 0 || hw(20 + q) > 0.62) return;
+          const ex = x + 0.5 + dx * 0.6 + (dx ? 0 : (hw(24 + q) - 0.5) * 0.7), ez = y + 0.5 + dy * 0.6 + (dy ? 0 : (hw(28 + q) - 0.5) * 0.7);
+          if (hw(32 + q) < 0.3) { const pb = new THREE.Mesh(Mo.geo.ico(0), reedM[2]); pb.position.set(ex, 0.03, ez); pb.scale.set(0.2 + hw(36 + q) * 0.14, 0.1, 0.16 + hw(40 + q) * 0.1); pb.rotation.y = hw(44 + q) * TAU; tuft.add(pb); return; }
+          for (let i = 0; i < 5; i++) { const hgt = (ti === 3 ? 0.2 : 0.3) + hw(48 + q * 5 + i) * 0.28, b = new THREE.Mesh(Mo.geo.cone(4), reedM[i % 2]); b.position.set(ex + (hw(70 + q * 5 + i) - 0.5) * 0.22, hgt / 2, ez + (hw(92 + q * 5 + i) - 0.5) * 0.22); b.scale.set(0.045, hgt, 0.045); b.rotation.set((hw(114 + q * 5 + i) - 0.5) * 0.5, hw(136 + q * 5 + i) * 3, (hw(158 + q * 5 + i) - 0.5) * 0.5); tuft.add(b); }
+        });
+        if (ti === 0) {
+          const n = hw(0) < 0.5 ? (hw(1) < 0.4 ? 2 : 1) : 0;
+          for (let i = 0; i < n; i++) {
+            const lx = x + 0.5 + (hw(2 + i) - 0.5) * 2 * k, lz = y + 0.5 + (hw(4 + i) - 0.5) * 2 * k, sc = 0.3 + hw(6 + i) * 0.22, pm = new THREE.Mesh(padG, padM[(x + y + i) % 2]);
+            pm.position.set(lx, 0.022 + i * 0.004, lz); pm.scale.set(sc, 1, sc); pm.rotation.y = hw(8 + i) * TAU; tuft.add(pm);
+            if (!i && hw(10) < 0.42) { const f = new THREE.Mesh(Mo.lotusGeo(), flM); f.position.set(lx + sc * 0.25, 0.02, lz - sc * 0.2); f.scale.setScalar(0.85 + hw(11) * 0.4); f.rotation.y = hw(12) * TAU; tuft.add(f); }
+          }
+        } else if (ti === 3 && hw(0) < 0.4) {
+          const ic = new THREE.Mesh(Mo.geo.cyl(0.5, 0.5, 6), iceM); ic.position.set(x + 0.5 + (hw(2) - 0.5) * 2 * k, 0.03, y + 0.5 + (hw(4) - 0.5) * 2 * k); ic.scale.set(0.3 + hw(6) * 0.3, 0.035, 0.22 + hw(7) * 0.24); ic.rotation.y = hw(8) * TAU; tuft.add(ic);
+        }
+      }
+    }
     // 北面：高出墙头的一道山脊，脊上有树
     for (let x = -0.9; x < w + 1; x += 1.8) {
       kk++; if (nearDoor('n', x, 0)) continue;
@@ -900,7 +951,8 @@
           colN(x, top, z, s2, k);
           const sh = [[x + s2 * 0.9, 1.6 + hb(k, 5) * 2.2, z + s2 * 0.75, s2 * 0.55], [x - s2 * 0.85, 2.8 + hb(k, 6) * 2.6, z + s2 * 0.5, s2 * 0.5]]; // 两个矮一截的石肩，肩上有树
           sh.forEach(([sx2, st, sz2, ss], q) => { colN(sx2, st, sz2, ss, k + 1 + q);
-            if (woods && hb(k, 10 + q) < 0.8) { const tr = Mo.tree(k + bs + q, ti, treeKind(hb(k, 12 + q) * 0.8), 1.5 + hb(k, 14 + q) * 0.7, { bark: bk, leaf: lf }); tr.g.position.set(sx2, st - 0.12, sz2); tr.g.rotation.y = hb(k, 16 + q) * TAU; scnFar.add(tr.g); } });
+            if (ti !== 1 && hb(k, 30 + q) < 0.34) { const hl = Mo.hall(ti); for (const pm of hl.mats) { pm.userData.hz = [hzC, 0.14]; rs.mats.push(pm); } hl.g.scale.setScalar(ss * 0.74); hl.g.position.set(sx2, st - 0.1, sz2 + ss * 0.1); hl.g.rotation.y = (hb(k, 32 + q) - 0.5) * 0.5; scnFar.add(hl.g); } // 有的石肩上是一座殿
+            else if (woods && hb(k, 10 + q) < 0.8) { const tr = Mo.tree(k + bs + q, ti, treeKind(hb(k, 12 + q) * 0.8), 1.5 + hb(k, 14 + q) * 0.7, { bark: bk, leaf: lf }); tr.g.position.set(sx2, st - 0.12, sz2); tr.g.rotation.y = hb(k, 16 + q) * TAU; scnFar.add(tr.g); } });
           if (ti !== 2 && hb(k, 18) < 0.4) { // 瀑布
             const wm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72, depthWrite: false, side: THREE.DoubleSide }), fw = 0.35 + hb(k, 19) * 0.4, fh = top + 8;
             const wf = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), wm); wf.position.set(x + (hb(k, 20) - 0.5) * s2 * 0.6, top - 1.2 - fh / 2, z + s2 * 0.86); g.add(wf);
@@ -1087,6 +1139,106 @@
   }
 
   /* 把一组静态网格烘焙成单个带顶点色的网格 */
+  /* 幡旗（卡通画风）：屋脊、角楼顶上的三角旗。一根细杆、一面顺风飘的旗——旗面是一张细分过的三角片，
+     顶点着色器里让它离杆越远摆得越大，明暗跟着布的起伏走。整间屋子的旗合成一个网格 */
+  const clothT = { value: 0 }; // 布料摆动的钟：所有幡共用
+  const PEN = [['#f2bc3c', '#c8402a'], ['#b8402c', '#3a2a26'], ['#8a2e28', '#2c2624'], ['#e6f2fa', '#6aa2cc']]; // 各章的旗色：旗面、镶边
+  function pennants(list, rs, g, kit, ti) {
+    const pos = [], nor = [], colr = [], wv = [], NX = 8, L = 1.2, H = 0.5, cb = new THREE.Color(PEN[ti][0]), ce = new THREE.Color(PEN[ti][1]);
+    list.forEach(([px, py, pz, len], fi) => {
+      kit.slab(px, py + len / 2, pz, 0.045, len, 0.045, 'dark'); kit.slab(px, py + len + 0.04, pz, 0.1, 0.1, 0.1, 'gold'); // 杆与杆头
+      const cy = py + len - H / 2 - 0.02, hh = (u) => (H / 2) * (1 - 0.82 * u), ph = px * 1.7 + pz * 0.9 + fi;
+      const V = (u, k, c) => { pos.push(px + 0.02 + u * L, cy + k * hh(u), pz); nor.push(0, 0, 1); colr.push(c.r, c.g, c.b); wv.push(u, ph); };
+      for (let i = 0; i < NX; i++) {
+        const u0 = i / NX, u1 = (i + 1) / NX;
+        for (const [k0, k1, c] of [[1, 0.62, ce], [0.62, -0.62, cb], [-0.62, -1, ce]]) { V(u0, k0, c); V(u0, k1, c); V(u1, k0, c); V(u1, k0, c); V(u0, k1, c); V(u1, k1, c); } // 上镶边、旗面、下镶边
+      }
+    });
+    const geo = new THREE.BufferGeometry(); rs.geos.push(geo);
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3)); geo.setAttribute('wv', new THREE.Float32BufferAttribute(wv, 2));
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), uT = { value: 0 }; rs.mats.push(mat);
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uT = uT;
+      sh.vertexShader = 'attribute vec2 wv;\nuniform float uT;\n' + sh.vertexShader
+        .replace('#include <color_vertex>', '#include <color_vertex>\n  vColor.rgb *= 0.86 + 0.26 * cos(uT * 5.0 - wv.x * 6.5 + wv.y) * min(1.0, wv.x * 3.0);')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed.z += (sin(uT * 5.0 - wv.x * 6.5 + wv.y) * 0.1 + sin(uT * 3.1 - wv.x * 3.0 + wv.y * 1.7) * 0.06) * wv.x;\n  transformed.y += sin(uT * 4.2 - wv.x * 5.0 + wv.y) * 0.035 * wv.x - wv.x * wv.x * 0.07;');
+    };
+    mat.customProgramCacheKey = () => 'pennant';
+    const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; g.add(m);
+    rs.anims.push((t) => { uT.value = t; });
+  }
+
+  /* 水面（卡通画风）：水格上铺一张真的面，不再只是地上画的一块颜色。
+     每个像素算自己离岸多远（岸角是圆的）：近岸浅而亮、离岸深；岸边一圈白沫，一道细浪往岸上涌；
+     水里游着一张亮线织的网（两层大小不同的胞格，各自慢慢游走），水面的法线跟着细波起伏，所以日头的高光是碎的；会接影子 */
+  function waterMesh(room, rs, g, th, ti, at) {
+    const w = room.w, h = room.h, pos = [], nor = [], tuv = [], em = [], cm = [], Y = 0.014, w3 = (x, y) => at(x, y) === 3;
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      if (!w3(x, y)) continue;
+      const W = !w3(x - 1, y), E = !w3(x + 1, y), N = !w3(x, y - 1), S2 = !w3(x, y + 1);
+      const e4 = [W ? 1 : 0, E ? 1 : 0, N ? 1 : 0, S2 ? 1 : 0];
+      const c4 = [!W && !N && !w3(x - 1, y - 1) ? 1 : 0, !E && !N && !w3(x + 1, y - 1) ? 1 : 0, !W && !S2 && !w3(x - 1, y + 1) ? 1 : 0, !E && !S2 && !w3(x + 1, y + 1) ? 1 : 0]; // 只有斜对角是岸：凹角
+      for (const [u, v] of [[0, 0], [0, 1], [1, 0], [1, 0], [0, 1], [1, 1]]) { pos.push(x + u, Y, y + v); nor.push(0, 1, 0); tuv.push(u, v); em.push(...e4); cm.push(...c4); }
+    }
+    if (!pos.length) return null;
+    const geo = new THREE.BufferGeometry(); rs.geos.push(geo);
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('tuv', new THREE.Float32BufferAttribute(tuv, 2)); geo.setAttribute('em', new THREE.Float32BufferAttribute(em, 4)); geo.setAttribute('cm', new THREE.Float32BufferAttribute(cm, 4));
+    const deep = new THREE.Color(th.water), hi = new THREE.Color(th.waterHi), shal = deep.clone().lerp(hi, 0.26), sky = new THREE.Color(th.sky || 0x88aacc);
+    const U2 = { uT: { value: 0 }, uDeep: { value: deep }, uShal: { value: shal }, uHi: { value: hi }, uSky: { value: sky }, uWeb: { value: [1, 0.8, 0.35, 0.9][ti] } }; // 燕翎堡的水是死水：水纹淡
+    const mat = new THREE.MeshPhongMaterial({ color: 0xffffff, specular: new THREE.Color(0.5, 0.5, 0.48), shininess: 90 }); rs.mats.push(mat);
+    mat.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, U2);
+      sh.vertexShader = 'attribute vec2 tuv;\nattribute vec4 em;\nattribute vec4 cm;\nvarying vec2 vTuv;\nvarying vec4 vEm;\nvarying vec4 vCm;\nvarying vec2 vWp;\n' + sh.vertexShader
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vTuv = tuv; vEm = em; vCm = cm; vWp = position.xz;');
+      // wShore：这个像素离岸多远（格），负的在岸上；wCell：离最近的胞心多远，胞心自己在慢慢游
+      sh.fragmentShader = `uniform float uT; uniform float uWeb; uniform vec3 uDeep; uniform vec3 uShal; uniform vec3 uHi; uniform vec3 uSky;
+varying vec2 vTuv; varying vec4 vEm; varying vec4 vCm; varying vec2 vWp;
+float wShore() {
+  const float R = 0.3333; const float BIG = 9.0;
+  float u = vTuv.x, v = vTuv.y;
+  float d = min(min(vEm.x > 0.5 ? u : BIG, vEm.y > 0.5 ? 1.0 - u : BIG), min(vEm.z > 0.5 ? v : BIG, vEm.w > 0.5 ? 1.0 - v : BIG));
+  if (vEm.x > 0.5 && vEm.z > 0.5 && u < R && v < R) d = R - length(vec2(R - u, R - v));
+  if (vEm.y > 0.5 && vEm.z > 0.5 && u > 1.0 - R && v < R) d = R - length(vec2(u - 1.0 + R, R - v));
+  if (vEm.x > 0.5 && vEm.w > 0.5 && u < R && v > 1.0 - R) d = R - length(vec2(R - u, v - 1.0 + R));
+  if (vEm.y > 0.5 && vEm.w > 0.5 && u > 1.0 - R && v > 1.0 - R) d = R - length(vec2(u - 1.0 + R, v - 1.0 + R));
+  if (vCm.x > 0.5) d = min(d, length(vec2(u, v)));
+  if (vCm.y > 0.5) d = min(d, length(vec2(1.0 - u, v)));
+  if (vCm.z > 0.5) d = min(d, length(vec2(u, 1.0 - v)));
+  if (vCm.w > 0.5) d = min(d, length(vec2(1.0 - u, 1.0 - v)));
+  return min(d, 1.0);
+}
+vec2 wHash(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
+vec2 wCell(vec2 p, float t) {
+  vec2 i = floor(p), f = fract(p); float d1 = 8.0, d2 = 8.0;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) { vec2 q = vec2(float(x), float(y)); vec2 o = 0.5 + 0.38 * sin(t + 6.2831 * wHash(i + q)); float d = length(q + o - f); if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d; }
+  return vec2(d1, d2 - d1);
+}
+` + sh.fragmentShader
+        .replace('#include <color_fragment>', `#include <color_fragment>
+  float wd = wShore(); if (wd < 0.0) discard;
+  vec2 wob = vec2(sin(vWp.y * 2.3 + uT * 0.9) + 0.5 * sin(vWp.y * 6.1 - vWp.x * 2.0 + uT * 1.3), cos(vWp.x * 2.1 - uT * 0.8) + 0.5 * cos(vWp.x * 5.7 + vWp.y * 2.4 - uT * 1.1)) * 0.11;
+  vec2 c1 = wCell(vWp * 1.5 + wob + vec2(uT * 0.05, uT * 0.03), uT * 0.6);
+  vec2 c2 = wCell(vWp * 2.9 - wob * 1.6 - vec2(uT * 0.04, -uT * 0.06), uT * 0.9 + 2.0);
+  float web = (1.0 - smoothstep(0.025, 0.09, c1.y)) * 0.42 + (1.0 - smoothstep(0.02, 0.1, c2.y)) * 0.2;
+  float dep = smoothstep(0.0, 0.5, wd);
+  vec3 wc = mix(uShal, uDeep, dep);
+  wc *= 0.9 + 0.2 * smoothstep(0.1, 0.6, c1.x);
+  wc = mix(wc, uSky, 0.1);
+  float foam = 1.0 - smoothstep(0.02, 0.05, wd + (c2.x - 0.3) * 0.05);
+  float surf = smoothstep(0.016, 0.0, abs(wd - 0.15 - 0.04 * sin(uT * 1.2 + vWp.x * 2.6 + vWp.y * 1.9))) * 0.4;
+  diffuseColor.rgb = mix(wc + uHi * web * uWeb * (0.25 + 0.2 * dep), uHi, clamp(foam + surf, 0.0, 1.0) * 0.9);`)
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  { vec2 rp = vec2(cos(vWp.x * 5.1 + uT * 1.7) + cos(vWp.x * 2.3 - vWp.y * 3.7 + uT * 1.1), cos(vWp.y * 4.7 - uT * 1.4) + cos(vWp.y * 2.9 + vWp.x * 3.1 + uT * 0.9)) * 0.06;
+    normal = normalize((viewMatrix * vec4(normalize(vec3(rp.x, 1.0, rp.y)), 0.0)).xyz); }`);
+    };
+    mat.customProgramCacheKey = () => 'water';
+    const m = new THREE.Mesh(geo, mat); m.receiveShadow = true; g.add(m);
+    rs.anims.push((t) => { U2.uT.value = t; });
+    return m;
+  }
+
   function mergeStatic(root) {
     root.updateMatrixWorld(true);
     takePads(root);
@@ -1308,6 +1460,7 @@
 
   /* ============================ 每帧同步：静态场景动效 ============================ */
   function animateRoom(room, t) {
+    clothT.value = t;
     for (const a of cur.anims) a(t);
     const th = G.Themes[room.theme];
     for (const f of cur.flags || []) { // 幡：未解时暗沉，可走而没去过的是亮金色，去过的是褪色的青灰

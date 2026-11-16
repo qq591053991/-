@@ -269,6 +269,18 @@
     return { g, mats: [m, st], tex: [tex] };
   };
 
+  /* 匾：门楼正中的一块，深底、金边、金字。字是在画布上现写的 */
+  Mo.plaque = function (ti, text) {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 96; const c = cv.getContext('2d');
+    c.fillStyle = ['#14222e', '#201814', '#1e1612', '#16304a'][ti]; c.fillRect(0, 0, 256, 96);
+    c.strokeStyle = '#e6c46a'; c.lineWidth = 6; c.strokeRect(5, 5, 246, 86); c.lineWidth = 1.5; c.strokeRect(13, 13, 230, 70);
+    c.fillStyle = '#f8e09a'; c.font = 'bold 54px "STKaiti","KaiTi","Kaiti SC","楷体","Noto Serif CJK SC","Songti SC","SimSun","WenQuanYi Zen Hei",serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    const chs = text.split(''), gap = 196 / chs.length; chs.forEach((ch, i) => c.fillText(ch, 128 + (i - (chs.length - 1) / 2) * gap, 51));
+    const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+    const m = new THREE.MeshBasicMaterial({ map: tex }), g = new THREE.Mesh(gg('plaque', () => new THREE.PlaneGeometry(1.56, 0.58)), m);
+    return { g, mats: [m], tex: [tex] };
+  };
+
   /* 立轴：挂在北墙上的一幅山水，随风轻摆。画是程序画的：纸、远山三重、云气、一轮日、一方印 */
   function scrollCanvas(ti, seed) {
     const cold = ti === 3, cv = document.createElement('canvas'); cv.width = 128; cv.height = 256;
@@ -321,6 +333,47 @@
     { tile: '#3c3836', ridge: '#58524e', wood: '#4a342a', stone: '#8a847a', dark: '#544e46', gold: '#9a7c48' },
     { tile: '#6a8098', ridge: '#b4c8d8', wood: '#8a98a6', stone: '#a8b8c6', dark: '#526678', gold: '#c8b070' },
   ].forEach((o, i) => Object.assign(KIT[i], o));
+  /* 灯笼：原点在挂点，灯垂在下面。一根挂绳、上下两只盖、鼓腹的灯身（腰上一圈亮的，是里头的火）、底下一条穗。
+     用不受光的材质画——它自己就是亮的 */
+  Mo.lanternGeo = (ti) => Mo.sculpt('lantern' + (ti === 3 ? 3 : 0), (put) => {
+    const c = ti === 3 ? ['#9fd4f6', '#f2fbff', '#5f8fb4', '#cfe8f8'] : ['#e23a22', '#ffb04a', '#d0a84a', '#c22c1c'];
+    put(Mo.geo.cyl(0.5, 0.5, 6), '#3a2a22', [0, -0.09, 0], [0.012, 0.18, 0.012]);
+    put(Mo.geo.cyl(0.5, 0.5, 6), c[2], [0, -0.19, 0], [0.11, 0.035, 0.11]);
+    put(Mo.geo.sph(8), c[0], [0, -0.325, 0], [0.27, 0.26, 0.27]);
+    put(Mo.geo.sph(8), c[1], [0, -0.325, 0], [0.283, 0.12, 0.283]);
+    put(Mo.geo.cyl(0.5, 0.5, 6), c[2], [0, -0.46, 0], [0.1, 0.035, 0.1]);
+    put(Mo.geo.cyl(0.5, 0.5, 6), c[3], [0, -0.56, 0], [0.028, 0.17, 0.028]);
+  }, 1, 1);
+  /* 荷花：六瓣，粉白相间，中间一点黄蕊 */
+  Mo.lotusGeo = () => Mo.sculpt('lotus', (put) => {
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * TAU; put(Mo.geo.cone(6), i % 2 ? '#f49cbc' : '#fcd4e2', [Math.cos(a) * 0.05, 0.075, Math.sin(a) * 0.05], [0.075, 0.18, 0.045], [Math.sin(a) * 0.62, 0, -Math.cos(a) * 0.62]); }
+    put(Mo.geo.sph(6), '#f2d060', [0, 0.05, 0], 0.055);
+  }, 0.86, 1.1);
+  Mo.padGeoFlat = () => gg('lilypad', () => { const q = new THREE.CircleGeometry(0.5, 11, 0.3, TAU - 0.55); q.rotateX(-PI / 2); return q; }); // 荷叶：缺一个口子的圆片
+  /* 远处石肩上的殿宇：台基、一圈朱柱、粉墙、两重屋檐（下檐宽、上檐窄）、四角起翘、正脊与宝顶。只当远景 */
+  const hipGeo = () => gg('hip', () => { // 庑殿顶：四面坡，顶上一条正脊。底 1×1、高 1
+    const P = [[-0.5, 0, 0.5], [0.5, 0, 0.5], [0.5, 0, -0.5], [-0.5, 0, -0.5], [-0.22, 1, 0], [0.22, 1, 0]], v = [];
+    for (const f of [[0, 1, 5], [0, 5, 4], [2, 3, 4], [2, 4, 5], [1, 2, 5], [3, 0, 4]]) for (const i of f) v.push(...P[i]);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals(); return g;
+  });
+  Mo.hall = function (ti) {
+    const K = KIT[ti], g = new THREE.Group(), M = {}, m = (n) => M[n] || (M[n] = lam(K[n] || n)), box = Mo.geo.box(), con = Mo.geo.cone(6), hip = hipGeo(), wall = ti === 3 ? 'stone' : '#ece4d2';
+    const put = (geo, mat, x, y, z, sx, sy, sz) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.scale.set(sx, sy, sz); g.add(o); return o; };
+    put(box, m('stone'), 0, 0.09, 0, 2.5, 0.18, 1.7); put(box, m('dark'), 0, 0.2, 0, 2.2, 0.06, 1.45);
+    put(box, m(wall), 0, 0.58, 0, 1.7, 0.72, 1.0);                                                                   // 殿身
+    put(box, m('#3a2a22'), 0, 0.5, 0.51, 0.5, 0.56, 0.03);                                                           // 门
+    for (const sx of [-1, -0.34, 0.34, 1]) for (const sz of [-1, 1]) put(Mo.geo.cyl(0.5, 0.5, 6), m('wood'), sx * 0.98, 0.58, sz * 0.62, 0.1, 0.74, 0.1);
+    const roof = (y, wx, wz, hh) => { // 一重屋檐：四面坡、檐口一圈、四角起翘
+      put(hip, m('tile'), 0, y, 0, wx, hh, wz);
+      put(box, m('ridge'), 0, y + 0.01, 0, wx * 1.02, 0.05, wz * 1.02);
+      for (const cx of [-1, 1]) for (const cz of [-1, 1]) { const t = put(con, m('ridge'), cx * wx * 0.52, y + 0.12, cz * wz * 0.52, 0.11, 0.36, 0.11); t.rotation.set(cz * 0.8, 0, -cx * 0.8); }
+    };
+    roof(0.95, 2.7, 1.9, 0.42);
+    put(box, m(wall), 0, 1.48, 0, 1.2, 0.4, 0.72);                                                                   // 上层
+    roof(1.66, 1.9, 1.3, 0.5);
+    put(box, m('ridge'), 0, 2.17, 0, 0.6, 0.08, 0.1); put(Mo.geo.sph(8), m('gold'), 0, 2.28, 0, 0.14, 0.18, 0.14);   // 正脊与宝顶
+    return { g, mats: Object.values(M) };
+  };
   /* 远处石峰上的亭子：台基、四根朱柱、攒尖顶、四角起翘、宝顶。只当远景，零件很少 */
   Mo.pavilion = function (ti) {
     const K = KIT[ti], g = new THREE.Group(), M = {}, m = (n) => M[n] || (M[n] = lam(K[n])), box = Mo.geo.box(), pyr = Mo.geo.cone(4), con = Mo.geo.cone(6);
@@ -343,6 +396,28 @@
       mats: () => Object.values(mats),
       /* 沿 X 的瓦顶：屋脊从 x0 到 x0+len，z 是屋脊所在，y 是檐口高度 */
       roofX(x0, len, z, y, depth, hgt) {
+        if (G.DH) { // 飞檐：屋面是凹的——近脊处陡、近檐处缓，檐口略略翘起；一垄垄的筒瓦顺着屋面走；檐下一排斗拱；两头的檐角高高翘起
+          const cx = x0 + len / 2, K = 4, ov = 0.05, run = depth / 2 + ov, pt = (t) => [run * t, hgt * Math.pow(1 - t, 1.9) + 0.05 * Math.max(0, t - 0.8) / 0.2];
+          for (const sd of [1, -1]) for (let i = 0; i < (sd > 0 ? K : 2); i++) { // 背面（朝北）只铺近脊的两段：看不见
+            const a = pt(i / K), b = pt((i + 1) / K), dz = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dz, dy), ang = Math.atan2(-dy, dz) * sd;
+            put(box, M('tile'), cx, y + (a[1] + b[1]) / 2, z + sd * (a[0] + b[0]) / 2, len + 0.5, 0.05, L + 0.02).rotation.x = ang;
+            if (sd > 0) for (let x = x0 - 0.12; x <= x0 + len + 0.12; x += 0.3) put(box, M('ridge'), x, y + (a[1] + b[1]) / 2 + 0.035, z + (a[0] + b[0]) / 2, 0.085, 0.05, L + 0.02).rotation.x = ang; // 瓦垄
+          }
+          const eave = pt(1);
+          put(box, M('ridge'), cx, y + eave[1] + 0.02, z + eave[0], len + 0.56, 0.07, 0.07);                         // 檐口的瓦当
+          put(box, M('wood'), cx, y - 0.02, z + run - 0.2, len + 0.3, 0.09, 0.07);                                    // 檐下的枋
+          for (let x = x0 + 0.2; x <= x0 + len - 0.1; x += 0.62) { put(box, M('#2f6e6a'), x, y - 0.1, z + run - 0.3, 0.17, 0.1, 0.24); put(box, M('gold'), x, y - 0.035, z + run - 0.22, 0.24, 0.045, 0.3); } // 斗拱：青绿的斗、描金的拱
+          put(box, M('ridge'), cx, y + hgt + 0.05, z, len + 0.4, 0.15, 0.2);                                          // 正脊
+          put(box, M('gold'), cx, y + hgt + 0.15, z, 0.34, 0.12, 0.12); put(Mo.geo.sph(8), M('gold'), cx, y + hgt + 0.27, z, 0.15, 0.2, 0.15); // 脊中的宝顶
+          for (const e of [-1, 1]) {
+            put(con, M('ridge'), cx + e * (len / 2 + 0.22), y + hgt + 0.2, z, 0.18, 0.5, 0.18).rotation.z = -e * 0.7;  // 鸱吻
+            const ex = cx + e * (len / 2 + 0.25);
+            put(box, M('ridge'), ex, y + hgt * 0.5, z + run * 0.5, 0.1, 0.09, Math.hypot(run, hgt)).rotation.x = Math.atan2(hgt, run); // 垂脊
+            const t1 = put(con, M('ridge'), ex + e * 0.06, y + eave[1] + 0.14, z + eave[0] + 0.02, 0.13, 0.46, 0.13); t1.rotation.z = -e * 0.95; t1.rotation.x = 0.75; // 翘起的檐角
+            put(Mo.geo.sph(6), M('gold'), ex + e * 0.24, y + eave[1] + 0.3, z + eave[0] + 0.14, 0.07, 0.07, 0.07);
+          }
+          return;
+        }
         const cx = x0 + len / 2, sl = Math.hypot(hgt, depth / 2), ang = Math.atan2(hgt, depth / 2);
         put(gable, M('tile'), cx, y, z, len + 0.5, hgt, depth);
         put(box, M('ridge'), cx, y + hgt + 0.03, z, len + 0.34, 0.11, 0.17);                       // 正脊
@@ -364,6 +439,7 @@
         put(hex, M('stone'), x, 0.06, z, r * 3.2, 0.12, r * 3.2);
         put(col8, M('wood'), x, hgt / 2, z, r * 2, hgt, r * 2);
         put(box, M(rings ? 'gold' : 'dark'), x, hgt - 0.05, z, r * 3.2, 0.1, r * 3.2);
+        if (G.DH && !rings) { put(box, M('#2f6e6a'), x, hgt - 0.16, z, r * 2.6, 0.08, r * 2.6); put(col8, M('gold'), x, hgt * 0.14, z, r * 2.25, 0.035, r * 2.25); } // 柱头的斗、柱脚的一道金箍
         if (rings) for (const k of [0.16, 0.8]) put(col8, M('gold'), x, hgt * k, z, r * 2.35, 0.06, r * 2.35);
       },
       /* 栏杆：沿 X（alongX）或沿 Z 的一排望柱与寻杖 */
@@ -380,6 +456,20 @@
       },
       /* 角楼：一截方墩，上面是四角攒尖顶 */
       tower(x, z, hgt, size) {
+        if (G.DH) { // 角楼：石台座 + 楼身（七玄门是粉墙朱柱）+ 两折的攒尖顶——下面一圈平缓的檐、上面一个陡的尖，轮廓就是凹的；四角起翘
+          const b = hgt * 0.62, wallC = ti === 0 ? '#ece4d2' : 'stone', my = (b + hgt) / 2 + 0.03;
+          put(box, M('stone'), x, b / 2, z, size, b, size);
+          put(box, M('dark'), x, b + 0.03, z, size * 1.1, 0.06, size * 1.1);
+          put(box, M(wallC), x, my, z, size * 0.86, hgt - b, size * 0.86);
+          for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(col8, M(ti === 2 ? 'dark' : 'wood'), x + sx * size * 0.44, my, z + sz * size * 0.44, size * 0.11, hgt - b, size * 0.11);
+          put(box, M(ti === 2 ? 'dark' : 'wood'), x, hgt + 0.02, z, size * 1.02, 0.07, size * 1.02);
+          put(pyr, M('tile'), x, hgt + 0.05 + size * 0.1, z, size * 2.3, size * 0.2, size * 2.3).rotation.y = PI / 4;
+          put(pyr, M('tile'), x, hgt + 0.1 + size * 0.36, z, size * 1.5, size * 0.62, size * 1.5).rotation.y = PI / 4;
+          put(box, M('ridge'), x, hgt + 0.065, z, size * 1.64, 0.05, size * 1.64);
+          put(Mo.geo.sph(8), M('gold'), x, hgt + 0.1 + size * 0.7, z, size * 0.2, size * 0.24, size * 0.2);
+          for (let i = 0; i < 4; i++) { const a = PI / 4 + (i * PI) / 2, t = put(con, M('ridge'), x + Math.cos(a) * size * 1.14, hgt + 0.17, z + Math.sin(a) * size * 1.14, size * 0.13, size * 0.34, size * 0.13); t.rotation.set(Math.sin(a) * 0.95, 0, -Math.cos(a) * 0.95); }
+          return;
+        }
         put(box, M('stone'), x, hgt / 2, z, size, hgt, size);
         put(box, M('dark'), x, hgt + 0.04, z, size * 1.12, 0.08, size * 1.12);
         put(pyr, M('tile'), x, hgt + 0.08 + size * 0.3, z, size * 1.75, size * 0.6, size * 1.75).rotation.y = PI / 4;
