@@ -1,6 +1,7 @@
 'use strict';
-/* 凡人问道 —— 人物造型（卡通画风下的卡通人物）。
-   人物是一块块建出来的：先出卡通风格的设定图当参考（大头小身、圆润的简单形体、平涂的颜色），
+/* 凡人问道 —— 人物造型（卡通画风下的人物）。
+   卡通，但不是 Q 版：身形修长（约四个半头高），头小、有颈、腿长，眼是细长的——冷一点，不萌。
+   人物是一块块建出来的：先出卡通风格的设定图当参考（简单的形体、平涂的颜色），
    再照着用球、柱、锥、旋转体把头、发、衣、袖、腿、兵器拼成模型。模型上没有任何图片——颜色都烘在顶点上，
    明暗是分成几档的卡通光照，外面一道描边。
    一个人分成七块来动：身子（躯干）、头、两臂、两腿，下摆单独一块；走路、蓄力、出手都只是转这几块。
@@ -51,9 +52,10 @@
   const mesh = (geo, mat, parent, shadow) => { const m = new THREE.Mesh(geo, mat); m.castShadow = shadow !== false; parent.add(m); return m; };
 
   /* ---------- 身形 ----------
-     高度以 1 为准（渲染时再整体放大）。大头小身，约两个半到三个头高：
-     腿 0.24，躯干到 0.55，头的中心 0.72、半径 0.185 */
-  const HIP = 0.25, NECK = 0.58, HC = 0.16, EYE = '#1c1418', HS = 0.92; // HS：头整体的大小
+     高度以 1 为准（渲染时再整体放大）。修长的身形，约四个半头高：腿到 0.4，肩到 0.78，头顶约 1。
+     各块的几何体是照"腿 0.25、躯干 0.33"那套矮胖的比例建的，拼的时候再拉长、收窄（LEGK / TY / ARMK / SLIM），头整体缩小（HS） */
+  const HIP = 0.4, NECK = 0.78, HC = 0.16, EYE = '#1c1418', HS = 0.62; // HS：头整体的大小
+  const LEGK = HIP / 0.25, TY = (NECK - HIP) / 0.33, ARMK = 1.42, SLIM = 0.86; // 腿、躯干、臂各拉长几成；身子收窄几成
 
   /* 头：h 是这个人的单子。返回 [头的几何体, 发光的眼（没有就是 null）] */
   function headGeo(key, h) {
@@ -63,11 +65,12 @@
       put(ico(2), h.face || skin, [0, HC, 0], [0.37, 0.36, 0.35]);                                         // 脑袋
       if (!h.eyeGlow && st !== 'helmMask') for (const sx of [-1, 1]) {
         if (puppet) put(box(), EYE, [sx * 0.065, HC - 0.005, 0.17], [0.03, 0.085, 0.02]);                  // 傀儡：两道竖缝
-        else put(sph(8), h.eye || EYE, [sx * 0.07, HC - 0.012, 0.162], [0.052, 0.088, 0.034]);             // 两点黑豆眼
-        if (h.brow) put(box(), h.browC || EYE, [sx * 0.072, HC + 0.064, 0.166], [0.075, 0.014, 0.016], [0, 0, -sx * (h.brow === 'angry' ? 0.42 : 0.1)]);
+        else put(sph(8), h.eye || EYE, [sx * 0.074, HC - 0.012, 0.163], [0.068, 0.03, 0.03], [0, 0, sx * 0.16]); // 细长的眼，眼梢略挑（不是圆圆的豆眼）
+        if (h.brow) put(box(), h.browC || EYE, [sx * 0.074, HC + 0.05, 0.164], [0.08, 0.011, 0.016], [0, 0, sx * (h.brow === 'angry' ? 0.4 : 0.08)]); // 眉：怒的眉梢上挑
       }
+      if (!puppet && st !== 'helmMask' && !h.muzzle) put(box(), tint(h.face || skin, -0.42), [0, HC - 0.092, 0.166], [0.045, 0.009, 0.012]); // 嘴：抿着的一道
       const cap = (c, sc = 1, tilt = -0.32, dy = 0.005) => put(dome(), c, [0, HC + dy, -0.012], [0.4 * sc, 0.4 * sc, 0.39 * sc], [tilt, 0, 0]); // 一顶盖住头顶与后脑的帽 / 发
-      const fringe = (c) => { put(ico(1), c, [0, HC + 0.118, 0.125], [0.2, 0.09, 0.1]); for (const sx of [-1, 1]) { put(ico(1), c, [sx * 0.125, HC + 0.075, 0.105], [0.11, 0.14, 0.1], [0, 0, sx * 0.3]); put(ico(1), c, [sx * 0.176, HC - 0.02, 0.02], [0.05, 0.17, 0.11]); } }; // 刘海与鬓角
+      const fringe = (c) => { put(ico(1), c, [0, HC + 0.148, 0.118], [0.2, 0.055, 0.085]); for (const sx of [-1, 1]) { put(ico(1), c, [sx * 0.14, HC + 0.105, 0.095], [0.075, 0.1, 0.085], [0, 0, sx * 0.3]); put(ico(1), c, [sx * 0.178, HC - 0.03, 0.03], [0.036, 0.2, 0.085]); } }; // 发际与鬓角：头发往上拢，额头露出来（不是盖住额头的齐刘海）
       const bun = (c, y = 0.235, r = 0.13) => put(sph(10), c, [0, HC + y, -0.03], r);                                                      // 发髻
       const tails = (c, y, z, len = 0.15) => { for (const sx of [-1, 1]) put(box(), c, [sx * 0.035, HC + y, z], [0.04, len, 0.014], [0.5, 0, sx * 0.25]); }; // 两条飘带
       if (st === 'bun' || st === 'crown' || st === 'elder') {
@@ -210,8 +213,8 @@
     return bake(key + ':arm' + sx, (put) => {
       if (sl === 'wide') { // 宽袖：越往下越宽，袖口一道缘边
         put(cyl(0.36, 0.5, 10), h.c1, [0, -0.085, 0], [0.135, 0.19, 0.125]);
-        put(cyl(0.5, 0.5, 10), h.cuff || h.c2, [0, -0.172, 0], [0.14, 0.03, 0.13]);
-        put(ico(1), hand, [0, -0.2, 0], 0.075);
+        put(cyl(0.5, 0.5, 10), h.cuff || tint(h.c1, -0.3), [0, -0.176, 0], [0.141, 0.018, 0.131]);              // 袖口：一道深色的缘边（白的会像个拳套）
+        put(ico(1), hand, [0, -0.197, 0], [0.066, 0.045, 0.066]);
       } else if (sl === 'bare') { // 赤膊：粗胳膊，铁拳套
         put(ico(1), h.skin, [0, -0.075, 0], [0.125 * b, 0.19, 0.125 * b]);
         if (h.fist) { put(ico(1), h.fist, [0, -0.195, 0], [0.16 * b, 0.15, 0.16 * b]); put(cyl(0.5, 0.5, 8), tint(h.fist, 0.25), [0, -0.165, 0], [0.165 * b, 0.025, 0.165 * b]); put(cyl(0.5, 0.5, 8), tint(h.fist, 0.25), [0, -0.225, 0], [0.165 * b, 0.025, 0.165 * b]); }
@@ -271,15 +274,16 @@
     const h = TOON[key]; if (!h) return null;
     const c = Mo._ctx(), g = c.g, mat = toonMat(c), glo = h.eyeGlow || h.weapon === 'flame' ? c.glow('#ffffff', { vertexColors: true }) : null, b = h.bulk || 1;
     const body = c.grp([0, 0, 0]);
-    const sk = skirtGeo(key, h); if (sk) mesh(sk, mat, body);
-    const legs = [-1, 1].map((sx) => { const lg = c.grp([sx * 0.068 * b, HIP, 0], body); mesh(legGeo(key, h), mat, lg); return lg; });
-    const torso = c.grp([0, HIP, 0], body); mesh(torsoGeo(key, h), mat, torso);
-    const head = c.grp([0, NECK - HIP, 0], torso), [hg, eg] = headGeo(key, h);
+    const sk = skirtGeo(key, h); if (sk) mesh(sk, mat, body).scale.set(0.8, 1, 0.8); // 下摆收窄：肩比摆宽，人才挺拔，不像个铃铛
+    const legs = [-1, 1].map((sx) => { const lg = c.grp([sx * 0.068 * b * SLIM, HIP, 0], body); mesh(legGeo(key, h), mat, lg).scale.set(SLIM, LEGK, SLIM); return lg; });
+    const torso = c.grp([0, HIP, 0], body); mesh(torsoGeo(key, h), mat, torso).scale.set(SLIM * 1.07, TY, SLIM * 0.96);
+    mesh(bake('neck:' + h.skin, (put) => put(cyl(0.5, 0.5, 8), h.skin, [0, NECK - HIP + 0.012, 0], [0.078, 0.07, 0.078]), 1, 1), mat, torso, false); // 颈
+    const head = c.grp([0, NECK - HIP + 0.03, 0], torso), [hg, eg] = headGeo(key, h);
     mesh(hg, mat, head); if (eg) mesh(eg, glo, head, false);
     head.scale.setScalar(HS * (h.headS || 1));
-    const ax = 0.135 * b + 0.025, ay = NECK - HIP - 0.055;
-    const arms = [-1, 1].map((sx) => { const a = c.grp([sx * ax, ay, 0], torso); mesh(armGeo(key, h, sx), mat, a); return a; });
-    const W = weaponGeo(key, h), wr = c.grp([0, -0.2, 0], arms[1]);
+    const ax = (0.135 * b + 0.025) * SLIM * 1.07, ay = NECK - HIP - 0.06;
+    const arms = [-1, 1].map((sx) => { const a = c.grp([sx * ax, ay, 0], torso); mesh(armGeo(key, h, sx), mat, a).scale.set(SLIM * 0.95, ARMK, SLIM * 0.95); return a; });
+    const W = weaponGeo(key, h), wr = c.grp([0, -0.2 * ARMK, 0], arms[1]);
     if (W.hand) mesh(W.hand, mat, wr); if (W.glow) mesh(W.glow, glo, wr, false);
     if (W.side) { const sd = c.grp([(ax + 0.085) * 1, -HIP, 0.09], torso); mesh(W.side, mat, sd); }
     const sc = (h.s || 1) * (o.scale || 1); g.scale.setScalar(sc);
@@ -292,7 +296,7 @@
         arms[0].rotation.set(-1.45 + br * 0.03, 0, 0.08); arms[1].rotation.set(-1.45 - br * 0.03 - atk * 0.5 + wind * 0.3, 0, -0.08);
         torso.rotation.x = atk * 0.25 - wind * 0.1; head.rotation.x = 0; return;
       }
-      legs[0].rotation.x = s * 0.75; legs[1].rotation.x = -s * 0.75;
+      legs[0].rotation.x = s * 0.56; legs[1].rotation.x = -s * 0.56; // 腿长了，摆幅收一点
       body.position.y = mv ? Math.abs(Math.cos(t * sp)) * 0.022 : br * 0.004;
       body.rotation.z = s * 0.035;
       let wx; // 出手的那只手
