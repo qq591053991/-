@@ -9,7 +9,7 @@
   const R = (G.Render = { FONT, ok: true, t: 0 });
 
   const PITCH = 0.84, FOV = 26, HALF_TAN = Math.tan((FOV * PI) / 360), BASE_DIST = 23;
-  const ACTOR = 1.3; // 角色模型整体放大（Q 版比例，俯视下更易辨认）
+  const ACTOR = 1.3; // 角色模型整体放大（俯视下更易辨认）
   const HN = 1.5, HS = 0.9, HL = 0.38, HI = 0.8; // 北墙 / 侧墙 / 南矮墙 / 内墙 高度
   const MAX_LIGHTS = 6;
 
@@ -2195,7 +2195,7 @@ vec2 wCell(vec2 p, float t) {
   }
 
   /* ============================ 2D 叠加层 ============================ */
-  const HGT = { human: 50, brute: 60, wolf: 32, bat: 18, toad: 28, centipede: 24, flower: 50, ghost: 54, skull: 20, crystal: 50, flame: 44, puppet: 50, jiao: 70 };
+  const HGT = { human: 57, brute: 68, wolf: 32, bat: 18, toad: 28, centipede: 24, flower: 50, ghost: 54, skull: 20, crystal: 50, flame: 44, puppet: 50, jiao: 70 };
 
   function drawOverlay(Gm, room, p, t, world) {
     const c = octx;

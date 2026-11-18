@@ -1,6 +1,6 @@
 'use strict';
 /* 凡人问道 —— 人物造型（卡通画风下的人物）。
-   卡通，但不是 Q 版：身形修长（约四个半头高），头小、有颈、腿长，眼是细长的——冷一点，不萌。
+   卡通的画法，动画里的比例：约七个头高——头小、颈长、肩宽、腰以下占一半，眼是细长的。照《凡人修仙传》动画里成人的身形来，不是 Q 版。
    人物是一块块建出来的：先出卡通风格的设定图当参考（简单的形体、平涂的颜色），
    再照着用球、柱、锥、旋转体把头、发、衣、袖、腿、兵器拼成模型。模型上没有任何图片——颜色都烘在顶点上，
    明暗是分成几档的卡通光照，外面一道描边。
@@ -52,10 +52,11 @@
   const mesh = (geo, mat, parent, shadow) => { const m = new THREE.Mesh(geo, mat); m.castShadow = shadow !== false; parent.add(m); return m; };
 
   /* ---------- 身形 ----------
-     高度以 1 为准（渲染时再整体放大）。修长的身形，约四个半头高：腿到 0.4，肩到 0.78，头顶约 1。
-     各块的几何体是照"腿 0.25、躯干 0.33"那套矮胖的比例建的，拼的时候再拉长、收窄（LEGK / TY / ARMK / SLIM），头整体缩小（HS） */
-  const HIP = 0.4, NECK = 0.78, HC = 0.16, EYE = '#1c1418', HS = 0.62; // HS：头整体的大小
-  const LEGK = HIP / 0.25, TY = (NECK - HIP) / 0.33, ARMK = 1.42, SLIM = 0.86; // 腿、躯干、臂各拉长几成；身子收窄几成
+     高度以 1 为准（渲染时再整体放大）。动画里成人的比例，约七个头高：胯在一半（0.5），肩到 0.85，头连发约 0.15，
+     手垂下来到大腿中段。各块的几何体是照"腿 0.25、躯干 0.33"那套矮胖的比例建的，拼的时候再拉长、收窄，头整体缩小（HS） */
+  const HIP = 0.5, NECK = 0.85, HC = 0.16, EYE = '#1c1418', HS = 0.4; // HS：头整体的大小
+  const LEGK = HIP / 0.25, TY = (NECK - HIP) / 0.33, ARMK = 1.85, SLIM = 0.8; // 腿、躯干、臂各拉长几成；身子收窄几成
+  const TALL = 1.12; // 人比原先高一成多：身子细了，再照原先的高度就显得小，站在狼和石灯旁边不成比例
 
   /* 头：h 是这个人的单子。返回 [头的几何体, 发光的眼（没有就是 null）] */
   function headGeo(key, h) {
@@ -65,8 +66,8 @@
       put(ico(2), h.face || skin, [0, HC, 0], [0.37, 0.36, 0.35]);                                         // 脑袋
       if (!h.eyeGlow && st !== 'helmMask') for (const sx of [-1, 1]) {
         if (puppet) put(box(), EYE, [sx * 0.065, HC - 0.005, 0.17], [0.03, 0.085, 0.02]);                  // 傀儡：两道竖缝
-        else put(sph(8), h.eye || EYE, [sx * 0.074, HC - 0.012, 0.163], [0.068, 0.03, 0.03], [0, 0, sx * 0.16]); // 细长的眼，眼梢略挑（不是圆圆的豆眼）
-        if (h.brow) put(box(), h.browC || EYE, [sx * 0.074, HC + 0.05, 0.164], [0.08, 0.011, 0.016], [0, 0, sx * (h.brow === 'angry' ? 0.4 : 0.08)]); // 眉：怒的眉梢上挑
+        else put(sph(8), h.eye || EYE, [sx * 0.076, HC - 0.012, 0.163], [0.082, 0.036, 0.03], [0, 0, sx * 0.16]); // 细长的眼，眼梢略挑（不是圆圆的豆眼）
+        if (!puppet) put(box(), h.browC || EYE, [sx * 0.078, HC + 0.052, 0.163], [0.095, 0.015, 0.016], [0, 0, sx * (h.brow === 'angry' ? 0.4 : h.brow === 'flat' ? 0.06 : 0.17)]); // 眉：眉梢略挑；怒的更斜
       }
       if (!puppet && st !== 'helmMask' && !h.muzzle) put(box(), tint(h.face || skin, -0.42), [0, HC - 0.092, 0.166], [0.045, 0.009, 0.012]); // 嘴：抿着的一道
       const cap = (c, sc = 1, tilt = -0.32, dy = 0.005) => put(dome(), c, [0, HC + dy, -0.012], [0.4 * sc, 0.4 * sc, 0.39 * sc], [tilt, 0, 0]); // 一顶盖住头顶与后脑的帽 / 发
@@ -141,7 +142,7 @@
         if (h.collar) put(cyl(0.5, 0.5, 12), h.collar, [0, 0.305, 0], [0.24, 0.055, 0.23]);
       } else if (top === 'armor') { // 甲：深色的衬里外面一副胸甲与背甲，领口、护心镜是缘边的颜色，两肩有披膊
         const un = h.under || tint(c1, -0.55);
-        put(cyl(0.44, 0.5, 12), un, [0, 0.15, 0], [0.28 * b, 0.3, 0.21 * b]);
+        put(cyl(0.5, 0.42, 12), un, [0, 0.15, 0], [0.28 * b, 0.3, 0.21 * b]);
         put(sph(10), un, [0, 0.27, 0], [0.31 * b, 0.12, 0.21 * b]);
         for (const sz of [-1, 1]) put(ico(1), c1, [0, 0.165, sz * 0.03 * b], [0.275 * b, 0.25, 0.19 * b]);       // 胸甲、背甲
         put(cyl(0.5, 0.5, 12), c2, [0, 0.288, 0], [0.2 * b, 0.028, 0.17 * b]);                                  // 领口
@@ -152,16 +153,16 @@
         put(ico(1), c1, [0, 0.16, 0], [0.27 * b, 0.32, 0.21 * b]);
         put(cyl(0.5, 0.5, 10), c2, [0, 0.27, 0], [0.2 * b, 0.03, 0.17 * b]); put(sph(8), c2, [0, 0.16, 0.1 * b], [0.07, 0.07, 0.03]);
       } else { // 袍 / 短衣：交领
-        put(cyl(0.42, 0.5, 12), c1, [0, 0.15, 0], [0.275 * b, 0.3, 0.205 * b]);
-        put(sph(10), c1, [0, 0.27, 0], [0.31 * b, 0.12, 0.21 * b]);                                         // 肩
+        put(cyl(0.5, 0.4, 12), c1, [0, 0.15, 0], [0.285 * b, 0.3, 0.2 * b]);                                // 肩宽腰窄
+        put(sph(10), c1, [0, 0.275, 0], [0.31 * b, 0.1, 0.2 * b]);                                          // 肩
         put(ico(1), h.inner || '#efe9dc', [0, 0.275, 0.062 * b], [0.11, 0.09, 0.07]);                       // 领口露出的中衣
         put(box(), c2, [0.028, 0.2, 0.098 * b], [0.042, 0.2, 0.022], [0.06, 0, 0.5]);                       // 右衽：一条斜的领缘
         put(box(), c2, [-0.05, 0.25, 0.092 * b], [0.04, 0.1, 0.022], [0.1, 0, -0.5]);
         if (h.patch) put(box(), h.patch, [-0.07 * b, 0.13, 0.1 * b], [0.07, 0.06, 0.012], [0, 0, 0.2]);     // 补丁
       }
       if (h.sash !== false) { // 腰带，前面打个结、垂下一截
-        put(cyl(0.5, 0.5, 12), c3, [0, 0.05, 0], [(top === 'bare' ? 0.31 : 0.283) * b, 0.06, (top === 'bare' ? 0.24 : 0.212) * b]);
-        if (top !== 'armor' && top !== 'puppet') { put(box(), c3, [0.035, 0.045, 0.108 * b], [0.065, 0.055, 0.03]); put(box(), c3, [0.035, -0.045, 0.113 * b], [0.038, 0.14, 0.016], [-0.12, 0, 0]); }
+        put(cyl(0.5, 0.5, 12), c3, [0, 0.05, 0], [(top === 'bare' ? 0.31 : top === 'robe' ? 0.25 : 0.27) * b, 0.06, (top === 'bare' ? 0.24 : top === 'robe' ? 0.185 : 0.2) * b]);
+        if (top !== 'armor' && top !== 'puppet') { put(box(), c3, [0.035, 0.045, 0.095 * b], [0.065, 0.055, 0.03]); put(box(), c3, [0.035, -0.045, 0.1 * b], [0.038, 0.14, 0.016], [-0.12, 0, 0]); }
         else put(sph(8), h.buckle || c2, [0, 0.05, 0.108 * b], [0.07, 0.06, 0.03]);
       }
       if (h.back === 'sword') { // 背上的剑：斜插，剑柄露在右肩上
@@ -199,10 +200,10 @@
     return bake(key + ':leg', (put) => {
       if (lg === 'baggy') { put(ico(1), c4, [0, -0.085, 0], [0.135 * k, 0.19, 0.145 * k]); put(cyl(0.5, 0.5, 8), h.wrap || '#d8c8a8', [0, -0.165, 0], [0.085 * k, 0.05, 0.085 * k]); } // 灯笼裤，扎着绑腿
       else if (lg === 'armor') { put(cyl(0.5, 0.44, 8), h.under || tint(h.c1, -0.55), [0, -0.085, 0], [0.11 * k, 0.17, 0.11 * k]); put(cyl(0.44, 0.5, 8), h.c1, [0, -0.125, 0], [0.125 * k, 0.09, 0.125 * k]); put(cyl(0.5, 0.5, 8), h.c2, [0, -0.085, 0], [0.128 * k, 0.016, 0.128 * k]); } // 胫甲
-      else if (lg === 'puppet') { put(cyl(0.5, 0.5, 8), h.c1, [0, -0.085, 0], [0.07, 0.15, 0.07]); put(sph(8), h.c2, [0, -0.01, 0], 0.085); }
+      else if (lg === 'puppet') { put(cyl(0.5, 0.5, 8), h.c1, [0, -0.085, 0], [0.07, 0.15, 0.07]); put(sph(8), h.c2, [0, -0.01, 0], [0.085, 0.085 / LEGK, 0.085]); }
       else if (lg === 'bare') put(cyl(0.5, 0.42, 8), h.skin, [0, -0.09, 0], [0.13 * k, 0.17, 0.13 * k]);
       else put(cyl(0.5, 0.44, 8), c4, [0, -0.09, 0], [0.11 * k, 0.17, 0.115 * k]);
-      put(ico(1), boot, [0, -0.2, 0.022], [0.108 * k, 0.085, 0.165 * k]);                                   // 靴
+      put(ico(1), boot, [0, -0.2425 + 0.05 / LEGK, 0.03], [0.1 * k, 0.1 / LEGK, 0.2 * k]);                  // 靴（腿在拼的时候要拉长 LEGK 倍，这里先压扁）
       if (lg !== 'puppet') put(cyl(0.5, 0.5, 8), tint(boot, 0.18), [0, -0.165, 0], [0.1 * k, 0.03, 0.1 * k]);
     }, 0.8, 1.0);
   }
@@ -217,17 +218,17 @@
         put(ico(1), hand, [0, -0.197, 0], [0.066, 0.045, 0.066]);
       } else if (sl === 'bare') { // 赤膊：粗胳膊，铁拳套
         put(ico(1), h.skin, [0, -0.075, 0], [0.125 * b, 0.19, 0.125 * b]);
-        if (h.fist) { put(ico(1), h.fist, [0, -0.195, 0], [0.16 * b, 0.15, 0.16 * b]); put(cyl(0.5, 0.5, 8), tint(h.fist, 0.25), [0, -0.165, 0], [0.165 * b, 0.025, 0.165 * b]); put(cyl(0.5, 0.5, 8), tint(h.fist, 0.25), [0, -0.225, 0], [0.165 * b, 0.025, 0.165 * b]); }
-        else put(ico(1), hand, [0, -0.19, 0], 0.1 * b);
+        if (h.fist) { put(ico(1), h.fist, [0, -0.195, 0], [0.16 * b, 0.1, 0.16 * b]); put(cyl(0.5, 0.5, 8), tint(h.fist, 0.25), [0, -0.165, 0], [0.165 * b, 0.025, 0.165 * b]); put(cyl(0.5, 0.5, 8), tint(h.fist, 0.25), [0, -0.225, 0], [0.165 * b, 0.025, 0.165 * b]); }
+        else put(ico(1), hand, [0, -0.19, 0], [0.1 * b, 0.062 * b, 0.1 * b]);
       } else if (sl === 'armor') {
         put(cyl(0.5, 0.44, 8), h.under || tint(h.c1, -0.55), [0, -0.085, 0], [0.095 * b, 0.17, 0.095 * b]); put(cyl(0.44, 0.5, 8), h.c1, [0, -0.13, 0], [0.112 * b, 0.075, 0.112 * b]); put(cyl(0.5, 0.5, 8), h.c2, [0, -0.095, 0], [0.115 * b, 0.014, 0.115 * b]); // 护臂
-        put(ico(1), hand, [0, -0.195, 0], 0.085 * b);
+        put(ico(1), hand, [0, -0.195, 0], [0.085 * b, 0.055 * b, 0.085 * b]);
       } else if (sl === 'puppet') {
-        put(sph(8), h.c2, [0, -0.01, 0], 0.085); put(cyl(0.5, 0.5, 8), h.c1, [0, -0.09, 0], [0.06, 0.15, 0.06]); put(sph(8), h.c2, [0, -0.1, 0], 0.07); put(ico(1), hand, [0, -0.19, 0], 0.075);
+        put(sph(8), h.c2, [0, -0.01, 0], [0.085, 0.085 / ARMK, 0.085]); put(cyl(0.5, 0.5, 8), h.c1, [0, -0.09, 0], [0.06, 0.15, 0.06]); put(sph(8), h.c2, [0, -0.1, 0], [0.07, 0.07 / ARMK, 0.07]); put(ico(1), hand, [0, -0.19, 0], [0.075, 0.05, 0.075]);
       } else { // 窄袖，腕上缠着布
         put(cyl(0.5, 0.42, 8), h.c1, [0, -0.08, 0], [0.095, 0.17, 0.095]);
         put(cyl(0.5, 0.5, 8), h.wrap || tint(h.c1, -0.35), [0, -0.15, 0], [0.085, 0.05, 0.085]);
-        put(ico(1), hand, [0, -0.195, 0], 0.075);
+        put(ico(1), hand, [0, -0.195, 0], [0.07, 0.048, 0.07]);
       }
       if (h.claw) for (let i = -1; i <= 1; i++) put(cone(4), '#1c1a20', [i * 0.03, -0.245, 0.02], [0.022, 0.06, 0.022], [PI, 0, 0]);
     }, 0.9, 1.02);
@@ -274,19 +275,19 @@
     const h = TOON[key]; if (!h) return null;
     const c = Mo._ctx(), g = c.g, mat = toonMat(c), glo = h.eyeGlow || h.weapon === 'flame' ? c.glow('#ffffff', { vertexColors: true }) : null, b = h.bulk || 1;
     const body = c.grp([0, 0, 0]);
-    const sk = skirtGeo(key, h); if (sk) mesh(sk, mat, body).scale.set(0.8, 1, 0.8); // 下摆收窄：肩比摆宽，人才挺拔，不像个铃铛
-    const legs = [-1, 1].map((sx) => { const lg = c.grp([sx * 0.068 * b * SLIM, HIP, 0], body); mesh(legGeo(key, h), mat, lg).scale.set(SLIM, LEGK, SLIM); return lg; });
-    const torso = c.grp([0, HIP, 0], body); mesh(torsoGeo(key, h), mat, torso).scale.set(SLIM * 1.07, TY, SLIM * 0.96);
-    mesh(bake('neck:' + h.skin, (put) => put(cyl(0.5, 0.5, 8), h.skin, [0, NECK - HIP + 0.012, 0], [0.078, 0.07, 0.078]), 1, 1), mat, torso, false); // 颈
+    const sk = skirtGeo(key, h); if (sk) mesh(sk, mat, body).scale.set(0.7, 1, 0.7); // 下摆收窄：肩比摆宽，人才挺拔，不像个铃铛
+    const legs = [-1, 1].map((sx) => { const lg = c.grp([sx * 0.068 * b * SLIM, HIP, 0], body); mesh(legGeo(key, h), mat, lg).scale.set(SLIM * 0.97, LEGK, SLIM * 0.97); return lg; });
+    const torso = c.grp([0, HIP, 0], body); mesh(torsoGeo(key, h), mat, torso).scale.set(SLIM * 1.06, TY, SLIM * 0.97);
+    mesh(bake('neck:' + h.skin, (put) => put(cyl(0.5, 0.5, 8), h.skin, [0, NECK - HIP + 0.012, 0], [0.066, 0.06, 0.066]), 1, 1), mat, torso, false); // 颈
     const head = c.grp([0, NECK - HIP + 0.03, 0], torso), [hg, eg] = headGeo(key, h);
     mesh(hg, mat, head); if (eg) mesh(eg, glo, head, false);
     head.scale.setScalar(HS * (h.headS || 1));
-    const ax = (0.135 * b + 0.025) * SLIM * 1.07, ay = NECK - HIP - 0.06;
-    const arms = [-1, 1].map((sx) => { const a = c.grp([sx * ax, ay, 0], torso); mesh(armGeo(key, h, sx), mat, a).scale.set(SLIM * 0.95, ARMK, SLIM * 0.95); return a; });
+    const ax = (0.135 * b + 0.025) * SLIM * 1.06, ay = NECK - HIP - 0.05;
+    const arms = [-1, 1].map((sx) => { const a = c.grp([sx * ax, ay, 0], torso); mesh(armGeo(key, h, sx), mat, a).scale.set(SLIM * 0.92, ARMK, SLIM * 0.92); return a; });
     const W = weaponGeo(key, h), wr = c.grp([0, -0.2 * ARMK, 0], arms[1]);
     if (W.hand) mesh(W.hand, mat, wr); if (W.glow) mesh(W.glow, glo, wr, false);
     if (W.side) { const sd = c.grp([(ax + 0.085) * 1, -HIP, 0.09], torso); mesh(W.side, mat, sd); }
-    const sc = (h.s || 1) * (o.scale || 1); g.scale.setScalar(sc);
+    const sc = (h.s || 1) * (o.scale || 1) * TALL; g.scale.setScalar(sc);
     const act = h.act || 'chop', rest = h.rest !== undefined ? h.rest : W.side ? -0.75 : W.hand ? -0.3 : 0, spread = 0.2 + (b - 1) * 0.25, ph = Math.random() * 6.28;
     return Mo._finish(c, 1.02 * sc, function (e) {
       const t = (e.t || 0) + ph, mv = e.moving ? 1 : 0, wind = Math.min(1, e.wind || 0), atk = Math.min(1, e.atk || 0), dash = e.charge || e.dashing ? 1 : 0;
@@ -296,7 +297,7 @@
         arms[0].rotation.set(-1.45 + br * 0.03, 0, 0.08); arms[1].rotation.set(-1.45 - br * 0.03 - atk * 0.5 + wind * 0.3, 0, -0.08);
         torso.rotation.x = atk * 0.25 - wind * 0.1; head.rotation.x = 0; return;
       }
-      legs[0].rotation.x = s * 0.56; legs[1].rotation.x = -s * 0.56; // 腿长了，摆幅收一点
+      legs[0].rotation.x = s * 0.5; legs[1].rotation.x = -s * 0.5; // 腿长了，摆幅收一点
       body.position.y = mv ? Math.abs(Math.cos(t * sp)) * 0.022 : br * 0.004;
       body.rotation.z = s * 0.035;
       let wx; // 出手的那只手
@@ -319,19 +320,19 @@
     hero: { skin: SK, hair: '#1e1c24', head: 'bun', ribbon: '#cfe6d4', c1: '#3f8f86', c2: '#e3f1e6', c3: '#2b3338', c4: '#30383c', lower: 'robe', sleeve: 'wide', back: 'sword', act: 'cast' },
     thug: { skin: TAN, hair: '#5a3a26', head: 'band', hat: '#b83228', brow: 'angry', c1: '#8a5a3a', c2: '#5a3a26', c3: '#b83228', c4: '#4a3428', lower: 'tunic', leg: 'baggy', sleeve: 'narrow', wrap: '#d8c8a8', patch: '#6a4630', weapon: 'saber' },
     archer: { skin: TAN, hair: '#2a2420', head: 'hood', hat: '#6a6252', face: '#c89a70', brow: 'flat', c1: '#74705c', c2: '#4a4638', c3: '#3a3028', c4: '#4a4438', lower: 'tunic', leg: 'baggy', sleeve: 'narrow', back: 'quiver', weapon: 'bow', act: 'shoot', rest: -0.5 },
-    ironslave: { skin: '#9a969c', head: 'bald', muzzle: '#4a474e', scar: '#b04038', brow: 'angry', top: 'bare', collar: '#4a474e', chain: '#5a575e', c1: '#5a4e4a', c2: '#3a3432', c3: '#6a5a4a', lower: 'none', leg: 'pants', c4: '#4a4244', sleeve: 'bare', fist: '#4a474e', bulk: 1.45, s: 1.22, headS: 0.86 },
+    ironslave: { skin: '#9a969c', head: 'bald', muzzle: '#4a474e', scar: '#b04038', brow: 'angry', top: 'bare', collar: '#4a474e', chain: '#5a575e', c1: '#5a4e4a', c2: '#3a3432', c3: '#6a5a4a', lower: 'none', leg: 'pants', c4: '#4a4244', sleeve: 'bare', fist: '#4a474e', bulk: 1.45, s: 1.22, headS: 1.12 },
     disciple: { skin: '#f8dccc', hair: '#3a2c30', head: 'tail', ribbon: '#8fb4ee', pin: '#c8d8f4', c1: '#eef0fa', c2: '#8fb0e8', c3: '#7a9ae0', c4: '#d8dcec', boot: '#e8ecf6', lower: 'robe', sleeve: 'wide', weapon: 'sword', guard: '#c8d8f4', act: 'cast', rest: -0.2 },
     ghostcult: { skin: '#c4d0c0', face: '#9aa898', head: 'hood', hat: '#232a26', c1: '#2a332e', c2: '#5fd898', c3: '#141a16', c4: '#1c221e', lower: 'robe', sleeve: 'wide', weapon: 'banner', act: 'cast' },
     bloodguard: { skin: '#c8a090', head: 'helmMask', hat: '#8a2428', hat2: '#c8a04a', plume: '#c83030', mask: '#3a2a2a', top: 'armor', c1: '#9a262c', c2: '#d0a84a', c3: '#2a1214', under: '#2c1418', lower: 'tasset', leg: 'armor', sleeve: 'armor', hand: '#3a2a2a', weapon: 'glaive', bulk: 1.08, s: 1.06 },
     flamecult: { skin: '#ecd0c4', hair: '#2c2238', head: 'bun', ribbon: '#a060f0', brow: 'angry', c1: '#2e2640', c2: '#a060f0', c3: '#6a3ab0', c4: '#201a2c', lower: 'robe', sleeve: 'wide', weapon: 'flame', flame: '#b070ff', act: 'cast', rest: -0.9 },
     ironcorpse: { skin: '#8e9cac', head: 'qing', eye: '#f4f4f4', c1: '#2a3350', c2: '#c8a04a', c3: '#a83030', c4: '#1e2438', lower: 'robe', sleeve: 'wide', hand: '#8e9cac', claw: 1, stiff: 1, bulk: 1.15, s: 1.18 },
     puppetarcher: { skin: '#c8a070', hair: '#6a4a30', metal: '#b08a4a', head: 'puppet', eyeGlow: '#6affea', top: 'puppet', c1: '#5a4030', c2: '#b08a4a', c3: '#a83030', lower: 'tunic', skirt: '#4a3428', leg: 'puppet', sleeve: 'puppet', hand: '#b08a4a', weapon: 'crossbow', act: 'shoot', rest: -0.6 },
-    golem: { skin: '#9aa4b0', head: 'helm', hat: '#8a94a2', hat2: '#6a7482', horn: 1, eyeGlow: '#6ad0ff', face: '#7a8492', top: 'armor', moss: '#6a8a54', c1: '#98a2b0', c2: '#5a6472', c3: '#4a5462', under: '#727c8a', lower: 'tasset', leg: 'armor', sleeve: 'armor', hand: '#7a8492', boot: '#6a7482', weapon: 'halberd', bulk: 1.4, s: 1.42, headS: 0.82 },
+    golem: { skin: '#9aa4b0', head: 'helm', hat: '#8a94a2', hat2: '#6a7482', horn: 1, eyeGlow: '#6ad0ff', face: '#7a8492', top: 'armor', moss: '#6a8a54', c1: '#98a2b0', c2: '#5a6472', c3: '#4a5462', under: '#727c8a', lower: 'tasset', leg: 'armor', sleeve: 'armor', hand: '#7a8492', boot: '#6a7482', weapon: 'halberd', bulk: 1.4, s: 1.42, headS: 1.1 },
     corpse: { skin: '#9aa884', head: 'helm', hat: '#6a8a5c', hat2: '#a8904a', eyeGlow: '#b8ff7a', face: '#7c8a68', top: 'armor', c1: '#6f9a64', c2: '#b89a4a', c3: '#3c4a30', under: '#38442e', lower: 'tasset', leg: 'armor', sleeve: 'armor', hand: '#7c8a68', boot: '#4a5a3c', weapon: 'bronze', guard: '#a8904a', bulk: 1.15, s: 1.12 },
     modaifu: { skin: '#e4d0b8', hair: '#a8a8ac', head: 'elder', ribbon: '#3a3a40', beard: '#b8b8bc', brow: 'flat', browC: '#a8a8ac', c1: '#5a5e68', c2: '#c9ccd4', c3: '#2e3038', c4: '#3a3c44', lower: 'robe', sleeve: 'wide', handR: '#dfe6f0', act: 'chop', rest: -0.2 },
     wangchan: { skin: '#f2dcd4', hair: '#261a1e', head: 'tail', ribbon: '#c83040', hatTop: '#e0b84a', brow: 'angry', c1: '#8a1a26', c2: '#e0b84a', c3: '#1e1214', c4: '#2a1418', lower: 'robe', sleeve: 'wide', back: 'cape', cape: '#3a1218', act: 'cast' },
     jiyin: { skin: '#b8c6b4', hair: '#e8ece8', head: 'long', beard: '#e8ece8', hatTop: '#2a332e', brow: 'angry', browC: '#e8ece8', c1: '#24322c', c2: '#6ae89a', c3: '#141c18', c4: '#1a221e', lower: 'robe', sleeve: 'wide', weapon: 'staff', act: 'cast' },
-    pet_quhun: { skin: '#8a7a70', head: 'bamboo', hat: '#c8a468', brow: 'flat', c1: '#2a282c', c2: '#3a383c', c3: '#1a181c', c4: '#222024', lower: 'tunic', leg: 'baggy', wrap: '#2a282c', sleeve: 'narrow', bulk: 1.32, s: 1.2, headS: 0.88 },
+    pet_quhun: { skin: '#8a7a70', head: 'bamboo', hat: '#c8a468', brow: 'flat', c1: '#2a282c', c2: '#3a383c', c3: '#1a181c', c4: '#222024', lower: 'tunic', leg: 'baggy', wrap: '#2a282c', sleeve: 'narrow', bulk: 1.32, s: 1.2, headS: 1.08 },
     pet_renxing: { skin: '#eadcc0', hair: '#6a4a34', metal: '#c8a058', head: 'puppet', top: 'puppet', c1: '#e6d8b8', c2: '#c8a058', c3: '#7ab0a8', lower: 'tunic', skirt: '#efe6d0', leg: 'puppet', sleeve: 'puppet', hand: '#c8a058', weapon: 'bow', bowC: '#c8a058', act: 'shoot', rest: -0.5, s: 0.96 },
   };
   Mo.toon = (key, o) => (G.DH ? build(key, o) : null);
